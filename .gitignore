@@ -1,5 +1,7 @@
 node_modules/
 vendor/
+vendor_local/
+writable/
 .env
 .env.*
 build/
