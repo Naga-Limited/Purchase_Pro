@@ -1,0 +1,8 @@
+node_modules/
+vendor/
+.env
+.env.*
+build/
+dist/
+*.log
+*.zip

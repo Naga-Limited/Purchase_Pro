@@ -1,0 +1,340 @@
+import { Badge } from "reactstrap";
+import { toast } from "react-toastify";
+import React from "react";
+import { ElapsedTimer } from "../../../views/common/ElapsedTimer";
+export const containerTypeMaster = [
+  {
+    value: "HIGH CUBE",
+    label: "HIGH CUBE",
+  },
+  {
+    value: "STANDARD",
+    label: "STANDARD",
+  },
+];
+
+export const statusCode = {
+  REDIRECT_GATEOUT: 18,
+  IRS_COMPELTE: 17,
+  RECEIVER_GATE_IN: 16,
+  INTRANSIT: 15,
+  PICKSLIP: 14,
+  LOADING: 13,
+  COMPLETED: 12,
+  REJECTED_GATE_OUT: 11,
+  PORT_RECEIPT: 10,
+  PORT_DISPTACH_INFO: 9,
+  YARD_DISPTACH_INFO: 8,
+  MIGO_COMPLETED: 7,
+  GATEOUT: 5,
+  UNLOAD: 4,
+  QC_CHECK: 2,
+  IN: 1,
+  FirstWeight:23,
+  SecondWeight:24
+};
+
+export const status = {
+  1: { title: "Waiting for IN", color: "light-primary" },
+  2: { title: "QC Check", color: "light-success" },
+  3: { title: "QC Deduction", color: "light-success" },
+  4: { title: "Unload", color: "light-success" },
+  5: { title: "Gate Out", color: "light-success" },
+  6: { title: "MIGO Approval", color: "light-success" },
+  7: { title: "MIGO Approval Completed", color: "light-success" },
+  8: { title: "Yard/WH Dispatch", color: "light-success" },
+  9: { title: "Port Dispatch", color: "light-success" },
+  10: { title: "Port Receipt", color: "light-success" },
+  11: { title: "Rejected Gate Out", color: "light-success" },
+  12: { title: "Completed", color: "light-success" },
+  13: { title: "Loading", color: "light-success" },
+  14: { title: "Pickslip", color: "light-success" },
+  15: { title: "Intransit", color: "light-success" },
+  16: { title: "Receiver Gate In", color: "light-success" },
+  17: { title: "IAS Complete", color: "light-success" },
+  18: { title: "Redirect Gate Out", color: "light-success" },
+  21: { title: "QC Check After Unload", color: "light-success" },
+  22: { title: "Quality Deduction Approval", color: "light-success" },
+  23: { title: "First Weight Entry", color: "light-success" },
+  24: { title: "Second Weight Entry", color: "light-success" },
+};
+//4,13,14
+export const taColumns = [
+  {
+    name: "Warehouse Code",
+    selector: "WH_CODE",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "Warehouse",
+    selector: "WH_NAME",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "Lot No",
+    selector: "lotnomaster",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+
+  {
+    name: "Maximum Capacity",
+    selector: "maxcapacity",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+
+  {
+    name: "Total Capacity",
+    selector: "totalcapacity",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+ 
+  /*{
+    name: "Segment",
+    selector: "Segment",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "Wheat Variety",
+    selector: "WheatVariety",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "Bag Name",
+    selector: "BAG_NAME",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+ 
+  {
+    name: "Bag Code",
+    selector: "BAG_CODE",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "Fumigation Type",
+    selector: "Fumigation_Type",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },*/
+
+
+];
+
+export const WPColumns = [
+  {
+    name: "Movement Group No",
+    selector: "movementgroupno",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "Warehouse",
+    selector: "FromWH",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+ 
+  {
+    name: "Plant",
+    selector: "FromPlant",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "Storage Location",
+    selector: "STORAGE_LOCATION",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "Lot No",
+    selector: "FromLotNo",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "Wheat Variety",
+    selector: "WheatVariety",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "Actual Qty",
+    selector: "actualmvtqty",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "R & D Confirment Qty",
+    selector: "rndconfirmqty",
+   //style:row.RndSkipFlag == 1 ? "color:blue" :"color:red",
+   style: (row) => {
+    return row.RndSkipFlag == 1 ? "color:blue" : "color:green";
+  },
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "Fumigation Cleared Qty",
+  selector: "fumigationclearedqty",
+  style: (row) => {
+    return row.FumigationSkipFlag == 1 ? "color:blue" : "color:green";
+  },
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "KeyLoan DO Qty",
+    selector: "keyloandoqty",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "Movement Qty",
+    selector: "planqty",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  /*{
+    name: "Mixing Ratio",
+    selector: "mixing_ratio",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "Actual Mvt Qty",
+    selector: "actualmvtqty",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },*/
+  {
+    name: "Valid From",
+    selector: "validfrom",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "Valid To",
+    selector: "validto",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "Week",
+    selector: "weekno",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "Division",
+    selector: "Division",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+  {
+    name: "Restrict",
+    selector: "restrict_mode",
+    sortable: true,
+    minWidth: "200px",
+    wrap: true,
+  },
+ 
+  
+
+  
+ 
+
+];
+export const errorToast = (msg) => {
+  toast.error(msg, { position: toast.POSITION.BOTTOM_CENTER, autoClose: 3000 });
+  
+};
+
+export const ShowToast = (msg) => {
+  toast.success(msg, { position: toast.POSITION.TOP_RIGHT, autoClose: 2000 });
+  
+};
+export function roundOf(val) {
+  return val && !isNaN(Number(val)) ? Math.round(Number(val)) : val;
+}
+export function roundOf_3(val) {
+  if(isNaN(val)){
+    val=0;
+  }
+  return parseFloat(val).toFixed(3);
+}
+
+export const LastDayOfMonth = function(y,m){
+  return  new Date(y, m +1, 0).getDate();
+  };
+
+export const MonthArray=[
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/******
+ * Usage : ClearDropdown("WH/PLANT/SL/LOT",form, 'locationid', 'storagelocationid', 'lotid', '');
+ */
+export const ClearDropdown = (Item,form, plantid, locationid, lotid, wheatvarietyid) => {
+  if (Item === "WH"){
+    if(plantid!='') form.setFieldValue(plantid, '');
+    if(locationid!='') form.setFieldValue(locationid,'');
+    if(lotid!='') form.setFieldValue(lotid, '');
+    if(wheatvarietyid!='') form.setFieldValue(wheatvarietyid, '');
+  }else if (Item === "PLANT"){
+    if(locationid) form.setFieldValue(locationid,'');
+    if(lotid) form.setFieldValue(lotid, '');
+    if(wheatvarietyid) form.setFieldValue(wheatvarietyid, '');
+  }else if (Item === "SL"){
+    if(lotid) form.setFieldValue(lotid, '');
+    if(wheatvarietyid!="") form.setFieldValue(wheatvarietyid, '');
+  }else if (Item === "LOT"){
+    if(wheatvarietyid) form.setFieldValue(wheatvarietyid, '');
+  }
+}

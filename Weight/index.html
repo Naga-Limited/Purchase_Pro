@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Foresight Serial Communication</title>
+  <meta http-equiv="origin-trial" content="AiM0rMslVx2jumsJjQ144QeZTScNmGVMYzBuXoaMQwCd7UHWbQH8Rg20adCN7XWaTMai4HvsUIyx3+blPPiupwEAAABreyJvcmlnaW4iOiJodHRwczovL3VuamF2YXNjcmlwdGVyLXdlYi1zZXJpYWwtZXhhbXBsZS5nbGl0Y2gubWU6NDQzIiwiZmVhdHVyZSI6IlNlcmlhbCIsImV4cGlyeSI6MTU5Njk3OTA1NX0=">
+  <style>
+    .repo-link {
+      position: fixed;
+      bottom: 0;
+      right: 0;
+      margin: 0 1rem 1rem 0;
+    }
+  </style>
+</head>
+<body>
+<br><br><br><br>
+  <button id="connect-to-serial">Connect to Scale</button>
+  <button id="get-serial-messages">Get Weight</button>
+  <div>
+    <form id="message-form">
+      <input style="display:none;" type="text" id="message-input" disabled="true">
+      <button style="display:none;" type="submit" id="submit-button" disabled="true">Send</button>
+      <br><input type="text" id="txtWeight" style="font-size:24px;">
+    </form>
+  </div>
+  <div id="serial-messages-container"></div>
+  
+  <div class="repo-link">
+    <a href="https://github.com/UnJavaScripter/web-serial-example">Foresight Technologies</a>
+  </div>
+
+  <script src="./app.js"></script>
+  <script>
+    const serialLEDController = new SerialLEDController();
+    const connect = document.getElementById('connect-to-serial');
+    const getSerialMessages = document.getElementById('get-serial-messages');
+    const messageForm = document.getElementById('message-form');
+    const messageInput = document.getElementById('message-input');
+    const submitButton = document.getElementById('submit-button');
+    const serialMessagesContainer = document.getElementById('serial-messages-container');
+
+    connect.addEventListener('pointerdown', () => {
+      serialLEDController.init();
+
+      serialMessagesContainer.removeAttribute('disabled');
+      messageInput.removeAttribute('disabled');
+      submitButton.removeAttribute('disabled');
+	  
+    });
+
+    messageForm.addEventListener('submit', event => {
+      event.preventDefault();
+      serialLEDController.write(event.target.firstElementChild.value);
+      getSerialMessage();
+    });
+
+    getSerialMessages.addEventListener('pointerdown', async () => {
+      getSerialMessage();
+    });
+a=0;
+    async function getSerialMessage() {
+	await serialLEDController.read();
+      ////serialMessagesContainer.innerText += await serialLEDController.read() + '\n';
+	  if(a==0)
+	  {
+	  //setInterval(function(){ getSerialMessage(); }, 1000);
+	  a=1;
+	  }
+    }
+
+  </script>
+</body>
+</html>

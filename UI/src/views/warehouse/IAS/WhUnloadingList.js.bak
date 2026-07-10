@@ -1,0 +1,125 @@
+import React, { useState } from "react";
+import { useHistory } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { useEffect } from "react";
+import { useLoader } from "../../../utility/hooks/useLoader";
+
+import { Card, CardBody, CardHeader, CardTitle } from "reactstrap";
+import { Button, Row, Col } from "reactstrap";
+import { CustomDropdownInput, CustomTextInput } from "../../forms/custom-form";
+import TableComponent from "../../common/TableComponent";
+import { useFormik } from "formik";
+import { RefreshBlock } from "../../common/RefreshBlock";
+import { BASE_URL, apiBaseUrl } from "../../../urlConstants";
+import { errorToast, ShowToast } from "../common/appHelper";
+import { apiPostMethod } from "../../../helper/axiosHelper";
+
+const WhUnloadingList = () => {
+    let { showLoader, hideLoader } = useLoader();
+    
+    const form = useFormik({
+        isInitialValid: false,
+        initialValues: {},
+        // validationSchema: getValidationSchema(dispatchDetails, isReceivingGateOut),
+    });
+
+    const taColumns = [
+        {
+            name: "VA No",
+            selector: "VA_No",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Vehicle No",
+            selector: "Truck_No",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Driver No",
+            selector: "Driver_No",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Overall Duration",
+            selector: "",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Screen Duration",
+            selector: "",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Waiting AT",
+            selector: "",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Plant",
+            selector: "",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Action",
+            selector: "",
+            minWidth: "150px",
+            cell: (row) => {
+                return  (
+                  <Button.Ripple color="primary"  /*onClick={() => ViewRelot(row.RelotId)}*/ >
+                    {"Edit"}
+                  </Button.Ripple>
+                );
+            }
+        },
+    ];
+
+    let id=0;
+    useEffect(() => { 
+        getReportList();
+      }, []);
+
+
+    const getReportList = (FilterData)=>{
+        let fdata = {FilterData};
+        showLoader();
+        apiPostMethod(apiBaseUrl+'warehouse/Master/getReportList', fdata)
+          .then((response) => {
+            const { data } = response;
+            if (data.success) {
+                form.setValues({
+                    ...form.values, CheckList: data.results
+                });
+            }else{
+                errorToast("Data Not Found !!!");      
+            }
+        })
+        .catch((error) => {
+          errorToast("Something went wrong, please try again after sometime");
+        })
+        .finally((a) => {
+          hideLoader();
+        });
+    }
+
+    return (
+        <div>
+            <RefreshBlock />
+            <Card>
+                <CardHeader>
+                    <CardTitle>{"Unloading WH Incharge - List"}</CardTitle>
+                </CardHeader>
+                <CardBody>
+                    <TableComponent columns={taColumns} data ={form.values.CheckList} formType="Report" />
+                </CardBody>
+            </Card>
+        </div>
+    )
+};
+export default WhUnloadingList;

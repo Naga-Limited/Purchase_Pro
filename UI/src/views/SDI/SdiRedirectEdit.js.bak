@@ -1,0 +1,405 @@
+import { Card, CardBody, FormGroup, Row, Col, Input, Button, Label } from "reactstrap";
+import { Delete, Paperclip } from "react-feather";
+import { apiBaseUrl, previewUrl, sdisdUrl } from "../../urlConstants";
+import { errorToast } from "@helpers/appHelper";
+import React, { useState, useEffect } from "react";
+import { useHistory, useParams } from "react-router";
+import { apiPostMethod } from "@helpers/axiosHelper";
+
+import { roundOf } from "../../helper/appHelper";
+import { useFormik } from "formik";
+import { CustomDropdownInput, validation, Yup } from "../forms/custom-form";
+import { getTextElement } from "../../@core/components/custom/input-control";
+import { useLoader } from "../../utility/hooks/useLoader";
+const TruckMdl = "14";
+const RackMdl = "13";
+const ContrMdl = "12";
+
+const SdiRedirectEdit = () => {
+  const history = useHistory();
+  let { id } = useParams();
+  let refid = id.replace(":", "");
+
+  let DeleteId="";
+  let Splrefid=refid.split("-");
+  if(Splrefid.length>1){
+   if(Splrefid[0]=="Delete"){
+     DeleteId=Splrefid[1];
+     id="";
+   }
+  }
+
+
+  let { showLoader, hideLoader } = useLoader();
+
+  const form = useFormik({
+    isInitialValid: false,
+    initialValues: {},
+    validationSchema: Yup.object().shape({
+      LINE_ITEM: validation.required(),
+    }),
+    onSubmit(values) {},
+  });
+  const values = form.values;
+
+  const [poData, setPOData] = useState({});
+  const [vehicalDatas, setvehicalDatas] = useState([]);
+  const [poLineOptions, setPOLinedata] = useState([]);
+  useEffect(() => {
+    if (id) {
+      onFetchSDIdetailsById();
+    }
+  }, [id]);
+  useEffect(() => {
+    if (DeleteId) {
+      SDIDeleteById();
+    }
+  }, [DeleteId]);
+
+ 
+
+  useEffect(() => {
+    if (values.LINE_ITEM) {
+      onFetchPOdetails();
+    }
+  }, [values.LINE_ITEM]);
+
+  useEffect(() => {
+    if (poData.PURCHASE_ORG) {
+      addTblRecord();
+    }
+  }, [poData.PURCHASE_ORG]);
+
+  const SDIDeleteById = ()=>{
+   
+    let fdata = {
+      id: DeleteId,
+    };
+    showLoader();
+    apiPostMethod(apiBaseUrl + "sdi/Deletesdi", fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          history.push(`/SDIR`);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      })
+      .finally((a) => {
+        hideLoader();
+      });
+
+  }
+  const onFetchSDIdetailsById = () => {
+    let fdata = {
+      id: refid,
+    };
+    showLoader();
+    apiPostMethod(apiBaseUrl + "sdi/getsdiDetailsById", fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          let { LINE_ITEM, ...sResult } = data.results[0];
+          setPOData({
+            ...poData,
+            ...sResult,
+            LINE_ITEM,
+          });
+          onFetchPOLine(sResult.ZPO_NUMBER, sResult.ZSUPPLIER_CODE);
+          form.setFieldValue("LINE_ITEM", { label: LINE_ITEM, value: LINE_ITEM });
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      })
+      .finally((a) => {
+        hideLoader();
+      });
+  };
+  const onFetchPOdetails = () => {
+    let fdata = { PO_NUMBER: poData.ZPO_NUMBER, ZPO_LINE_ITEM: values.LINE_ITEM.value, ZSUPPLIER_CODE: poData.ZSUPPLIER_CODE };
+    apiPostMethod(sdisdUrl, fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success && data.results.length) {
+          const { results } = data;
+          setPOData({ ...poData, ...results[0] });
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });
+  };
+
+  const onFetchPOLine = (PO_number, ZSUPPLIER_CODE) => {
+    let fdata = { PO_NUMBER: PO_number, ZSUPPLIER_CODE: ZSUPPLIER_CODE };
+    apiPostMethod(apiBaseUrl + "sdi/getsdiPOLines", fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          setPOLinedata([{ options: data.results }]);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });
+  };
+
+  const onSubmitSD = () => {
+    if (!form.isValid) {
+      form.setSubmitting(true);
+      form.validateForm();
+      return;
+    }
+    let formData = form.values;
+    if (poData.LINE_ITEM === formData.LINE_ITEM.value) {
+      resetForm();
+      return;
+    }
+    const postdata = {
+      id: refid,
+      lineItem: formData.LINE_ITEM.value,
+      plantId: poData.plant_id,
+    };
+    showLoader();
+    apiPostMethod(apiBaseUrl + "sdi/updatesdiPOLine", postdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          resetForm();
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      })
+      .finally((a) => {
+        hideLoader();
+      });
+  };
+  const resetForm = () => {
+    history.push(`/SDIR`);
+  };
+
+  const openAttach = (url) => {
+    //window.open(previewUrl + url, "_blank");
+    window.open(previewUrl +"pdfview.php?fn="+ url, "_blank");
+  };
+
+  const addTblRecord = () => {
+    const {
+      PURCHASE_ORG,
+      VEHICAL_NO,
+      WB_QTY,
+      WB_DT,
+      WB_COPY,
+      INV_COPY,
+      SEAL_NO,
+      NO_OF_WAGON,
+      ZSUPPLIER_INV_RATE,
+      ZSUPPLIER_INV_NO,
+      ZSUPPLIER_INV_DT,
+      ZSUPPLIER_INV_QTY,
+    } = poData;
+
+    const basicObj = {
+      VEHICAL_NO,
+      INV_COPY,
+      WB_COPY,
+      WB_QTY,
+      WB_DT,
+      ZSUPPLIER_INV_RATE,
+      ZSUPPLIER_INV_NO,
+      ZSUPPLIER_INV_DT,
+      ZSUPPLIER_INV_QTY,
+    };
+    const vhType = {
+      [TruckMdl]: { ...basicObj },
+      [ContrMdl]: { SEAL_NO, ...basicObj },
+      [RackMdl]: { VEHICAL_NO, NO_OF_WAGON, INV_COPY, WB_COPY },
+    };
+    const vhTA = { ...vhType[PURCHASE_ORG] };
+    let vd = [];
+    vd.push(vhTA);
+    setvehicalDatas(vd);
+  };
+
+  const renderHeader = (vehicleId) => {
+    const headObj = { [TruckMdl]: "Truck Details", [ContrMdl]: "Container Details", [RackMdl]: "Rake Details" };
+    return (
+      <Row className="p-0">
+        <Col md="12" sm="12">
+          <h5>{headObj[vehicleId]}</h5>
+        </Col>
+      </Row>
+    );
+  };
+  const renderSupplierInvoiceDetails = (info) => {
+    return (
+      <>
+        {getTextElement("Invoice Rate (In Kgs)", info.ZSUPPLIER_INV_RATE, "3")}
+        {getTextElement("Invoice No", info.ZSUPPLIER_INV_NO, "2")}
+        {getTextElement("Invoice Date", info.ZSUPPLIER_INV_DT, "2")}
+        {getTextElement("Invoice Qty (In Kgs)", info.ZSUPPLIER_INV_QTY, "3")}
+      </>
+    );
+  };
+  const renderContExtraFields = () => {
+    const { VESSEL_NAME, VESSEL_NO, FUMIGATION } = poData;
+    return (
+      <Row className="col-12 m-0 p-0">
+        {getTextElement("Vessel Name", VESSEL_NAME, "3")}
+        {getTextElement("Vessel Number", VESSEL_NO, "3")}
+        {getTextElement("Fumigation", FUMIGATION, "3")}
+      </Row>
+    );
+  };
+  const renderBody = (vehicleId) => {
+    return (
+      <Col md="12" sm="12" className="p-0 mt-2">
+        {vehicalDatas &&
+          vehicalDatas.length &&
+          vehicalDatas.map((item, i) => {
+            return (
+              <div key={vehicleId + "_" + i}>
+                <Row className="col-12 p-0 m-0">
+                  <Col md="2" sm="12">
+                    <FormGroup>
+                      {vehicleId === TruckMdl ? (
+                        <Label>Truck No</Label>
+                      ) : vehicleId === ContrMdl ? (
+                        <Label>Container No</Label>
+                      ) : (
+                        <Label>RR No</Label>
+                      )}
+                      <Input type="text" value={item.VEHICAL_NO} disabled />
+                    </FormGroup>
+                  </Col>
+                  {vehicleId === ContrMdl ? <>{getTextElement("Seal No", item.SEAL_NO, "2")}</> : ""}
+                  {vehicleId === RackMdl ? <>{getTextElement("No of Wagon", item.NO_OF_WAGON, "2")}</> : ""}
+                  {vehicleId === TruckMdl || vehicleId === ContrMdl ? (
+                    <>
+                      {getTextElement("Supplier WB qty (In Kgs)", item.WB_QTY, "3")}
+                      {getTextElement("Supplier WB date", item.WB_DT, "2")}
+                    </>
+                  ) : (
+                    ""
+                  )}
+
+                  {renderSupplierInvoiceDetails(item)}
+                  <Col md="2" sm="12">
+                    <FormGroup>
+                      <Label className="d-block" for="nameMulti" title="Supplier Invoice Copy">
+                        Inv Copy
+                      </Label>
+                      <Button.Ripple outline color="primary" onClick={(e) => openAttach(item.INV_COPY)}>
+                        <Paperclip size={14} />
+                        <span className="align-middle ml-25">View</span>
+                      </Button.Ripple>
+                    </FormGroup>
+                  </Col>
+                  <Col md="2" sm="12">
+                    <FormGroup>
+                      <Label className="d-block" for="nameMulti" title="Supplier WB Copy">
+                        WB Copy
+                      </Label>
+                      <Button.Ripple outline color="primary" onClick={(e) => openAttach(item.WB_COPY)}>
+                        <Paperclip size={14} />
+                        <span className="align-middle ml-25">View</span>
+                      </Button.Ripple>
+                    </FormGroup>
+                  </Col>
+                </Row>
+
+                <Col sm={12}>
+                  <hr />
+                </Col>
+              </div>
+            );
+          })}
+      </Col>
+    );
+  };
+  const renderVehicals = (vehicleId) => {
+    return (
+      <Card>
+        <CardBody>
+          {renderHeader(vehicleId)}
+          {vehicleId === ContrMdl ? renderContExtraFields() : ""}
+          {renderBody(vehicleId)}
+        </CardBody>
+      </Card>
+    );
+  };
+
+  const {
+    ZPO_NUMBER,
+    ZSUPPLIER_NAME,
+    BROCKER_NAME,
+    IDNLF,
+    MATNR,
+    NETPR,
+    PLANT_NAME,
+    STORAGE_LOCATION,
+    INCO_DESC,
+    POLOADINGDATE,
+    VEHICLETYPE,
+    PO_Bag_Type,
+    PURCHASE_ORG,
+    LINER_NAME,
+    ZSUPPLIER_LOAD_POINT,
+    ZSUPPLIER_LOAD_DT,
+    EDA,
+  } = poData;
+  return (
+    <div>
+      {PURCHASE_ORG && renderVehicals(PURCHASE_ORG)}
+      <Card>
+        <CardBody>
+          <div>
+            <Row>
+              <Col md="12" sm="12">
+                <h5>{"Supplier Dispatch Redirect"}</h5>
+              </Col>
+              {getTextElement("PO Number", ZPO_NUMBER)}
+              <Col md="4" sm="12">
+                <CustomDropdownInput options={poLineOptions} label={"PO Line Item"} form={form} id="LINE_ITEM" />
+              </Col>
+              {getTextElement("Supplier Name", ZSUPPLIER_NAME)}
+              {getTextElement("Inco Terms", INCO_DESC)}
+              {getTextElement("Broker Name", BROCKER_NAME)}
+              {getTextElement("Wheat Variety", IDNLF)}
+              {getTextElement("PO Rate", roundOf(NETPR))}
+              {getTextElement("Receiving Storage Location", STORAGE_LOCATION)}
+              {getTextElement("Receiving Plant", PLANT_NAME)}
+              {getTextElement("PO Bag Type", PO_Bag_Type)}
+              {getTextElement("Purchase PO org", VEHICLETYPE)}
+              {getTextElement("Liner Name", LINER_NAME)}
+              {getTextElement("PO Loading Date", POLOADINGDATE)}
+              {getTextElement("Material NO", MATNR)}
+              {getTextElement("Supplier Loading Point", ZSUPPLIER_LOAD_POINT)}
+              {getTextElement("Supplier Loading Date", ZSUPPLIER_LOAD_DT)}
+              {getTextElement("EDA", EDA)}
+            </Row>
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <Col sm="12" className="my-1">
+          <FormGroup className="d-flex mb-0 justify-content-end align-items-center">
+            <Button.Ripple outline color="secondary" type="button" className="mr-2" onClick={(e) => resetForm()}>
+              Cancel
+            </Button.Ripple>
+            <div className="mr-50">
+              <Button.Ripple color="primary" type="button" onClick={(e) => onSubmitSD()}>
+                Submit
+              </Button.Ripple>
+            </div>
+          </FormGroup>
+        </Col>
+      </Card>
+    </div>
+  );
+};
+export default SdiRedirectEdit;

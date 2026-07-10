@@ -1,0 +1,59 @@
+import { Col } from "reactstrap";
+import React from "react";
+import { CustomDropdownInput, CustomTextInput } from "../../../forms/custom-form";
+import { apiBaseUrl } from "../../../../urlConstants";
+
+export let LoadingDetails = ({ form, disabled, isTruck }) => {
+  return (
+    <>
+      <Col md="4" sm="12">
+        {isTruck ? (
+          <CustomTextInput label={"Truck No"} form={form} id="truckNo" disabled />
+        ) : (
+          <CustomTextInput label={"Trailer No"} form={form} id="trailerNo" disabled />
+        )}
+      </Col>
+      <Col md="4" sm="12">
+        <CustomTextInput label={"Driver No"} form={form} id="driverNo" disabled />
+      </Col>
+      <Col md="4" sm="12">
+        <CustomDropdownInput
+          isDisabled={disabled}
+          label={"Last Mile Transporter"}
+          url={`${apiBaseUrl}master/getLastMileTransporter`}
+          form={form}
+          id="lastMileTransporter"
+        />
+      </Col>
+      <Col md="4" sm="12">
+        <CustomTextInput disabled={disabled} label={"Freight Charges Per Ton"} form={form} id="freightChargesPerTon" isNumberOnly />
+      </Col>
+      {isTruck && (
+        <>
+          <Col md="4" sm="12">
+           {/** <CustomTextInput disabled={disabled} label={"Loaded Lot No"} form={form} id="loadedLotNo" />*/} 
+           <CustomDropdownInput
+              isDisabled={disabled}
+              label={"Loaded Lot No"}
+              url={`${apiBaseUrl}master/getLoadingLotNo`}
+              form={form}
+              id="loadedLotNo"
+            />
+          </Col>
+          <Col md="4" sm="12">
+            <CustomDropdownInput
+              isDisabled={disabled}
+              label={"Loading Vendor"}
+              url={`${apiBaseUrl}master/getIntraLoadingVendor`}
+              form={form}
+              id="loadingVendor"
+            />
+          </Col>
+          <Col md="4" sm="12">
+            <CustomTextInput disabled={disabled} label={"Loading Charges Per Ton"} form={form} id="loadingChargesPerTon" isNumberOnly />
+          </Col>
+        </>
+      )}
+    </>
+  );
+};

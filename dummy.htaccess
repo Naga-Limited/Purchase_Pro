@@ -1,0 +1,8 @@
+# To prevent access to .env and other files
+<Files .*>
+    Deny from all
+</Files>
+
+<IfModule mod_alias.c>
+RedirectMatch 301 ^/pp/$ https://localhost/pp/public
+</IfModule>

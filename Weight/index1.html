@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Serial</title>
+  <meta http-equiv="origin-trial" content="AiM0rMslVx2jumsJjQ144QeZTScNmGVMYzBuXoaMQwCd7UHWbQH8Rg20adCN7XWaTMai4HvsUIyx3+blPPiupwEAAABreyJvcmlnaW4iOiJodHRwczovL3VuamF2YXNjcmlwdGVyLXdlYi1zZXJpYWwtZXhhbXBsZS5nbGl0Y2gubWU6NDQzIiwiZmVhdHVyZSI6IlNlcmlhbCIsImV4cGlyeSI6MTU5Njk3OTA1NX0=">
+  <style>
+    .repo-link {
+      position: fixed;
+      bottom: 0;
+      right: 0;
+      margin: 0 1rem 1rem 0;
+    }
+  </style>
+</head>
+<body>
+
+  <button id="connect-to-serial">Connect to serial port</button>
+  <button id="get-serial-messages">Get serial messages</button>
+  <div>
+    <form id="message-form">
+      <input type="text" id="message-input" disabled="true">
+      <button type="submit" id="submit-button" disabled="true">Send</button>
+    </form>
+  </div>
+  <div id="serial-messages-container"></div>
+  
+  <div class="repo-link">
+    <a href="https://github.com/UnJavaScripter/web-serial-example">GitHub Repo</a>
+  </div>
+
+  <script src="./ch_serial.js"></script>
+  <script>
+  	
+
+  </script>
+</body>
+</html>

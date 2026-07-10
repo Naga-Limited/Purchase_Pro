@@ -1,0 +1,1660 @@
+import React, { useEffect, useState } from "react";
+import { useHistory, useParams } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { useLoader } from "../../../utility/hooks/useLoader";
+
+import { Card, CardBody, CardHeader, CardTitle } from "reactstrap";
+import { Button, Row, Col  } from "reactstrap";
+import { CustomDropdownInput, CustomTextInput } from "../../forms/custom-form";
+import { HrLine } from "../../common/HrLine";
+import { useFormik } from "formik";
+import { RefreshBlock } from "../../common/RefreshBlock";
+import { BASE_URL, apiBaseUrl } from "../../../urlConstants";
+import { errorToast, ShowToast } from "../common/appHelper";
+import { apiPostMethod } from "../../../helper/axiosHelper";
+import { fromPairs, size } from "lodash";
+import { array } from "prop-types";
+
+const WhUnloadingUpdateLot = () => {
+    let { showLoader, hideLoader } = useLoader();
+    const [LoadedLot, setLoadedLot] = useState([]);
+    const [POLineItemList, setPOLineItemList] = useState([]);
+    const [VANumber, setVANumber] = useState("");
+    
+
+    const history = useHistory();
+
+    let { id } = useParams();
+    let refid='';
+    if(id){
+        refid = id.replace(":", "");
+    }
+    //console.log("REF ID :", refid);
+
+    const form = useFormik({
+        initialErrors: false,
+        initialValues: {},
+       // validationSchema: getValidationSchema(dispatchDetails, isReceivingGateOut),
+    });
+
+    const initialState  = {};
+
+    useEffect(() => {getVADet(refid);}, [refid]);
+    useEffect(() => {getSegmentDet(form.values.POLineItem);}, [form.values.POLineItem]);
+    useEffect(() => {getPlanninglotDet(form.values.LoadedLotNo);}, [form.values.LoadedLotNo]);
+
+    const getSegmentDet = (PO_Line_Item) => {
+
+        // console.log("getSegmentDet", PO_Line_Item);
+        // console.log("PO Number", form.values.PONumber);
+        let Segment_Id="";
+        const po = {...form.values.PONumber}
+        const {value, label} = po;
+        let Po_No = po.value;
+
+        let PO_Line_Item_List = {...PO_Line_Item};
+        Object.keys(PO_Line_Item_List).forEach((k) => {
+            //console.log(k ," ASDF ", PO_Line_Item_List[k].value, "PO No ", Po_No);
+
+            let fdata = {
+                PO_No:Po_No,
+                PO_Line:PO_Line_Item_List[k].value,
+            }
+            showLoader();
+            apiPostMethod(apiBaseUrl + 'warehouse/Master/getSegmentDet', fdata)
+                .then((response) => {
+                    const { data } = response;
+                    // console.log("SEGMENT Details :", data.results);
+                    if (data.success) {
+                        if (k == 0) {
+                        
+                            form.setValues({
+                                ...form.values,
+                                SegmentId1: data.results[0].SEG_ID,
+                                Segment1: data.results[0].StockSegment,
+                                WheatVariety1: data.results[0].WheatVariety
+                            });
+                            Segment_Id = "'"+data.results[0].SEG_ID+"'";
+                        }else if (k == 1) {
+                        
+                            form.setValues({
+                                ...form.values,
+                                SegmentId2: data.results[0].SEG_ID,
+                                Segment2: data.results[0].StockSegment,
+                                WheatVariety2: data.results[0].WheatVariety
+                            });
+                            Segment_Id = Segment_Id + ",'"+data.results[0].SEG_ID+"'";
+                        }else if (k == 2) {
+                        
+                            form.setValues({
+                                ...form.values,
+                                SegmentId3: data.results[0].SEG_ID,
+                                Segment3: data.results[0].StockSegment,
+                                WheatVariety3: data.results[0].WheatVariety
+                            });
+                            Segment_Id = Segment_Id + ",'"+data.results[0].SEG_ID+"'";
+                        }
+                        getLotBySegment(Segment_Id);
+                    } else {
+                        errorToast("Data Not Found !!!");
+                    }
+                })
+                .catch((error) => {
+                    errorToast("Something went wrong, please try again after sometime");
+                })
+                .finally((a) => {
+                    hideLoader();
+                });            
+        });
+    }
+
+    const getLotBySegment = (SegmentId) => {
+        // console.log("getLotBySegment", SegmentId);
+      
+        let fdata = {SegmentId:SegmentId};
+        showLoader();
+        apiPostMethod(apiBaseUrl+'warehouse/Master/getLotBySegment', fdata)
+        .then((response) => {
+            const { data } = response;
+            // console.log("getLotBySegment :",data.results);
+            if (data.success) { 
+                setLoadedLot(data.results);
+            }else{
+                errorToast("Data Not Found !!!");
+            }
+        })
+        .catch((error) => {
+          errorToast("Something went wrong, please try again after sometime");
+        })
+        .finally((a) => {
+          hideLoader();
+        });
+    }
+
+    const getPlanninglotDet = (PlanningLot) => {
+        // console.log("getPlanninglotDet", PlanningLot);
+        let fdata="";
+        let PlanningLot_List = {...PlanningLot};
+        Object.keys(PlanningLot_List).forEach((k) => {
+            
+            if(k==0){
+                fdata = {
+                    PlanningLot_Id:PlanningLot[0].value,
+                    Wheat_Id:form.values.SegmentId1,
+                    };
+            }else if(k==1){
+                fdata = {
+                    PlanningLot_Id:PlanningLot[1].value,
+                    Wheat_Id:form.values.SegmentId2,
+                    };
+            }else if(k==2){
+                fdata = {
+                    PlanningLot_Id:PlanningLot[2].value,
+                    Wheat_Id:form.values.SegmentId3,
+                    };
+            }
+
+
+            // console.log("Planning LOT", fdata);
+
+            showLoader();
+            apiPostMethod(apiBaseUrl+'warehouse/Master/getPlanninglotDet', fdata)
+            .then((response) => {
+                const { data } = response;
+                // console.log("getPlanninglotDet :",data.results);
+                if (data.success) { 
+                    //LotNo1 PlanningQty1 SAPQty1
+                    if (k == 0) {
+
+                        form.setValues({
+                            ...form.values,
+                            LotNo1: data.results[0].fromlotno,
+                            PlanningQty1: data.results[0].planqty,
+                            SAPQty1: data.results[0].SAP_Qty
+                        });
+
+                    } else if (k == 1) {
+
+                        form.setValues({
+                            ...form.values,
+                            LotNo2: data.results[0].fromlotno,
+                            PlanningQty2: data.results[0].planqty,
+                            SAPQty2: data.results[0].SAP_Qty
+                        });
+
+                    } else if (k == 2) {
+
+                        form.setValues({
+                            ...form.values,
+                            LotNo3: data.results[0].fromlotno,
+                            PlanningQty3: data.results[0].planqty,
+                            SAPQty3: data.results[0].SAP_Qty
+                        });
+
+                    }
+
+                }else{
+                    errorToast("Data Not Found !!!");
+                }
+            })
+            .catch((error) => {
+              errorToast("Something went wrong, please try again after sometime");
+            })
+            .finally((a) => {
+              hideLoader();
+            });
+        });
+    }
+
+    const onchangeBagCutting = (e, Vendor, Charges ) => {
+        const { value, label } = e;
+        form.setValues({
+            ...form.values, 
+            [Vendor]:{label:e.label,value:e.value},
+            [Charges]: e.label.split("|")[1]
+        });
+    }
+
+    const CalcBagCount = (e, Column_Id, ) => {
+
+        const { value, label } = e;
+        if(e.label=="Loose Wheat|0.00"){
+            if (Column_Id === "BagType1Lot1"){
+                
+                form.setFieldValue("BagType1Lot1",{label:e.label,value:e.value});
+                form.setFieldValue("BagCuttingType1Lot1","");
+                form.setFieldValue("BagCuttingVendor1Lot1","");
+                form.setFieldValue("Charges1Lot1","");
+
+                document.getElementById("LooseWheat111").style.display="";
+                document.getElementById("LooseWheat112").style.display="";
+                document.getElementById("LooseWheat113").style.display="";
+
+            }else if (Column_Id === "BagType2Lot1"){
+
+                form.setFieldValue("BagType2Lot1",{label:e.label,value:e.value});
+                document.getElementById("LooseWheat211").style.display="";
+                document.getElementById("LooseWheat212").style.display="";
+                document.getElementById("LooseWheat213").style.display="";
+
+            }else if (Column_Id === "BagType3Lot1"){
+
+                form.setFieldValue("BagType3Lot1",{label:e.label,value:e.value});
+                document.getElementById("LooseWheat311").style.display="";
+                document.getElementById("LooseWheat312").style.display="";
+                document.getElementById("LooseWheat313").style.display="";
+
+            }else if (Column_Id === "BagType1Lot2"){
+
+                form.setFieldValue("BagType1Lot2",{label:e.label,value:e.value});
+                document.getElementById("LooseWheat121").style.display="";
+                document.getElementById("LooseWheat122").style.display="";
+                document.getElementById("LooseWheat123").style.display="";
+
+            }else if (Column_Id === "BagType2Lot2"){
+
+                form.setFieldValue("BagType2Lot2",{label:e.label,value:e.value});
+                document.getElementById("LooseWheat221").style.display="";
+                document.getElementById("LooseWheat222").style.display="";
+                document.getElementById("LooseWheat223").style.display="";
+
+            }else if (Column_Id === "BagType3Lot2"){
+
+                form.setFieldValue("BagType3Lot2",{label:e.label,value:e.value});
+                document.getElementById("LooseWheat321").style.display="";
+                document.getElementById("LooseWheat322").style.display="";
+                document.getElementById("LooseWheat323").style.display="";
+
+            }else if (Column_Id === "BagType1Lot3"){
+
+                form.setFieldValue("BagType1Lot3",{label:e.label,value:e.value});
+                document.getElementById("LooseWheat131").style.display="";
+                document.getElementById("LooseWheat132").style.display="";
+                document.getElementById("LooseWheat133").style.display="";
+
+            }else if (Column_Id === "BagType2Lot3"){
+
+                form.setFieldValue("BagType2Lot3",{label:e.label,value:e.value});
+                document.getElementById("LooseWheat231").style.display="";
+                document.getElementById("LooseWheat232").style.display="";
+                document.getElementById("LooseWheat233").style.display="";
+
+            }else if (Column_Id === "BagType3Lot3"){
+
+                form.setFieldValue("BagType3Lot3",{label:e.label,value:e.value});
+                document.getElementById("LooseWheat331").style.display="";
+                document.getElementById("LooseWheat332").style.display="";
+                document.getElementById("LooseWheat333").style.display="";
+            }
+        }else{
+
+            if (Column_Id === "BagType1Lot1"){
+
+                form.setValues({
+                    ...form.values, 
+                    BagType1Lot1:{label:e.label,value:e.value},
+                    BagCuttingType1Lot1:{label:'',value:''},
+                    BagCuttingVendor1Lot1:{label:'',value:''},
+                    Charges1Lot1:''
+                });
+
+                document.getElementById("LooseWheat111").style.display="none";
+                document.getElementById("LooseWheat112").style.display="none";
+                document.getElementById("LooseWheat113").style.display="none";
+
+            }else if (Column_Id === "BagType2Lot1"){
+
+                form.setValues({
+                    ...form.values, 
+                    BagType2Lot1:{label:e.label,value:e.value},
+                    BagCuttingType2Lot1:{label:'',value:''},
+                    BagCuttingVendor2Lot1:{label:'',value:''},
+                    Charges2Lot1:''
+                });
+
+                form.setFieldValue("BagType2Lot1",{label:e.label,value:e.value});
+                document.getElementById("LooseWheat211").style.display="none";
+                document.getElementById("LooseWheat212").style.display="none";
+                document.getElementById("LooseWheat213").style.display="none";
+
+            }else if (Column_Id === "BagType3Lot1"){
+
+                form.setValues({
+                    ...form.values, 
+                    BagType3Lot1:{label:e.label,value:e.value},
+                    BagCuttingType3Lot1:{label:'',value:''},
+                    BagCuttingVendor3Lot1:{label:'',value:''},
+                    Charges3Lot1:'0'
+                });
+
+                form.setFieldValue("BagType3Lot1",{label:e.label,value:e.value});
+                document.getElementById("LooseWheat311").style.display="none";
+                document.getElementById("LooseWheat312").style.display="none";
+                document.getElementById("LooseWheat313").style.display="none";
+
+            }else if (Column_Id === "BagType1Lot2"){
+
+                form.setValues({
+                    ...form.values, 
+                    BagType1Lot2:{label:e.label,value:e.value},
+                    BagCuttingType1Lot2:{label:'',value:''},
+                    BagCuttingVendor1Lot2:{label:'',value:''},
+                    Charges1Lot2:''
+                });
+
+                form.setFieldValue("BagType1Lot2",{label:e.label,value:e.value});
+                document.getElementById("LooseWheat121").style.display="none";
+                document.getElementById("LooseWheat122").style.display="none";
+                document.getElementById("LooseWheat123").style.display="none";
+
+            }else if (Column_Id === "BagType2Lot2"){
+
+                form.setValues({
+                    ...form.values, 
+                    BagType2Lot2:{label:e.label,value:e.value},
+                    BagCuttingType2Lot2:{label:'',value:''},
+                    BagCuttingVendor2Lot2:{label:'',value:''},
+                    Charges2Lot2:''
+                });
+
+                form.setFieldValue("BagType2Lot2",{label:e.label,value:e.value});
+                document.getElementById("LooseWheat221").style.display="none";
+                document.getElementById("LooseWheat222").style.display="none";
+                document.getElementById("LooseWheat223").style.display="none";
+
+            }else if (Column_Id === "BagType3Lot2"){
+
+                form.setValues({
+                    ...form.values, 
+                    BagType3Lot2:{label:e.label,value:e.value},
+                    BagCuttingType3Lot2:{label:'',value:''},
+                    BagCuttingVendor3Lot2:{label:'',value:''},
+                    Charges3Lot2:''
+                });
+
+                form.setFieldValue("BagType3Lot2",{label:e.label,value:e.value});
+                document.getElementById("LooseWheat321").style.display="none";
+                document.getElementById("LooseWheat322").style.display="none";
+                document.getElementById("LooseWheat323").style.display="none";
+
+            }else if (Column_Id === "BagType1Lot3"){
+
+                form.setValues({
+                    ...form.values, 
+                    BagType1Lot3:{label:e.label,value:e.value},
+                    BagCuttingType1Lot3:{label:'',value:''},
+                    BagCuttingVendor1Lot3:{label:'',value:''},
+                    Charges1Lot3:''
+                });
+
+                form.setFieldValue("BagType1Lot3",{label:e.label,value:e.value});
+                document.getElementById("LooseWheat131").style.display="none";
+                document.getElementById("LooseWheat132").style.display="none";
+                document.getElementById("LooseWheat133").style.display="none";
+
+            }else if (Column_Id === "BagType2Lot3"){
+
+                form.setValues({
+                    ...form.values, 
+                    BagType2Lot3:{label:e.label,value:e.value},
+                    BagCuttingType2Lot3:{label:'',value:''},
+                    BagCuttingVendor2Lot3:{label:'',value:''},
+                    Charges2Lot3:''
+                });
+
+                form.setFieldValue("BagType2Lot3",{label:e.label,value:e.value});
+                document.getElementById("LooseWheat231").style.display="none";
+                document.getElementById("LooseWheat232").style.display="none";
+                document.getElementById("LooseWheat233").style.display="none";
+
+            }else if (Column_Id === "BagType3Lot3"){
+
+                form.setValues({
+                    ...form.values, 
+                    BagType3Lot3:{label:e.label,value:e.value},
+                    BagCuttingType3Lot3:{label:'',value:''},
+                    BagCuttingVendor3Lot3:{label:'',value:''},
+                    Charges3Lot3:''
+                });
+
+                form.setFieldValue("BagType3Lot3",{label:e.label,value:e.value});
+                document.getElementById("LooseWheat331").style.display="none";
+                document.getElementById("LooseWheat332").style.display="none";
+                document.getElementById("LooseWheat333").style.display="none";
+            }
+        }
+
+        let BagWt1 = 0;
+        let BagType1Lot1 = Column_Id === "BagType1Lot1"? e.label : form.values.BagType1Lot1 ? form.values.BagType1Lot1.label : "";
+        if(BagType1Lot1){
+            BagWt1=BagType1Lot1.split("|")[1];
+            BagWt1=BagWt1.replace('KGs','');
+        }
+
+        let BagWt2 = 0;
+        let BagType2Lot1 = Column_Id === "BagType2Lot1"? e.label : form.values.BagType2Lot1 ? form.values.BagType2Lot1.label : "";
+        if(BagType2Lot1){
+            BagWt2=BagType2Lot1.split("|")[1];
+            BagWt2=BagWt2.replace('KGs','');
+        }
+
+        let BagWt3 = 0;
+        let BagType3Lot1 = Column_Id === "BagType3Lot1"? e.label : form.values.BagType3Lot1 ? form.values.BagType3Lot1.label : "";
+        if(BagType3Lot1){
+            BagWt3=BagType3Lot1.split("|")[1];
+            BagWt3=BagWt3.replace('KGs','');
+        }
+
+        let BagWt4 = 0;
+        let BagType1Lot2 = Column_Id === "BagType1Lot2"? e.label : form.values.BagType1Lot2 ? form.values.BagType1Lot2.label : "";
+        if(BagType1Lot2){
+            BagWt4=BagType1Lot2.split("|")[1];
+            BagWt4=BagWt4.replace('KGs','');
+        }
+
+        let BagWt5 = 0;
+        let BagType2Lot2 = Column_Id === "BagType2Lot2"? e.label : form.values.BagType2Lot2 ? form.values.BagType2Lot2.label : "";
+        if(BagType2Lot2){
+            BagWt5=BagType2Lot2.split("|")[1];
+            BagWt5=BagWt5.replace('KGs','');
+        }
+
+        let BagWt6 = 0;
+        let BagType3Lot2 = Column_Id === "BagType3Lot2"? e.label : form.values.BagType3Lot2 ? form.values.BagType3Lot2.label : "";
+        if(BagType3Lot2){
+            BagWt6=BagType3Lot2.split("|")[1];
+            BagWt6=BagWt6.replace('KGs','');
+        }
+
+        let BagWt7 = 0;
+        let BagType1Lot3 = Column_Id === "BagType1Lot3"? e.label : form.values.BagType1Lot3 ? form.values.BagType1Lot3.label : "";
+        if(BagType1Lot3){
+            BagWt7=BagType1Lot3.split("|")[1];
+            BagWt7=BagWt7.replace('KGs','');
+        }
+
+        let BagWt8 = 0;
+        let BagType2Lot3 = Column_Id === "BagType2Lot3"? e.label : form.values.BagType2Lot3 ? form.values.BagType2Lot3.label : "";
+        if(BagType2Lot3){
+            BagWt8=BagType2Lot3.split("|")[1];
+            BagWt8=BagWt8.replace('KGs','');
+        }
+
+        let BagWt9 = 0;
+        let BagType3Lot3 = Column_Id === "BagType3Lot3"? e.label : form.values.BagType3Lot3 ? form.values.BagType3Lot3.label : "";
+        if(BagType3Lot3){
+            BagWt9=BagType3Lot3.split("|")[1];
+            BagWt9=BagWt9.replace('KGs','');
+        }
+
+        //Lot 1 => 3 Bag Types
+        let NoofBags1Lot1 = Column_Id === "NoofBags1Lot1"? e.target.value : form.values.NoofBags1Lot1 ? form.values.NoofBags1Lot1 : 0;
+        let NoofBags2Lot1 = Column_Id === "NoofBags2Lot1"? e.target.value : form.values.NoofBags2Lot1 ? form.values.NoofBags2Lot1 : 0;
+        let NoofBags3Lot1 = Column_Id === "NoofBags3Lot1"? e.target.value : form.values.NoofBags3Lot1 ? form.values.NoofBags3Lot1 : 0;
+
+        //Lot 2 => 3 Bag Types
+        let NoofBags1Lot2 = Column_Id === "NoofBags1Lot2"? e.target.value : form.values.NoofBags1Lot2 ? form.values.NoofBags1Lot2 : 0;
+        let NoofBags2Lot2 = Column_Id === "NoofBags2Lot2"? e.target.value : form.values.NoofBags2Lot2 ? form.values.NoofBags2Lot2 : 0;
+        let NoofBags3Lot2 = Column_Id === "NoofBags3Lot2"? e.target.value : form.values.NoofBags3Lot2 ? form.values.NoofBags3Lot2 : 0;
+
+        //Lot 3 => 3 Bag Types
+        let NoofBags1Lot3 = Column_Id === "NoofBags1Lot3"? e.target.value : form.values.NoofBags1Lot3 ? form.values.NoofBags1Lot3 : 0;
+        let NoofBags2Lot3 = Column_Id === "NoofBags2Lot3"? e.target.value : form.values.NoofBags2Lot3 ? form.values.NoofBags2Lot3 : 0;
+        let NoofBags3Lot3 = Column_Id === "NoofBags3Lot3"? e.target.value : form.values.NoofBags3Lot3 ? form.values.NoofBags3Lot3 : 0;
+
+        let BagCount_Lot1 = parseFloat(NoofBags1Lot1)+parseFloat(NoofBags2Lot1)+parseFloat(NoofBags3Lot1);
+        let BagCount_Lot2 = parseFloat(NoofBags1Lot2)+parseFloat(NoofBags2Lot2)+parseFloat(NoofBags3Lot2);
+        let BagCount_Lot3 = parseFloat(NoofBags1Lot3)+parseFloat(NoofBags2Lot3)+parseFloat(NoofBags3Lot3);
+
+        let TotalBagCount = parseFloat(BagCount_Lot1)+parseFloat(BagCount_Lot2)+parseFloat(BagCount_Lot3);
+
+        let GunnyWt_Lot1 = parseFloat(NoofBags1Lot1*BagWt1)+parseFloat(NoofBags2Lot1*BagWt2)+parseFloat(NoofBags3Lot1*BagWt3);
+        let GunnyWt_Lot2 = parseFloat(NoofBags1Lot2*BagWt4)+parseFloat(NoofBags2Lot2*BagWt5)+parseFloat(NoofBags3Lot2*BagWt6);
+        let GunnyWt_Lot3 = parseFloat(NoofBags1Lot3*BagWt7)+parseFloat(NoofBags2Lot3*BagWt8)+parseFloat(NoofBags3Lot3*BagWt9);
+
+        let TotalGunnyWt = parseFloat(GunnyWt_Lot1)+parseFloat(GunnyWt_Lot2)+parseFloat(GunnyWt_Lot3);
+            TotalGunnyWt = TotalGunnyWt.toFixed(3);
+
+
+        let NetWt = form.values.NetWeight ? form.values.NetWeight : 0;
+        let GunnyLessWt = parseFloat(NetWt) - parseFloat(TotalGunnyWt);
+            GunnyLessWt = GunnyLessWt.toFixed(3);
+
+        if (Column_Id === "BagType1Lot1" || Column_Id === "BagType2Lot1" || Column_Id === "BagType3Lot1" ||
+            Column_Id === "BagType1Lot2" || Column_Id === "BagType2Lot2" || Column_Id === "BagType3Lot2" ||
+            Column_Id === "BagType1Lot3" || Column_Id === "BagType2Lot3" || Column_Id === "BagType3Lot3") {
+            form.setValues({
+                ...form.values, 
+                [Column_Id]: { label: e.label, value: e.value },
+                NetWeight: NetWt,
+                GunnylessWeight: GunnyLessWt,
+                TotalBags: TotalBagCount,
+                GunnyWeight: TotalGunnyWt
+            });
+        } else if (Column_Id === "NoofBags1Lot1" || Column_Id === "NoofBags2Lot1" || Column_Id === "NoofBags3Lot1" ||
+            Column_Id === "NoofBags1Lot2" || Column_Id === "NoofBags2Lot2" || Column_Id === "NoofBags3Lot2" ||
+            Column_Id === "NoofBags1Lot3" || Column_Id === "NoofBags2Lot3" || Column_Id === "NoofBags3Lot3") {
+            form.setValues({
+                ...form.values, 
+                [Column_Id]: e.target.value,
+                NetWeight: NetWt,
+                GunnylessWeight: GunnyLessWt,
+                TotalBags: TotalBagCount,
+                GunnyWeight: TotalGunnyWt
+            });
+        }
+        console.log("TotalBagCount :", TotalBagCount);
+        console.log("TotalGunnyWt :", TotalGunnyWt);
+    }
+
+    const getVADet = (id) => {
+        // console.log("getVADet", id);
+        let fdata = { ID: id };
+        showLoader();
+        apiPostMethod(apiBaseUrl+'warehouse/Master/getVADetails', fdata)
+        .then((response) => {
+            const { data } = response;
+            // console.log("VA Details :",data.results);
+            if (data.success) { 
+
+                form.setValues({
+                    VANumber:data.results[0].ZVA_NUMBER,
+                    TruckNumber:data.results[0].TRUCK_NO,
+                    DriverNumber:data.results[0].DRIVER_NO
+                });         
+                setVANumber("[ VA No : "+ data.results[0].ZVA_NUMBER +" ]");
+            }else{
+                errorToast("Data Not Found !!!");
+            }
+        })
+        .catch((error) => {
+          errorToast("Something went wrong, please try again after sometime");
+        })
+        .finally((a) => {
+          hideLoader();
+        });
+    }
+    
+    const get_ias_PO_Data = (e) =>{
+
+        // console.log("get_ias_PO_Data");
+        
+        const { value, label } = e;
+        let fdata = { PO_Id: e.value };
+        let initState ="";
+        var Segment = [];
+        var Segment_Id = [];
+
+        //form.setFieldValue('PO_LineItem','');
+        setPOLineItemList(initState);
+        showLoader();
+        apiPostMethod(apiBaseUrl+'warehouse/Master/getPODetails', fdata)
+        .then((response) => {
+            const { data } = response;
+            
+            // console.log("PO Details :",data.results);
+
+            if (data.success) { 
+                setPOLineItemList([data.results[0].PoLineItem?{value:data.results[0].PoLineItem, label:data.results[0].PoLineItem}:'',
+                                   data.results[1].PoLineItem?{value:data.results[1].PoLineItem, label:data.results[1].PoLineItem}:'',
+                                   data.results[2].PoLineItem?{value:data.results[2].PoLineItem, label:data.results[2].PoLineItem}:'']);
+
+                form.setValues({
+                    ...form.values, 
+                    SendingPlant:data.results[0].SisterConcernFrom,
+                    SendingStorageLocation:data.results[0].SendingStorageLocation,
+                    ReceivingPlant:data.results[0].SisterConcernTo,
+                    ReceivingStorageLocation:data.results[0].ReceivingStorageLocation,
+                });
+                form.setFieldValue('PONumber',{value:e.value, label:e.label});
+
+                //getLoadedLot(Segment[0],Segment[1],Segment[2]);
+                getWeight(form.values.VANumber);
+
+            }else{
+                errorToast("Data Not Found !!!");
+            }
+        })
+        .catch((error) => {
+          errorToast("Something went wrong, please try again after sometime");
+        })
+        .finally((a) => {
+          hideLoader();
+        });
+    };
+
+    const getLoadedLot = (S1,S2,S3) => {
+        let fdata = {S1, S2, S3}
+
+        console.log("fdata :", fdata);
+        showLoader();
+        apiPostMethod(apiBaseUrl+'warehouse/Master/getLotNumberBySegment', fdata)
+          .then((response) => {
+            const { data } = response;
+            
+            console.log("Segment Details :",data.results);
+            if (data.success) {
+               setLoadedLot(data.results);
+            }else{
+                errorToast("Update Failed !!!");      
+            }
+        })
+        .catch((error) => {
+          errorToast("Something went wrong, please try again after sometime");
+        })
+        .finally((a) => {
+          hideLoader();
+        });
+    }
+
+    const getWeight = (va_number) => {
+        let fdata = {VANO:va_number}
+        showLoader();
+        apiPostMethod(apiBaseUrl+'warehouse/Master/getWeight', fdata)
+          .then((response) => {
+            const { data } = response;
+            // console.log("va_number :", va_number);
+            // console.log("Weight Details :",data.results);
+
+            if (data.success) {
+                form.setFieldValue('FirstWeight', data.results[0].FirstWeight);
+                form.setFieldValue('SecondWeight', data.results[0].SecondWeight);
+                let DiffWeight = 0;
+                    DiffWeight = parseFloat(data.results[0].SecondWeight)-parseFloat(data.results[0].FirstWeight);
+                form.setFieldValue('NetWeight', DiffWeight);
+            }else{
+                errorToast("Update Failed !!!");      
+            }
+        })
+        .catch((error) => {
+          errorToast("Something went wrong, please try again after sometime");
+        })
+        .finally((a) => {
+          hideLoader();
+        });
+    }
+
+    const Save_PO_Details = (e)=>{
+        let fdata = {
+                    PO_No: form.values.PONumber.label,
+                    
+                    POLineItemid:form.values.POLineItem.value,
+                    POLineItem:form.values.POLineItem.label,
+                    
+                    VANumber:form.values.VANumber,
+                    TruckNumber:form.values.TruckNumber,
+                    DriverNumber:form.values.DriverNumber,
+                    ReceivingBinid:form.values.ReceivingBin.value,
+                    ReceivingBin:form.values.ReceivingBin.label,
+
+                    LastMileTransportid:form.values.LastMileTransport.value,
+                    LastMileTransport:form.values.LastMileTransport.label,
+                    
+                    FreightCharges:form.values.FreightCharges,
+
+                    LoadingVendorid:form.values.LoadingVendor.value,
+                    LoadingVendor:form.values.LoadingVendor.label,
+
+                    LoadingCharges:form.values.LoadingCharges,
+                    Segment1:form.values.Segment1,
+                    WheatVariety1:form.values.WheatVariety1,
+                    Segment2:form.values.Segment2,
+                    WheatVariety2:form.values.WheatVariety2,
+                    Segment3:form.values.Segment3,
+                    WheatVariety3:form.values.WheatVariety3,
+                    
+                    SendingPlant:form.values.SendingPlant,
+                    SendingStorageLocation:form.values.SendingStorageLocation,
+                    
+                    ReceivingPlant:form.values.ReceivingPlant,
+                    ReceivingStorageLocation:form.values.ReceivingStorageLocation,
+                    
+                    FirstWeight:form.values.FirstWeight,
+                    SecondWeight:form.values.SecondWeight,
+                    NetWeight:form.values.NetWeight,
+                    GunnyWeight:form.values.GunnyWeight,
+                    GunnylessWeight:form.values.GunnylessWeight,
+
+                    LoadedLotNoid:form.values.LoadedLotNo?form.values.LoadedLotNo.value:0,
+                    LoadedLotNo:form.values.LoadedLotNo?form.values.LoadedLotNo.label:"",
+
+                    BagType1Lot1id:form.values.BagType1Lot1?form.values.BagType1Lot1.value:0,
+                    BagType1Lot1:form.values.BagType1Lot1?form.values.BagType1Lot1.label:"",
+                    NoofBags1Lot1:form.values.NoofBags1Lot1,
+                    BagCuttingType1Lot1id:form.values.BagCuttingType1Lot1?form.values.BagCuttingType1Lot1.value:0,
+                    BagCuttingType1Lot1:form.values.BagCuttingType1Lot1?form.values.BagCuttingType1Lot1.label:"",
+                    BagCuttingVendor1Lot1id:form.values.BagCuttingVendor1Lot1?form.values.BagCuttingVendor1Lot1.value:0,
+                    BagCuttingVendor1Lot1:form.values.BagCuttingVendor1Lot1?form.values.BagCuttingVendor1Lot1.label:"",
+                    Charges1Lot1:form.values.Charges1Lot1,
+
+                    BagType2Lot1id:form.values.BagType2Lot1?form.values.BagType2Lot1.value:0,
+                    BagType2Lot1:form.values.BagType2Lot1?form.values.BagType2Lot1.label:"",
+                    NoofBags2Lot1:form.values.NoofBags2Lot1,
+                    BagCuttingType2Lot1id: form.values.BagCuttingType2Lot1?form.values.BagCuttingType2Lot1.value:0,
+                    BagCuttingType2Lot1:form.values.BagCuttingType2Lot1?form.values.BagCuttingType2Lot1.label:"",
+                    BagCuttingVendor2Lot1id:form.values.BagCuttingVendor2Lot1?form.values.BagCuttingVendor2Lot1.value:0,
+                    BagCuttingVendor2Lot1:form.values.BagCuttingVendor2Lot1?form.values.BagCuttingVendor2Lot1.label:"",
+                    Charges2Lot1:form.values.Charges2Lot1,
+
+                    BagType3Lot1id:form.values.BagType3Lot1?form.values.BagType3Lot1.value:0,
+                    BagType3Lot1:form.values.BagType3Lot1?form.values.BagType3Lot1.label:"",
+                    NoofBags3Lot1:form.values.NoofBags3Lot1,
+                    BagCuttingType3Lot1id:form.values.BagCuttingType3Lot1?form.values.BagCuttingType3Lot1.value:0,
+                    BagCuttingType3Lot1:form.values.BagCuttingType3Lot1?form.values.BagCuttingType3Lot1.label:"",
+                    BagCuttingVendor3Lot1id:form.values.BagCuttingVendor3Lot1?form.values.BagCuttingVendor3Lot1.value:0,
+                    BagCuttingVendor3Lot1:form.values.BagCuttingVendor3Lot1?form.values.BagCuttingVendor3Lot1.label:"",
+                    Charges3Lot1:form.values.Charges3Lot1,
+
+                    BagType1Lot2id:form.values.BagType1Lot2?form.values.BagType1Lot2.value:0,
+                    BagType1Lot2:form.values.BagType1Lot2?form.values.BagType1Lot2.label:"",
+                    NoofBags1Lot2:form.values.NoofBags1Lot2,
+                    BagCuttingType1Lot2id:form.values.BagCuttingType1Lot2?form.values.BagCuttingType1Lot2.value:0,
+                    BagCuttingType1Lot2:form.values.BagCuttingType1Lot2?form.values.BagCuttingType1Lot2.label:"",
+                    BagCuttingVendor1Lot2id:form.values.BagCuttingVendor1Lot2?form.values.BagCuttingVendor1Lot2.value:0,
+                    BagCuttingVendor1Lot2:form.values.BagCuttingVendor1Lot2?form.values.BagCuttingVendor1Lot2.label:"",
+                    Charges1Lot2:form.values.Charges1Lot2,
+
+                    BagType2Lot2id:form.values.BagType2Lot2?form.values.BagType2Lot2.value:0,
+                    BagType2Lot2:form.values.BagType2Lot2?form.values.BagType2Lot2.label:"",
+                    NoofBags2Lot2:form.values.NoofBags2Lot2,
+                    BagCuttingType2Lot2id:form.values.BagCuttingType2Lot2?form.values.BagCuttingType2Lot2.value:0,
+                    BagCuttingType2Lot2:form.values.BagCuttingType2Lot2?form.values.BagCuttingType2Lot2.label:"",
+                    BagCuttingVendor2Lot2id:form.values.BagCuttingVendor2Lot2?form.values.BagCuttingVendor2Lot2.value:0,
+                    BagCuttingVendor2Lot2:form.values.BagCuttingVendor2Lot2?form.values.BagCuttingVendor2Lot2.label:"",
+                    Charges2Lot2:form.values.Charges2Lot2,
+
+                    BagType3Lot2id:form.values.BagType3Lot2?form.values.BagType3Lot2.value:0,
+                    BagType3Lot2:form.values.BagType3Lot2?form.values.BagType3Lot2.label:"",
+                    NoofBags3Lot2:form.values.NoofBags3Lot2,
+                    BagCuttingType3Lot2id:form.values.BagCuttingType3Lot2?form.values.BagCuttingType3Lot2.value:0,
+                    BagCuttingType3Lot2:form.values.BagCuttingType3Lot2?form.values.BagCuttingType3Lot2.label:"",
+                    BagCuttingVendor3Lot2id:form.values.BagCuttingVendor3Lot2?form.values.BagCuttingVendor3Lot2.value:0,
+                    BagCuttingVendor3Lot2:form.values.BagCuttingVendor3Lot2?form.values.BagCuttingVendor3Lot2.label:"",
+                    Charges3Lot2:form.values.Charges3Lot2,
+
+                    BagType1Lot3id:form.values.BagType1Lot3?form.values.BagType1Lot3.value:0,
+                    BagType1Lot3:form.values.BagType1Lot3?form.values.BagType1Lot3.label:"",
+                    NoofBags1Lot3:form.values.NoofBags1Lot3,
+                    BagCuttingType1Lot3id:form.values.BagCuttingType1Lot3?form.values.BagCuttingType1Lot3.value:0,
+                    BagCuttingType1Lot3:form.values.BagCuttingType1Lot3?form.values.BagCuttingType1Lot3.label:"",
+                    BagCuttingVendor1Lot3id:form.values.BagCuttingVendor1Lot3?form.values.BagCuttingVendor1Lot3.value:0,
+                    BagCuttingVendor1Lot3:form.values.BagCuttingVendor1Lot3?form.values.BagCuttingVendor1Lot3.label:"",
+                    Charges1Lot3:form.values.Charges1Lot3,
+
+                    BagType2Lot3id:form.values.BagType2Lot3?form.values.BagType2Lot3.value:0,
+                    BagType2Lot3:form.values.BagType2Lot3?form.values.BagType2Lot3.label:"",
+                    NoofBags2Lot3:form.values.NoofBags2Lot3,
+                    BagCuttingType2Lot3id:form.values.BagCuttingType2Lot3?form.values.BagCuttingType2Lot3.value:0,
+                    BagCuttingType2Lot3:form.values.BagCuttingType2Lot3?form.values.BagCuttingType2Lot3.label:"",
+                    BagCuttingVendor2Lot3id:form.values.BagCuttingVendor2Lot3?form.values.BagCuttingVendor2Lot3.value:0,
+                    BagCuttingVendor2Lot3:form.values.BagCuttingVendor2Lot3?form.values.BagCuttingVendor2Lot3.label:"",
+                    Charges2Lot3:form.values.Charges2Lot3,
+
+                    BagType3Lot3id:form.values.BagType3Lot3?form.values.BagType3Lot3.value:0,
+                    BagType3Lot3:form.values.BagType3Lot3?form.values.BagType3Lot3.label:"",
+                    NoofBags3Lot3:form.values.NoofBags3Lot3,
+                    BagCuttingType3Lot3id:form.values.BagCuttingType3Lot3?form.values.BagCuttingType3Lot3.value:0,
+                    BagCuttingType3Lot3:form.values.BagCuttingType3Lot3?form.values.BagCuttingType3Lot3.label:"",
+                    BagCuttingVendor3Lot3id:form.values.BagCuttingVendor3Lot3?form.values.BagCuttingVendor3Lot3.value:0,
+                    BagCuttingVendor3Lot3:form.values.BagCuttingVendor3Lot3?form.values.BagCuttingVendor3Lot3.label:"",
+                    Charges3Lot3:form.values.Charges3Lot3,
+
+                    TotalBags:form.values.TotalBags,
+
+                    LotNo1:form.values.LotNo1,
+                    PlanningQty1:form.values.PlanningQty1,
+                    SAPQty1:form.values.SAPQty1,
+                    MovementQty1:form.values.MovementQty1,
+
+                    LotNo2:form.values.LotNo2,
+                    PlanningQty2:form.values.PlanningQty2,
+                    SAPQty2:form.values.SAPQty2,
+                    MovementQty2:form.values.MovementQty2,
+
+                    LotNo3:form.values.LotNo3,
+                    PlanningQty3:form.values.PlanningQty3,
+                    SAPQty3:form.values.SAPQty3,
+                    MovementQty3:form.values.MovementQty3,
+
+                    TotalMovementQty:form.values.TotalMovementQty,
+                    RejectReason:form.values.RejectReason
+         };
+        showLoader();
+        apiPostMethod(apiBaseUrl+'warehouse/Master/SavePO_Submit', fdata)
+          .then((response) => {
+            const { data } = response;
+            
+            if (data.success) {
+                ShowToast("Updated Sucessfully !!!");
+                setTimeout(() => history.push(`/IASSWI`) , 2000);
+            }else{
+                errorToast("Update Failed !!!");      
+            }
+        })
+        .catch((error) => {
+          errorToast("Something went wrong, please try again after sometime");
+        })
+        .finally((a) => {
+          hideLoader();
+        });
+
+    };
+
+    // const getPO_Data = (e) => {
+    //     const { value, label } = e;
+    //     let fdata = { PO_Id: e.value };
+    //     let i=0;
+    //     let POList = [];
+    //     let LotList = [];
+    //     showLoader();
+    //     apiPostMethod(apiBaseUrl+'warehouse/Master/getPODetails', fdata)
+    //       .then((response) => {
+    //         const { data } = response;
+    //         console.log("PO Details :",data.results);
+    //         if (data.success) { 
+    //             setPOLineItemList([{value:data.results[0].PO_LineItem, label:data.results[0].PO_LineItem},
+    //                             {value:data.results[0].PO_LineItem2, label:data.results[0].PO_LineItem2},
+    //                             {value:data.results[0].PO_LineItem3, label:data.results[0].PO_LineItem3}]);
+                
+    //             setLoadedLot([{value:data.results[0].Lot1_LotNo_Id, label:data.results[0].Lot1_Lot_No},
+    //                         {value:data.results[0].Lot2_LotNo_Id, label:data.results[0].Lot2_Lot_No},
+    //                         {value:data.results[0].Lot3_LotNo_Id, label:data.results[0].Lot3_Lot_No}]); 
+                
+    //             form.setValues({
+    //                 ...form.values, 
+                    
+    //                 POLineItem:[data.results[0].PO_LineItem?{value:data.results[0].PO_LineItem, label:data.results[0].PO_LineItem}:'',
+    //                             data.results[0].PO_LineItem2?{value:data.results[0].PO_LineItem2, label:data.results[0].PO_LineItem2}:'',
+    //                             data.results[0].PO_LineItem3?{value:data.results[0].PO_LineItem3, label:data.results[0].PO_LineItem3}:''],
+                
+    //                 VANumber:data.results[0].VA_No,
+    //                 TruckNumber:data.results[0].Truck_No,
+    //                 DriverNumber:data.results[0].Driver_No,
+                    
+    //                 ReceivingBin:{value:data.results[0].ReceiviingBin_id,label:data.results[0].ReceivingBin_Name},
+    //                 LastMileTransport:{value:data.results[0].LastMile_Transport_id,label:data.results[0].LastMile_Transport_Name},
+
+    //                 FreightCharges:data.results[0].FreightCharges_Ton,
+    //                 LoadingVendor:{value:data.results[0].Loading_Vendor_id, label:data.results[0].Loading_Vendor_Name},
+    //                 LoadingCharges:data.results[0].LoadingCharges_Ton,
+    //                 Segment1:data.results[0].S_Segment1,
+    //                 WheatVariety1:data.results[0].S_WheatVariety1,
+    //                 Segment2:data.results[0].S_Segment2,
+    //                 WheatVariety2:data.results[0].S_WheatVariety2,
+    //                 Segment3:data.results[0].S_Segment3,
+    //                 WheatVariety3:data.results[0].S_WheatVariety3,
+                    
+    //                 SendingPlant:data.results[0].S_Plant,
+    //                 SendingStorageLocation:data.results[0].S_Location,
+                    
+    //                 ReceivingPlant:data.results[0].R_Plant,
+    //                 ReceivingStorageLocation:data.results[0].R_Location,
+                    
+    //                 FirstWeight:data.results[0].S_WbEmptyWt,
+    //                 SecondWeight:data.results[0].S_WbLoadWt,
+    //                 NetWeight:data.results[0].S_WbNetWt,
+    //                 GunnyWeight:data.results[0].S_GunnyWt,
+    //                 GunnylessWeight:data.results[0].S_GunnyLessNetWt,
+
+    //                 BagType1Lot1: {value:data.results[0].Lot1_BagType_id, label:data.results[0].Lot1_BagType_Name},
+    //                 NoofBags1Lot1:data.results[0].Lot1_No_bags,
+    //                 BagCuttingType1Lot1:{value:data.results[0].Lot1_BagCuttingType_id, label:data.results[0].Lot1_BagCuttingType_Name} ,
+    //                 BagCuttingVendor1Lot1:{value:data.results[0].Lot1_BagCuttingVendor_id,label:data.results[0].Lot1_BagCuttingVendor_Name},
+    //                 Charges1Lot1:data.results[0].Lot1_BagCuttingCharges,
+
+    //                 BagType2Lot1:{value:data.results[0].Lot1_BagType2_id, label:data.results[0].Lot1_BagType2_Name},
+    //                 NoofBags2Lot1:data.results[0].Lot1_No_bags2,
+    //                 BagCuttingType2Lot1:{value:data.results[0].Lot1_BagCuttingType2_id, label:data.results[0].Lot1_BagCuttingType2_Name},
+    //                 BagCuttingVendor2Lot1:{value:data.results[0].Lot1_BagCuttingVendor2_id,label:data.results[0].Lot1_BagCuttingVendor2_Name},
+    //                 Charges2Lot1:data.results[0].Lot1_BagCuttingCharges2,
+
+    //                 BagType3Lot1:{value:data.results[0].Lot1_BagType3_id, label:data.results[0].Lot1_BagType3_Name},
+    //                 NoofBags3Lot1:data.results[0].Lot1_No_bags3,
+    //                 BagCuttingType3Lot1:{value:data.results[0].Lot1_BagCuttingType3_id, label:data.results[0].Lot1_BagCuttingType3_Name},
+    //                 BagCuttingVendor3Lot1:{value:data.results[0].Lot1_BagCuttingVendor3_id,label:data.results[0].Lot1_BagCuttingVendor3_Name},
+    //                 Charges3Lot1:data.results[0].Lot1_BagCuttingCharges3,
+
+    //                 BagType1Lot2:{value:data.results[0].Lot2_BagType_id, label:data.results[0].Lot2_BagType_Name},
+    //                 NoofBags1Lot2:data.results[0].Lot2_No_bags,
+    //                 BagCuttingType1Lot2:{value:data.results[0].Lot2_BagCuttingType_id, label:data.results[0].Lot2_BagCuttingType_Name},
+    //                 BagCuttingVendor1Lot2:{value:data.results[0].Lot2_BagCuttingVendor_id,label:data.results[0].Lot2_BagCuttingVendor_Name},
+    //                 Charges1Lot2:data.results[0].Lot2_BagCuttingCharges,
+
+    //                 BagType2Lot2:{value:data.results[0].Lot2_BagType2_id, label:data.results[0].Lot2_BagType2_Name},
+    //                 NoofBags2Lot2:data.results[0].Lot2_No_bags2,
+    //                 BagCuttingType2Lot2:{value:data.results[0].Lot2_BagCuttingType2_id, label:data.results[0].Lot2_BagCuttingType2_Name},
+    //                 BagCuttingVendor2Lot2:{value:data.results[0].Lot2_BagCuttingVendor2_id,label:data.results[0].Lot2_BagCuttingVendor2_Name},
+    //                 Charges2Lot2:data.results[0].Lot2_BagCuttingCharges2,
+
+    //                 BagType3Lot2:{value:data.results[0].Lot2_BagType3_id, label:data.results[0].Lot2_BagType3_Name},
+    //                 NoofBags3Lot2:data.results[0].Lot2_No_bags3,
+    //                 BagCuttingType3Lot2:{value:data.results[0].Lot2_BagCuttingType3_id, label:data.results[0].Lot2_BagCuttingType3_Name},
+    //                 BagCuttingVendor3Lot2:{value:data.results[0].Lot2_BagCuttingVendor3_id,label:data.results[0].Lot2_BagCuttingVendor3_Name},
+    //                 Charges3Lot2:data.results[0].Lot2_BagCuttingCharges3,
+
+    //                 BagType1Lot3:{value:data.results[0].Lot3_BagType_id, label:data.results[0].Lot3_BagType_Name},
+    //                 NoofBags1Lot3:data.results[0].Lot3_No_bags,
+    //                 BagCuttingType1Lot3:{value:data.results[0].Lot3_BagCuttingType_id, label:data.results[0].Lot3_BagCuttingType_Name},
+    //                 BagCuttingVendor1Lot3:{value:data.results[0].Lot3_BagCuttingVendor_id,label:data.results[0].Lot3_BagCuttingVendor_Name},
+    //                 Charges1Lot3:data.results[0].Lot3_BagCuttingCharges,
+
+    //                 BagType2Lot3:{value:data.results[0].Lot3_BagType2_id, label:data.results[0].Lot3_BagType2_Name},
+    //                 NoofBags2Lot3:data.results[0].Lot3_No_bags2,
+    //                 BagCuttingType2Lot3:{value:data.results[0].Lot3_BagCuttingType2_id, label:data.results[0].Lot3_BagCuttingType2_Name},
+    //                 BagCuttingVendor2Lot3:{value:data.results[0].Lot3_BagCuttingVendor2_id,label:data.results[0].Lot3_BagCuttingVendor2_Name},
+    //                 Charges2Lot3:data.results[0].Lot3_BagCuttingCharges2,
+
+    //                 BagType3Lot3:{value:data.results[0].Lot3_BagType3_id, label:data.results[0].Lot3_BagType3_Name},
+    //                 NoofBags3Lot3:data.results[0].Lot3_No_bags3,
+    //                 BagCuttingType3Lot3:{value:data.results[0].Lot3_BagCuttingType3_id, label:data.results[0].Lot3_BagCuttingType3_Name},
+    //                 BagCuttingVendor3Lot3:{value:data.results[0].Lot3_BagCuttingVendor3_id,label:data.results[0].Lot3_BagCuttingVendor3_Name},
+    //                 Charges3Lot3:data.results[0].Lot3_BagCuttingCharges3,
+
+    //                 TotalBags:data.results[0].Total_BagCount,
+
+    //                 LoadedLotNo:[data.results[0].Lot1_LotNo_Id?{value:data.results[0].Lot1_LotNo_Id, label:data.results[0].Lot1_Lot_No}:'',
+    //                             data.results[0].Lot2_LotNo_Id?{value:data.results[0].Lot2_LotNo_Id, label:data.results[0].Lot2_Lot_No}:'',
+    //                             data.results[0].Lot3_LotNo_Id?{value:data.results[0].Lot3_LotNo_Id, label:data.results[0].Lot3_Lot_No}:''],
+
+    //                 LotNo1:data.results[0].Lot1_Lot_No,
+    //                 PlanningQty1:data.results[0].Lot1_Planning_Qty,
+    //                 SAPQty1:data.results[0].Lot1_SAP_Qty,
+    //                 MovementQty1:data.results[0].Lot1_Movement_Qty,
+
+    //                 LotNo2:data.results[0].Lot2_Lot_No,
+    //                 PlanningQty2:data.results[0].Lot2_Planning_Qty,
+    //                 SAPQty2:data.results[0].Lot2_SAP_Qty,
+    //                 MovementQty2:data.results[0].Lot2_Movement_Qty,
+
+    //                 LotNo3:data.results[0].Lot3_Lot_No,
+    //                 PlanningQty3:data.results[0].Lot3_Planning_Qty,
+    //                 SAPQty3:data.results[0].Lot3_SAP_Qty,
+    //                 MovementQty3:data.results[0].Lot3_Movement_Qty,
+
+    //                 TotalMovementQty:data.results[0].Total_Movement_Qty,
+    //                 RejectReason:data.results[0].RejectReason
+    //             });
+                
+    //             form.setFieldValue('PONumber',{value:e.value, label:e.label});
+    //         }
+    //       })
+    //       .catch((error) => {
+    //         errorToast("Something went wrong, please try again after sometime");
+    //       })
+    //       .finally((a) => {
+    //         hideLoader();
+    //       });
+    // };
+
+    const Save_PO = (e)=>{
+        let fdata = {
+                    PO_No: form.values.PONumber.label,
+                    
+                    POLineItemid:form.values.POLineItem.value,
+                    POLineItem:form.values.POLineItem.label,
+                    
+                    VANumber:form.values.VANumber,
+                    TruckNumber:form.values.TruckNumber,
+                    DriverNumber:form.values.DriverNumber,
+                    ReceivingBinid:form.values.ReceivingBin.value,
+                    ReceivingBin:form.values.ReceivingBin.label,
+
+                    LastMileTransportid:form.values.LastMileTransport.value,
+                    LastMileTransport:form.values.LastMileTransport.label,
+                    
+                    FreightCharges:form.values.FreightCharges,
+
+                    LoadingVendorid:form.values.LoadingVendor.value,
+                    LoadingVendor:form.values.LoadingVendor.label,
+
+                    LoadingCharges:form.values.LoadingCharges,
+                    Segment1:form.values.Segment1,
+                    WheatVariety1:form.values.WheatVariety1,
+                    Segment2:form.values.Segment2,
+                    WheatVariety2:form.values.WheatVariety2,
+                    Segment3:form.values.Segment3,
+                    WheatVariety3:form.values.WheatVariety3,
+                    
+                    SendingPlant:form.values.SendingPlant,
+                    SendingStorageLocation:form.values.SendingStorageLocation,
+                    
+                    ReceivingPlant:form.values.ReceivingPlant,
+                    ReceivingStorageLocation:form.values.ReceivingStorageLocation,
+                    
+                    FirstWeight:form.values.FirstWeight,
+                    SecondWeight:form.values.SecondWeight,
+                    NetWeight:form.values.NetWeight,
+                    GunnyWeight:form.values.GunnyWeight,
+                    GunnylessWeight:form.values.GunnylessWeight,
+
+                    LoadedLotNoid:form.values.LoadedLotNo?form.values.LoadedLotNo.value:0,
+                    LoadedLotNo:form.values.LoadedLotNo?form.values.LoadedLotNo.label:"",
+
+                    BagType1Lot1id:form.values.BagType1Lot1?form.values.BagType1Lot1.value:0,
+                    BagType1Lot1:form.values.BagType1Lot1?form.values.BagType1Lot1.label:"",
+                    NoofBags1Lot1:form.values.NoofBags1Lot1,
+                    BagCuttingType1Lot1id:form.values.BagCuttingType1Lot1?form.values.BagCuttingType1Lot1.value:0,
+                    BagCuttingType1Lot1:form.values.BagCuttingType1Lot1?form.values.BagCuttingType1Lot1.label:"",
+                    BagCuttingVendor1Lot1id:form.values.BagCuttingVendor1Lot1?form.values.BagCuttingVendor1Lot1.value:0,
+                    BagCuttingVendor1Lot1:form.values.BagCuttingVendor1Lot1?form.values.BagCuttingVendor1Lot1.label:"",
+                    Charges1Lot1:form.values.Charges1Lot1,
+
+                    BagType2Lot1id:form.values.BagType2Lot1?form.values.BagType2Lot1.value:0,
+                    BagType2Lot1:form.values.BagType2Lot1?form.values.BagType2Lot1.label:"",
+                    NoofBags2Lot1:form.values.NoofBags2Lot1,
+                    BagCuttingType2Lot1id: form.values.BagCuttingType2Lot1?form.values.BagCuttingType2Lot1.value:0,
+                    BagCuttingType2Lot1:form.values.BagCuttingType2Lot1?form.values.BagCuttingType2Lot1.label:"",
+                    BagCuttingVendor2Lot1id:form.values.BagCuttingVendor2Lot1?form.values.BagCuttingVendor2Lot1.value:0,
+                    BagCuttingVendor2Lot1:form.values.BagCuttingVendor2Lot1?form.values.BagCuttingVendor2Lot1.label:"",
+                    Charges2Lot1:form.values.Charges2Lot1,
+
+                    BagType3Lot1id:form.values.BagType3Lot1?form.values.BagType3Lot1.value:0,
+                    BagType3Lot1:form.values.BagType3Lot1?form.values.BagType3Lot1.label:"",
+                    NoofBags3Lot1:form.values.NoofBags3Lot1,
+                    BagCuttingType3Lot1id:form.values.BagCuttingType3Lot1?form.values.BagCuttingType3Lot1.value:0,
+                    BagCuttingType3Lot1:form.values.BagCuttingType3Lot1?form.values.BagCuttingType3Lot1.label:"",
+                    BagCuttingVendor3Lot1id:form.values.BagCuttingVendor3Lot1?form.values.BagCuttingVendor3Lot1.value:0,
+                    BagCuttingVendor3Lot1:form.values.BagCuttingVendor3Lot1?form.values.BagCuttingVendor3Lot1.label:"",
+                    Charges3Lot1:form.values.Charges3Lot1,
+
+                    BagType1Lot2id:form.values.BagType1Lot2?form.values.BagType1Lot2.value:0,
+                    BagType1Lot2:form.values.BagType1Lot2?form.values.BagType1Lot2.label:"",
+                    NoofBags1Lot2:form.values.NoofBags1Lot2,
+                    BagCuttingType1Lot2id:form.values.BagCuttingType1Lot2?form.values.BagCuttingType1Lot2.value:0,
+                    BagCuttingType1Lot2:form.values.BagCuttingType1Lot2?form.values.BagCuttingType1Lot2.label:"",
+                    BagCuttingVendor1Lot2id:form.values.BagCuttingVendor1Lot2?form.values.BagCuttingVendor1Lot2.value:0,
+                    BagCuttingVendor1Lot2:form.values.BagCuttingVendor1Lot2?form.values.BagCuttingVendor1Lot2.label:"",
+                    Charges1Lot2:form.values.Charges1Lot2,
+
+                    BagType2Lot2id:form.values.BagType2Lot2?form.values.BagType2Lot2.value:0,
+                    BagType2Lot2:form.values.BagType2Lot2?form.values.BagType2Lot2.label:"",
+                    NoofBags2Lot2:form.values.NoofBags2Lot2,
+                    BagCuttingType2Lot2id:form.values.BagCuttingType2Lot2?form.values.BagCuttingType2Lot2.value:0,
+                    BagCuttingType2Lot2:form.values.BagCuttingType2Lot2?form.values.BagCuttingType2Lot2.label:"",
+                    BagCuttingVendor2Lot2id:form.values.BagCuttingVendor2Lot2?form.values.BagCuttingVendor2Lot2.value:0,
+                    BagCuttingVendor2Lot2:form.values.BagCuttingVendor2Lot2?form.values.BagCuttingVendor2Lot2.label:"",
+                    Charges2Lot2:form.values.Charges2Lot2,
+
+                    BagType3Lot2id:form.values.BagType3Lot2?form.values.BagType3Lot2.value:0,
+                    BagType3Lot2:form.values.BagType3Lot2?form.values.BagType3Lot2.label:"",
+                    NoofBags3Lot2:form.values.NoofBags3Lot2,
+                    BagCuttingType3Lot2id:form.values.BagCuttingType3Lot2?form.values.BagCuttingType3Lot2.value:0,
+                    BagCuttingType3Lot2:form.values.BagCuttingType3Lot2?form.values.BagCuttingType3Lot2.label:"",
+                    BagCuttingVendor3Lot2id:form.values.BagCuttingVendor3Lot2?form.values.BagCuttingVendor3Lot2.value:0,
+                    BagCuttingVendor3Lot2:form.values.BagCuttingVendor3Lot2?form.values.BagCuttingVendor3Lot2.label:"",
+                    Charges3Lot2:form.values.Charges3Lot2,
+
+                    BagType1Lot3id:form.values.BagType1Lot3?form.values.BagType1Lot3.value:0,
+                    BagType1Lot3:form.values.BagType1Lot3?form.values.BagType1Lot3.label:"",
+                    NoofBags1Lot3:form.values.NoofBags1Lot3,
+                    BagCuttingType1Lot3id:form.values.BagCuttingType1Lot3?form.values.BagCuttingType1Lot3.value:0,
+                    BagCuttingType1Lot3:form.values.BagCuttingType1Lot3?form.values.BagCuttingType1Lot3.label:"",
+                    BagCuttingVendor1Lot3id:form.values.BagCuttingVendor1Lot3?form.values.BagCuttingVendor1Lot3.value:0,
+                    BagCuttingVendor1Lot3:form.values.BagCuttingVendor1Lot3?form.values.BagCuttingVendor1Lot3.label:"",
+                    Charges1Lot3:form.values.Charges1Lot3,
+
+                    BagType2Lot3id:form.values.BagType2Lot3?form.values.BagType2Lot3.value:0,
+                    BagType2Lot3:form.values.BagType2Lot3?form.values.BagType2Lot3.label:"",
+                    NoofBags2Lot3:form.values.NoofBags2Lot3,
+                    BagCuttingType2Lot3id:form.values.BagCuttingType2Lot3?form.values.BagCuttingType2Lot3.value:0,
+                    BagCuttingType2Lot3:form.values.BagCuttingType2Lot3?form.values.BagCuttingType2Lot3.label:"",
+                    BagCuttingVendor2Lot3id:form.values.BagCuttingVendor2Lot3?form.values.BagCuttingVendor2Lot3.value:0,
+                    BagCuttingVendor2Lot3:form.values.BagCuttingVendor2Lot3?form.values.BagCuttingVendor2Lot3.label:"",
+                    Charges2Lot3:form.values.Charges2Lot3,
+
+                    BagType3Lot3id:form.values.BagType3Lot3?form.values.BagType3Lot3.value:0,
+                    BagType3Lot3:form.values.BagType3Lot3?form.values.BagType3Lot3.label:"",
+                    NoofBags3Lot3:form.values.NoofBags3Lot3,
+                    BagCuttingType3Lot3id:form.values.BagCuttingType3Lot3?form.values.BagCuttingType3Lot3.value:0,
+                    BagCuttingType3Lot3:form.values.BagCuttingType3Lot3?form.values.BagCuttingType3Lot3.label:"",
+                    BagCuttingVendor3Lot3id:form.values.BagCuttingVendor3Lot3?form.values.BagCuttingVendor3Lot3.value:0,
+                    BagCuttingVendor3Lot3:form.values.BagCuttingVendor3Lot3?form.values.BagCuttingVendor3Lot3.label:"",
+                    Charges3Lot3:form.values.Charges3Lot3,
+
+                    TotalBags:form.values.TotalBags,
+
+                    LotNo1:form.values.LotNo1,
+                    PlanningQty1:form.values.PlanningQty1,
+                    SAPQty1:form.values.SAPQty1,
+                    MovementQty1:form.values.MovementQty1,
+
+                    LotNo2:form.values.LotNo2,
+                    PlanningQty2:form.values.PlanningQty2,
+                    SAPQty2:form.values.SAPQty2,
+                    MovementQty2:form.values.MovementQty2,
+
+                    LotNo3:form.values.LotNo3,
+                    PlanningQty3:form.values.PlanningQty3,
+                    SAPQty3:form.values.SAPQty3,
+                    MovementQty3:form.values.MovementQty3,
+
+                    TotalMovementQty:form.values.TotalMovementQty,
+                    RejectReason:form.values.RejectReason
+         };
+        showLoader();
+        apiPostMethod(apiBaseUrl+'warehouse/Master/SavePO_Submit', fdata)
+          .then((response) => {
+            const { data } = response;
+            
+            if (data.success) {
+                ShowToast("Updated Sucessfully !!!");
+                setTimeout(() => history.push(`/IASSWI`) , 2000);
+            }else{
+                errorToast("Update Failed !!!");      
+            }
+        })
+        .catch((error) => {
+          errorToast("Something went wrong, please try again after sometime");
+        })
+        .finally((a) => {
+          hideLoader();
+        });
+    };
+
+    const Reject_PO = (e, RejectReason)=>{
+        let fdata = { RejectReason:RejectReason };
+        showLoader();
+        apiPostMethod(apiBaseUrl+'warehouse/Master/SavePO_Reject', fdata)
+          .then((response) => {
+            const { data } = response;
+            
+            if (data.success) {
+                ShowToast("Rejected Sucessfully !!!");
+            }else{
+                errorToast("Rejection Failed !!!");      
+            }
+        })
+        .catch((error) => {
+          errorToast("Something went wrong, please try again after sometime");
+        })
+        .finally((a) => {
+          hideLoader();
+        });
+
+    }
+
+    const CalcMovementQty = (e, Column_Id) => {
+        let MovementQty1 = Column_Id === "MovementQty1"? e.target.value?e.target.value:0 : form.values.MovementQty1 ? form.values.MovementQty1 : 0;
+        let MovementQty2 = Column_Id === "MovementQty2"? e.target.value?e.target.value:0 : form.values.MovementQty2 ? form.values.MovementQty2 : 0;
+        let MovementQty3 = Column_Id === "MovementQty3"? e.target.value?e.target.value:0 : form.values.MovementQty3 ? form.values.MovementQty3 : 0;
+
+        let TotalMovementQty = 0;
+        TotalMovementQty = parseFloat(MovementQty1)+ parseFloat(MovementQty2)+ parseFloat(MovementQty3);
+
+        form.setValues({
+            ...form.values, 
+            [Column_Id]: e.target.value?e.target.value:'',
+            TotalMovementQty:TotalMovementQty
+        }); 
+        console.log("Movement Qty ", TotalMovementQty);
+    }
+
+    const getMovemenetDetails = (e) =>{
+        const {value, label}=e;
+        let PreLot = {...form.values.LoadedLotNo};
+        if (form.values.LoadedLotNo){
+            PreLot.push({...form.values.LoadedLotNo});
+        }
+        
+        PreLot.push({value:e.value, label:e.label});
+
+        console.log("getMovemenetDetails", e);
+        //form.setFieldValue('LoadedLot',[{value:e.value, label:e.label}])
+        form.setValues({
+            ...form.values, 
+            LoadedLotNo:PreLot
+        });
+    }
+
+    
+
+    /* ********************************************************************************************** */
+    
+    return (
+        <div>
+            <RefreshBlock />
+            <Card>
+                <CardHeader>
+                    <CardTitle>{"Unloading WH Incharge - Update Lot " + VANumber}</CardTitle>
+                </CardHeader>
+                
+                <CardBody>
+                <HrLine header={"PO & Vehicle Details"} /><br />
+                    <Row>
+                        <Col md="4" sm="12">
+                            <CustomDropdownInput label={"PO No"} form={form} id="PONumber" 
+                                url={`${apiBaseUrl}warehouse/Master/getPONumber`} 
+                                onChange ={(e) => get_ias_PO_Data(e)} />
+                        </Col>
+
+                        <Col md="4" sm="12">
+                            <CustomDropdownInput  label={"PO Line Item"} form={form} id="POLineItem" isMulti 
+                                options = {POLineItemList} />
+                        </Col>
+
+                        <Col md="4" sm="12">
+                            <CustomTextInput label={"VA No"} form={form} id="VANumber" type="text" disabled />
+                        </Col>
+                    </Row>
+
+                    <Row>
+                        <Col md="4" sm="12">
+                            <CustomTextInput label={"Truck No"} form={form} id="TruckNumber" type="text" disabled/>
+                        </Col>
+                        <Col md="4" sm="12">
+                            <CustomTextInput label={"Driver No"} form={form} id="DriverNumber" type="text" disabled/>
+                        </Col>
+                        <Col md="4" sm="12">
+                            <CustomDropdownInput label={"Receiving Bin"} form={form} id="ReceivingBin"
+                                url={`${apiBaseUrl}warehouse/master/getReceivingBin`} />
+                        </Col>
+                    </Row>
+                    <HrLine header={"Vendor Details"} /><br />
+                    <Row>
+                        <Col md="4" sm="12">
+                            <CustomDropdownInput  label={"Last Mile Transporter"} form={form} id="LastMileTransport"
+                                url={`${apiBaseUrl}warehouse/master/getLastMileTransportVendor`} />
+                        </Col>
+                        <Col md="2" sm="12">
+                            <CustomTextInput label={"Freight Charges Per Ton"} form={form} id="FreightCharges" type="text"/>
+                        </Col>
+                        <Col md="4" sm="12">
+                            <CustomDropdownInput label={"Loading Vendor"} form={form} id="LoadingVendor" 
+                                url={`${apiBaseUrl}warehouse/master/getLoadingVendor`} />
+                        </Col>
+                        <Col md="2" sm="12">
+                            <CustomTextInput label={"Loading Charges Per Ton"} form={form} id="LoadingCharges" type="text"/>
+                        </Col>
+                    </Row>
+                    
+                    <HrLine header={"Segment & Wheat Variety Details"} /><br/>
+                    <Row> 
+                        <Col md="6" sm="12">
+                            <CustomTextInput label={"Segment 1"} form={form} id="Segment1" type="text" disabled/>
+                            <CustomTextInput form={form} id="SegmentId1" type="text" />
+                        </Col>
+                        <Col md="6" sm="12">
+                            <CustomTextInput label={"Wheat Variety 1"} form={form} id="WheatVariety1" type="text" disabled/>
+                        </Col>
+                    </Row>
+
+                    <Row>
+                        <Col md="6" sm="12">
+                            <CustomTextInput label={"Segment 2"} form={form} id="Segment2" type="text" disabled/>
+                            <CustomTextInput form={form} id="SegmentId2" type="text" />
+                        </Col>
+                        <Col md="6" sm="12">
+                            <CustomTextInput label={"Wheat Variety 2"} form={form} id="WheatVariety2" type="text" disabled/>
+                        </Col>
+                    </Row>
+                    
+                    <Row>
+                        <Col md="6" sm="12">
+                            <CustomTextInput label={"Segment 3"} form={form} id="Segment3" type="text" disabled/>
+                            <CustomTextInput form={form} id="SegmentId3" type="text" />
+                        </Col>
+                        <Col md="6" sm="12">
+                            <CustomTextInput label={"Wheat Variety 3"} form={form} id="WheatVariety3" type="text" disabled/>
+                        </Col>
+                    </Row>
+                    
+                    <HrLine header={"Sending & Receiving Details"} /><br/>
+                    <Row>
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"Receiving Plant"} form={form} id="ReceivingPlant" type="text" disabled/>
+                        </Col>
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"Receiving Storage Location"} form={form} id="ReceivingStorageLocation" type="text" disabled/>
+                        </Col>
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"Sending Plant"} form={form} id="SendingPlant" type="text" disabled/>
+                        </Col>
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"Sending Storage Location"} form={form} id="SendingStorageLocation" type="text" disabled/>
+                        </Col>
+                    </Row>
+                    
+                    <Row>
+                        <Col md="6" sm="12">
+                            <CustomDropdownInput label={"Loaded Lot No"} form={form} id="LoadedLotNo" isMulti
+                                options = {LoadedLot} 
+                                /*onChange ={(e)=>getMovemenetDetails(e)}*/  />
+                        </Col>
+                    </Row>
+                    <Row>
+                        <Col md="2" sm="12">
+                            <CustomTextInput label={"First Weight"} form={form} id="FirstWeight" type="text" disabled/>
+                        </Col>
+                        <Col md="2" sm="12">
+                            <CustomTextInput label={"Second Weight"} form={form} id="SecondWeight" type="text" disabled/>
+                        </Col>
+                        <Col md="2" sm="12">
+                            <CustomTextInput label={"Net Weight"} form={form} id="NetWeight" type="text" disabled/>
+                        </Col>
+                        <Col md="2" sm="12">
+                            <CustomTextInput label={"Gunny Weight"} form={form} id="GunnyWeight" type="text" disabled/>
+                        </Col>
+                        <Col md="2" sm="12">
+                            <CustomTextInput label={"Gunnyless Weight"} form={form} id="GunnylessWeight" type="text" disabled/>
+                        </Col>
+                    </Row>
+
+                    
+                    {/* BAG TYPE 1 - LOT 1 */}
+                    <HrLine header={"Selected Lot 1 BagType"} /><br/>
+                    <Row>
+                        {/* onChange ={(e) => onchangeBagType(e, "LooseWheat11")} */}
+                        <Col md="3" sm="12">
+                            <CustomDropdownInput label={"Bag Type"} form={form} id="BagType1Lot1"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`} 
+                                onChange ={(e) => CalcBagCount(e, "BagType1Lot1")} />
+                        </Col>
+
+                        <Col md="2" sm="12">
+                            <CustomTextInput label={"No.of Bags"} form={form} id="NoofBags1Lot1" type="text"
+                                onChange ={(e) => CalcBagCount(e,"NoofBags1Lot1")}/>
+                        </Col>
+
+                        <Col md="2" sm="12" id="LooseWheat111">
+                            <CustomDropdownInput label={"Bag Cutting Type"} form={form} id="BagCuttingType1Lot1"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`} />
+                        </Col>
+                        <Col md="3" sm="12" id="LooseWheat112">
+                            <CustomDropdownInput  label={"Bag Cutting Vendor"} form={form} id="BagCuttingVendor1Lot1"
+                                url={`${apiBaseUrl}warehouse/master/getVendorwithCharges`}
+                                onChange ={(e) => onchangeBagCutting(e,"BagCuttingVendor1Lot1","Charges1Lot1")} />
+                        </Col>
+                        <Col md="2" sm="12" id="LooseWheat113">
+                            <CustomTextInput label={"Charges"} form={form} id="Charges1Lot1" type="text" disabled/>
+                        </Col>
+                    </Row>
+
+                    {/* BAG TYPE 2 - LOT 1 */}
+                    <Row>
+                        <Col md="3" sm="12">
+                            <CustomDropdownInput  label={""} form={form} id="BagType2Lot1"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`}
+                                onChange ={(e) => CalcBagCount(e, "BagType2Lot1")} />
+                        </Col>
+                        <Col md="2" sm="12">
+                            <CustomTextInput label={""} form={form} id="NoofBags2Lot1" type="text"
+                                onChange ={(e) => CalcBagCount(e,"NoofBags2Lot1")}/>
+                        </Col>
+
+                        <Col md="2" sm="12" id = "LooseWheat211">
+                            <CustomDropdownInput label={""} form={form} id="BagCuttingType2Lot1"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`} />
+                        </Col>
+                        <Col md="3" sm="12" id = "LooseWheat212">
+                            <CustomDropdownInput  label={""} form={form} id="BagCuttingVendor2Lot1"
+                                url={`${apiBaseUrl}warehouse/master/getVendorwithCharges`}
+                                onChange ={(e) => onchangeBagCutting(e,"BagCuttingVendor2Lot1","Charges2Lot1")} />
+                        </Col>
+                        <Col md="2" sm="12" id = "LooseWheat213">
+                            <CustomTextInput label={""} form={form} id="Charges2Lot1" type="text" disabled/>
+                        </Col>
+                    </Row>
+
+                    {/* BAG TYPE 3 - LOT 1 */}
+                    <Row>
+                        <Col md="3" sm="12">
+                            <CustomDropdownInput  label={""} form={form} id="BagType3Lot1"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`}
+                                onChange ={(e) => CalcBagCount(e, "BagType3Lot1")} />
+                        </Col>
+                        <Col md="2" sm="12">
+                            <CustomTextInput label={""} form={form} id="NoofBags3Lot1" type="text"
+                                onChange ={(e) => CalcBagCount(e,"NoofBags3Lot1")}/>
+                        </Col>
+
+                        <Col md="2" sm="12" id = "LooseWheat311">
+                            <CustomDropdownInput label={""} form={form} id="BagCuttingType3Lot1"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`} />
+                        </Col>
+                        <Col md="3" sm="12" id = "LooseWheat312">
+                            <CustomDropdownInput label={""} form={form} id="BagCuttingVendor3Lot1"
+                                url={`${apiBaseUrl}warehouse/master/getVendorwithCharges`}
+                                onChange ={(e) => onchangeBagCutting(e,"BagCuttingVendor3Lot1","Charges3Lot1")} />
+                        </Col>
+                        <Col md="2" sm="12" id = "LooseWheat313">
+                            <CustomTextInput label={""} form={form} id="Charges3Lot1" type="text" disabled/>
+                        </Col>
+                    </Row>
+
+                    <HrLine header={"Selected Lot 2 BagType"} /><br/>
+                    {/* BAG TYPE 1 - LOT 2 */}
+                    <Row>
+                        <Col md="3" sm="12">
+                            <CustomDropdownInput  label={"Bag Type"} form={form} id="BagType1Lot2"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`}
+                                onChange ={(e) => CalcBagCount(e, "BagType1Lot2")} />
+                        </Col>
+                        <Col md="2" sm="12">
+                            <CustomTextInput label={"No.of Bags"} form={form} id="NoofBags1Lot2" type="text"
+                                onChange ={(e) => CalcBagCount(e,"NoofBags1Lot2")}/>
+                        </Col>
+
+                        <Col md="2" sm="12" id = "LooseWheat121">
+                            <CustomDropdownInput label={"Bag Cutting Type"} form={form} id="BagCuttingType1Lot2"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`} />
+                        </Col>
+                        <Col md="3" sm="12" id = "LooseWheat122">
+                            <CustomDropdownInput label={"Bag Cutting Vendor"} form={form} id="BagCuttingVendor1Lot2"
+                                url={`${apiBaseUrl}warehouse/master/getVendorwithCharges`}
+                                onChange ={(e) => onchangeBagCutting(e,"BagCuttingVendor1Lot2","Charges1Lot2")} />
+                        </Col>
+                        <Col md="2" sm="12" id = "LooseWheat123">
+                            <CustomTextInput label={"Charges"} form={form} id="Charges1Lot2" type="text" disabled/>
+                        </Col>
+                    </Row>
+
+                    {/* BAG TYPE 2 - LOT 2 */}
+                    <Row>
+                        <Col md="3" sm="12">
+                            <CustomDropdownInput label={""} form={form} id="BagType2Lot2"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`}
+                                onChange ={(e) => CalcBagCount(e, "BagType2Lot2")} />
+                        </Col>
+                        <Col md="2" sm="12">
+                            <CustomTextInput label={""} form={form} id="NoofBags2Lot2" type="text"
+                                onChange ={(e) => CalcBagCount(e,"NoofBags2Lot2")}/>
+                        </Col>
+                        <Col md="2" sm="12" id = "LooseWheat221">
+                            <CustomDropdownInput label={""} form={form} id="BagCuttingType2Lot2"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`} />
+                        </Col>
+                        <Col md="3" sm="12" id = "LooseWheat222">
+                            <CustomDropdownInput label={""} form={form} id="BagCuttingVendor2Lot2"
+                                url={`${apiBaseUrl}warehouse/master/getVendorwithCharges`}
+                                onChange ={(e) => onchangeBagCutting(e,"BagCuttingVendor2Lot2","Charges2Lot2")} />
+                        </Col>
+                        <Col md="2" sm="12" id = "LooseWheat223">
+                            <CustomTextInput label={""} form={form} id="Charges2Lot2" type="text" disabled/>
+                        </Col>
+                    </Row>
+
+                    {/* BAG TYPE 3 - LOT 2 */}
+                    <Row>
+                        <Col md="3" sm="12">
+                            <CustomDropdownInput label={""} form={form} id="BagType3Lot2"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`}
+                                onChange ={(e) => CalcBagCount(e, "BagType3Lot2")} />
+                        </Col>
+                        <Col md="2" sm="12">
+                            <CustomTextInput label={""} form={form} id="NoofBags3Lot2" type="text"
+                                onChange ={(e) => CalcBagCount(e,"NoofBags3Lot2")}/>
+                        </Col>
+                        <Col md="2" sm="12" id = "LooseWheat321">
+                            <CustomDropdownInput label={""} form={form} id="BagCuttingType3Lot2"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`} />
+                        </Col>
+                        <Col md="3" sm="12" id = "LooseWheat322">
+                            <CustomDropdownInput label={""} form={form} id="BagCuttingVendor3Lot2"
+                            url={`${apiBaseUrl}warehouse/master/getVendorwithCharges`}
+                            onChange ={(e) => onchangeBagCutting(e,"BagCuttingVendor3Lot2","Charges3Lot2")} />
+                        </Col>
+                        <Col md="2" sm="12" id = "LooseWheat323">
+                            <CustomTextInput label={""} form={form} id="Charges3Lot2" type="text" disabled/>
+                        </Col>
+                    </Row>
+                   
+                    <HrLine header={"Selected Lot 3 BagType"} />
+                    {/* BAG TYPE 1 - LOT 3 */}
+                    <Row>
+                        <Col md="3" sm="12">
+                            <CustomDropdownInput label={"Bag Type"} form={form} id="BagType1Lot3"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`}
+                                onChange ={(e) => CalcBagCount(e, "BagType1Lot3")} />
+                        </Col>
+                        <Col md="2" sm="12">
+                            <CustomTextInput label={"No.of Bags"} form={form} id="NoofBags1Lot3" type="text"
+                                onChange ={(e) => CalcBagCount(e,"NoofBags1Lot3")}/>
+                        </Col>
+                        <Col md="2" sm="12" id = "LooseWheat131">
+                            <CustomDropdownInput  label={"Bag Cutting Type"} form={form} id="BagCuttingType1Lot3"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`} />
+                        </Col>
+                        <Col md="3" sm="12" id = "LooseWheat132">
+                            <CustomDropdownInput label={"Bag Cutting Vendor"} form={form} id="BagCuttingVendor1Lot3"
+                                url={`${apiBaseUrl}warehouse/master/getVendorwithCharges`}
+                                onChange ={(e) => onchangeBagCutting(e,"BagCuttingVendor1Lot3","Charges1Lot3")} />
+                        </Col>
+                        <Col md="2" sm="12" id = "LooseWheat133">
+                            <CustomTextInput label={"Charges"} form={form} id="Charges1Lot3" type="text" disabled/>
+                        </Col>
+                    </Row>
+
+                    {/* BAG TYPE 2 - LOT 3 */}
+                    <Row>
+                        <Col md="3" sm="12">
+                            <CustomDropdownInput label={""} form={form} id="BagType2Lot3"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`}
+                                onChange ={(e) => CalcBagCount(e, "BagType2Lot3")} />
+                        </Col>
+                        <Col md="2" sm="12">
+                            <CustomTextInput label={""} form={form} id="NoofBags2Lot3" type="text"
+                                onChange ={(e) => CalcBagCount(e,"NoofBags2Lot3")}/>
+                        </Col>
+                        <Col md="2" sm="12" id = "LooseWheat231">
+                            <CustomDropdownInput label={""} form={form} id="BagCuttingType2Lot3"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`} />
+                        </Col>
+                        <Col md="3" sm="12" id = "LooseWheat232">
+                            <CustomDropdownInput label={""} form={form} id="BagCuttingVendor2Lot3"
+                                url={`${apiBaseUrl}warehouse/master/getVendorwithCharges`}
+                                onChange ={(e) => onchangeBagCutting(e,"BagCuttingVendor2Lot3","Charges2Lot3")} />
+                        </Col>
+                        <Col md="2" sm="12" id = "LooseWheat233">
+                            <CustomTextInput label={""} form={form} id="Charges2Lot3" type="text" disabled/>
+                        </Col>
+                    </Row>
+
+                    {/* BAG TYPE 3 - LOT 3 */}
+                    <Row>
+                        <Col md="3" sm="12">
+                            <CustomDropdownInput label={""} form={form} id="BagType3Lot3"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`}
+                                onChange ={(e) => CalcBagCount(e, "BagType3Lot3")} />
+                        </Col>
+                        <Col md="2" sm="12">
+                            <CustomTextInput label={""} form={form} id="NoofBags3Lot3" type="text"
+                                onChange ={(e) => CalcBagCount(e,"NoofBags3Lot3")}/>
+                        </Col>
+                        <Col md="2" sm="12" id = "LooseWheat331">
+                            <CustomDropdownInput label={""} form={form} id="BagCuttingType3Lot3"
+                                url={`${apiBaseUrl}warehouse/master/bagtype_new`} />
+                        </Col>
+                        <Col md="3" sm="12" id = "LooseWheat332">
+                            <CustomDropdownInput label={""} form={form} id="BagCuttingVendor3Lot3"
+                                url={`${apiBaseUrl}warehouse/master/getVendorwithCharges`}
+                                onChange ={(e) => onchangeBagCutting(e,"BagCuttingVendor3Lot3","Charges3Lot3")} />
+                        </Col>
+                        <Col md="2" sm="12" id = "LooseWheat333">
+                            <CustomTextInput label={""} form={form} id="Charges3Lot3" type="text" disabled/>
+                        </Col>
+                    </Row>
+                    
+
+                    <Row>
+                        <Col md="3" sm="12"></Col>
+                        <Col md="2" sm="12">
+                            <CustomTextInput label={"Total Bags"} form={form} id="TotalBags" type="text" disabled/>
+                        </Col>
+                    </Row>
+                    
+
+                    <HrLine header={"Planning Lot Details"} /><br/>
+                    
+                    <Row> 
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"Lot No 1"} form={form} id="LotNo1" type="text" disabled/>
+                        </Col>
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"Planning Qty"} form={form} id="PlanningQty1" type="text" disabled/>
+                        </Col>
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"SAP Qty"} form={form} id="SAPQty1" type="text" disabled/>
+                        </Col>
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"Movement Qty in KG"} form={form} id="MovementQty1" type="text"
+                                onChange = {(e)=>CalcMovementQty(e, "MovementQty1")}/>
+                        </Col>
+                    </Row>
+                    <Row>
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"Lot No 2"} form={form} id="LotNo2" type="text" disabled/>
+                        </Col>
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"Planning Qty"} form={form} id="PlanningQty2" type="text" disabled/>
+                        </Col>
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"SAP Qty"} form={form} id="SAPQty2" type="text" disabled/>
+                        </Col>
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"Movement Qty in KG"} form={form} id="MovementQty2" type="text"
+                                onChange = {(e)=>CalcMovementQty(e, "MovementQty2")}/>
+                        </Col>
+                    </Row>
+                    <Row>
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"Lot No 3"} form={form} id="LotNo3" type="text" disabled/>
+                        </Col>
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"Planning Qty"} form={form} id="PlanningQty3" type="text" disabled/>
+                        </Col>
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"SAP Qty"} form={form} id="SAPQty3" type="text" disabled/>
+                        </Col>
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"Movement Qty in KG"} form={form} id="MovementQty3" type="text"
+                                onChange = {(e)=>CalcMovementQty(e, "MovementQty3")}/>
+                        </Col>
+                    </Row>
+
+                    <Row>
+                        <Col md="9" sm="12"></Col>
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"Total MovementQty"} form={form} id="TotalMovementQty" type="text" disabled/>
+                        </Col>
+                    </Row>
+                    
+                    <HrLine/>
+                    <Row>
+                        <Col md="7" sm="12"></Col>
+                        <Col md="3" sm="12">
+                            <CustomTextInput label={"Reject Reason"} form={form} id="RejectReason" type="text"/>
+                        </Col>
+                        <Col md="1" sm="12">
+                            <Button.Ripple color="primary" type="button" onClick={(e)=>Reject_PO(e,form.values.RejectReason)} >Reject</Button.Ripple>
+                        </Col>
+                        <Col md="1" sm="12">
+                        <Button.Ripple color="primary" type="button" onClick={(e)=>Save_PO(e)} >Submit</Button.Ripple>
+                        </Col>
+                    </Row>
+                </CardBody>
+            </Card>
+
+        </div>
+    )
+};
+export default WhUnloadingUpdateLot;

@@ -1,0 +1,147 @@
+<?php
+
+namespace App\Controllers\Api\MarketData;
+
+use App\Controllers\Api\BaseApiController;
+use App\Models\MarketData\MasterModel;
+
+class Master extends BaseApiController
+{
+  public function getDeliveryAt()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getDeliveryAt());
+  }
+
+  public function getLoadingLocation()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getLoadingLocation());
+  }
+  public function getFromLocation()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getFromLocation());
+  }
+  public function getToLocation()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getToLocation());
+  }
+
+  public function getModeOfTransport()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getModeOfTransport());
+  }
+
+  public function getSuppliers()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getSuppliers());
+  }
+
+  public function getSupplierCategory()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getSupplierCategory());
+  }
+
+  public function getWheatVariety()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getWheatVariety());
+  }
+  public function getPlants()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getPlants());
+  }
+
+  public function getWheatVarietyState()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getWheatVarietyState());
+  }
+
+  public function getWheatVarietyZone()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getWheatVarietyZone());
+  }
+
+  public function getWheatVarietyCity()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getWheatVarietyCity());
+  }
+
+  public function getWheatVarietySeed()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getWheatVarietySeed());
+  }
+
+  public function getwarehouses()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getwarehouses());
+  }
+
+  public function getmasterplant()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getmasterplant());
+  }
+
+  public function getmasterplantvalueId()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getmasterplantvalueId());
+  }
+
+  public function getuserinfo()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getuserinfo());
+  }
+
+  public function getprivilege()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getprivilege());
+  }
+
+  public function getscreenname()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getscreenname());
+  }
+  public function getscreenname_desc()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getscreenname_DESC());
+  }
+  
+
+  public function getrolename()
+  {
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getrolename());
+  }
+  public function getCommonActiveStatusG1(){
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getCommonActiveStatusG1());    
+
+  }
+  public function getCommonActiveStatusG2(){
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getCommonActiveStatusG2());    
+
+  }
+  public function getCommonActiveStatusG3(){
+    $master = new MasterModel();
+    return  $this->sendSuccessResult($master->getCommonActiveStatusG3());    
+
+  }
+}

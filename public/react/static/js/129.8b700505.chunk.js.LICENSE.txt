@@ -1,0 +1,30 @@
+/*!
+	Copyright (c) 2018 Jed Watson.
+	Licensed under the MIT License (MIT), see
+	http://jedwatson.github.io/classnames
+*/
+
+/*!
+ * The buffer module from node.js, for the browser.
+ *
+ * @author   Feross Aboukhadijeh <http://feross.org>
+ * @license  MIT
+ */
+
+/*! exports provided: default */
+
+/*! ieee754. BSD-3-Clause License. Feross Aboukhadijeh <https://feross.org/opensource> */
+
+/*! no static exports found */
+
+/*! react */
+
+/*! safe-buffer. MIT License. Feross Aboukhadijeh <https://feross.org/opensource> */
+
+/*!******************************!*\
+        !*** ./src/react-webcam.tsx ***!
+        \******************************/
+
+/*!**************************************************************************************!*\
+        !*** external {"root":"React","commonjs2":"react","commonjs":"react","amd":"react"} ***!
+        \**************************************************************************************/

@@ -1,0 +1,169 @@
+app\Config\App.php:22:	 * environments.
+app\Config\Boot\production.php:7: | Don't show ANY in production environments. Instead, let the system catch
+app\Config\Database.php:47:		'DBDebug'  => (ENVIRONMENT !== 'production'),
+app\Config\Database.php:73:		'DBDebug'  => (ENVIRONMENT !== 'production'),
+app\Config\Database.php:93:		if (ENVIRONMENT === 'testing')
+app\Config\Events.php:26:	if (ENVIRONMENT !== 'testing')
+app\Config\Routes.php:8:// Load the system's routing file first, so that the app and ENVIRONMENT
+app\Config\Routes.php:68: * need it to be able to override any defaults in this file. Environment
+app\Config\Routes.php:75:if (file_exists(APPPATH . 'Config/' . ENVIRONMENT . '/Routes.php'))
+app\Config\Routes.php:77:	require APPPATH . 'Config/' . ENVIRONMENT . '/Routes.php';
+app\Config\Toolbar.php:21: * NOT be displayed under production environments, and will only display if
+app\Filters\AuthFilter.php:20:                    //Console.write(ENVIRONMENT);
+app\Filters\AuthFilter.php:24:                    return Services::response()->setStatusCode(401)->setJSON(["success" => 0, "result" => "Please provide the auth token".ENVIRONMENT."X" ]);
+app\Views\welcome_message.php:157:		footer .environment {
+app\Views\welcome_message.php:292:	<div class="environment">
+app\Views\welcome_message.php:296:		<p>Environment: <?= ENVIRONMENT ?></p>
+public\index.php:20: * and fires up an environment-specific bootstrapping.
+vendor\codeigniter4\framework\app\Config\App.php:22:	 * environments.
+vendor\codeigniter4\framework\app\Config\Boot\production.php:7: | Don't show ANY in production environments. Instead, let the system catch
+vendor\codeigniter4\framework\app\Config\Database.php:42:		'DBDebug'  => (ENVIRONMENT !== 'production'),
+vendor\codeigniter4\framework\app\Config\Database.php:68:		'DBDebug'  => (ENVIRONMENT !== 'production'),
+vendor\codeigniter4\framework\app\Config\Database.php:88:		if (ENVIRONMENT === 'testing')
+vendor\codeigniter4\framework\app\Config\Events.php:26:	if (ENVIRONMENT !== 'testing')
+vendor\codeigniter4\framework\app\Config\Routes.php:8:// Load the system's routing file first, so that the app and ENVIRONMENT
+vendor\codeigniter4\framework\app\Config\Routes.php:43: * need it to be able to override any defaults in this file. Environment
+vendor\codeigniter4\framework\app\Config\Routes.php:50:if (file_exists(APPPATH . 'Config/' . ENVIRONMENT . '/Routes.php'))
+vendor\codeigniter4\framework\app\Config\Routes.php:52:	require APPPATH . 'Config/' . ENVIRONMENT . '/Routes.php';
+vendor\codeigniter4\framework\app\Config\Toolbar.php:21: * NOT be displayed under production environments, and will only display if
+vendor\codeigniter4\framework\app\Views\welcome_message.php:157:		footer .environment {
+vendor\codeigniter4\framework\app\Views\welcome_message.php:292:	<div class="environment">
+vendor\codeigniter4\framework\app\Views\welcome_message.php:296:		<p>Environment: <?= ENVIRONMENT ?></p>
+vendor\codeigniter4\framework\public\index.php:20: * and fires up an environment-specific bootstrapping.
+vendor\codeigniter4\framework\system\bootstrap.php:139:// Load environment settings from .env files into $_SERVER and $_ENV
+vendor\codeigniter4\framework\system\CLI\CLI.php:600:		if (ENVIRONMENT === 'testing')
+vendor\codeigniter4\framework\system\CLI\CLI.php:619:	 * terminals via named pipes, so we can only check the environment.
+vendor\codeigniter4\framework\system\CodeIgniter.php:157:	 * Handles some basic app and environment setup.
+vendor\codeigniter4\framework\system\CodeIgniter.php:161:		// Define environment variables
+vendor\codeigniter4\framework\system\CodeIgniter.php:162:		$this->detectEnvironment();
+vendor\codeigniter4\framework\system\CodeIgniter.php:163:		$this->bootstrapEnvironment();
+vendor\codeigniter4\framework\system\CodeIgniter.php:491:	 * current environment. Setting the environment also influences
+vendor\codeigniter4\framework\system\CodeIgniter.php:500:	protected function detectEnvironment()
+vendor\codeigniter4\framework\system\CodeIgniter.php:502:		// Make sure ENVIRONMENT isn't already set by other means.
+vendor\codeigniter4\framework\system\CodeIgniter.php:503:		if (! defined('ENVIRONMENT'))
+vendor\codeigniter4\framework\system\CodeIgniter.php:508:				define('ENVIRONMENT', 'testing');
+vendor\codeigniter4\framework\system\CodeIgniter.php:512:				define('ENVIRONMENT', $_SERVER['CI_ENVIRONMENT'] ?? 'production');
+vendor\codeigniter4\framework\system\CodeIgniter.php:520:	 * Load any custom boot files based upon the current environment.
+vendor\codeigniter4\framework\system\CodeIgniter.php:525:	protected function bootstrapEnvironment()
+vendor\codeigniter4\framework\system\CodeIgniter.php:527:		if (is_file(APPPATH . 'Config/Boot/' . ENVIRONMENT . '.php'))
+vendor\codeigniter4\framework\system\CodeIgniter.php:529:			require_once APPPATH . 'Config/Boot/' . ENVIRONMENT . '.php';
+vendor\codeigniter4\framework\system\CodeIgniter.php:535:			echo 'The application environment is not set correctly.';
+vendor\codeigniter4\framework\system\CodeIgniter.php:590:		if (is_cli() && ENVIRONMENT !== 'testing')
+vendor\codeigniter4\framework\system\CodeIgniter.php:614:		if (! is_cli() || ENVIRONMENT === 'testing')
+vendor\codeigniter4\framework\system\CodeIgniter.php:845:		return (is_cli() && ! (ENVIRONMENT === 'testing')) ? $this->request->getPath() : $this->request->uri->getPath();
+vendor\codeigniter4\framework\system\CodeIgniter.php:985:		if (ENVIRONMENT !== 'testing')
+vendor\codeigniter4\framework\system\CodeIgniter.php:1003:		throw PageNotFoundException::forPageNotFound(ENVIRONMENT !== 'production' || is_cli() ? $e->getMessage() : '');
+vendor\codeigniter4\framework\system\Commands\Database\CreateDatabase.php:97:				$group  = ENVIRONMENT === 'testing' ? 'tests' : $config->defaultGroup;
+vendor\codeigniter4\framework\system\Commands\Database\MigrateRefresh.php:61:		'-f'    => 'Force command - this option allows you to bypass the confirmation question when running this command in a production environment',
+vendor\codeigniter4\framework\system\Commands\Database\MigrateRefresh.php:76:		if (ENVIRONMENT === 'production')
+vendor\codeigniter4\framework\system\Commands\Database\MigrateRollback.php:62:		'-f' => 'Force command - this option allows you to bypass the confirmation question when running this command in a production environment',
+vendor\codeigniter4\framework\system\Commands\Database\MigrateRollback.php:75:		if (ENVIRONMENT === 'production')
+vendor\codeigniter4\framework\system\Commands\Database\MigrateStatus.php:95:			if (ENVIRONMENT !== 'testing')
+vendor\codeigniter4\framework\system\Commands\Server\Serve.php:119:		// to ensure our environment is set and it simulates basic mod_rewrite.
+vendor\codeigniter4\framework\system\Common.php:353:	 * Allows user to retrieve values from the environment
+vendor\codeigniter4\framework\system\Common.php:491:		if ((ENVIRONMENT !== 'testing' && (is_cli() || $request->isSecure())) || (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'test'))
+vendor\codeigniter4\framework\system\Common.php:500:		if (ENVIRONMENT !== 'testing' && session_status() === PHP_SESSION_ACTIVE)
+vendor\codeigniter4\framework\system\Common.php:529:		if (ENVIRONMENT !== 'testing')
+vendor\codeigniter4\framework\system\Common.php:820:		if (ENVIRONMENT === 'testing')
+vendor\codeigniter4\framework\system\Common.php:866:		if (session_status() === PHP_SESSION_NONE && ENVIRONMENT !== 'testing')
+vendor\codeigniter4\framework\system\Config\AutoloadConfig.php:105:		if (isset($_SERVER['CI_ENVIRONMENT']) && $_SERVER['CI_ENVIRONMENT'] === 'testing')
+vendor\codeigniter4\framework\system\Config\BaseConfig.php:26: * from the environment.
+vendor\codeigniter4\framework\system\Config\BaseConfig.php:55:	 * Will attempt to get environment variables with names
+vendor\codeigniter4\framework\system\Config\BaseConfig.php:92:	 * Initialization an environment-specific configuration setting
+vendor\codeigniter4\framework\system\Config\BaseConfig.php:133:	 * Retrieve an environment-specific configuration setting
+vendor\codeigniter4\framework\system\Config\DotEnv.php:17: * Environment-specific configuration
+vendor\codeigniter4\framework\system\Config\DotEnv.php:45:	 * so that we end up with all settings in the PHP environment vars
+vendor\codeigniter4\framework\system\Config\DotEnv.php:105:	 * Sets the variable into the environment. Will parse the string
+vendor\codeigniter4\framework\system\Config\DotEnv.php:169:	 * Strips quotes from the environment variable value.
+vendor\codeigniter4\framework\system\Config\DotEnv.php:232:	 * environment variable.
+vendor\codeigniter4\framework\system\Config\DotEnv.php:267:	 * Search the different places for environment variables and return first value found.
+vendor\codeigniter4\framework\system\Database\Config.php:67:			$group = ENVIRONMENT === 'testing' ? 'tests' : $config->defaultGroup;
+vendor\codeigniter4\framework\system\Database\MigrationRunner.php:1027:		// Skip tests db group when not running in testing environment
+vendor\codeigniter4\framework\system\Database\MigrationRunner.php:1028:		if (ENVIRONMENT !== 'testing' && $group === 'tests' && $this->groupFilter !== 'tests')
+vendor\codeigniter4\framework\system\Debug\Exceptions.php:141:				$this->respond(ENVIRONMENT === 'development' ? $this->collectVars($exception, $statusCode) : '', $statusCode)->send();
+vendor\codeigniter4\framework\system\Debug\Exceptions.php:215:		// Production environments should have a custom exception file.
+vendor\codeigniter4\framework\system\Debug\Toolbar\Collectors\Config.php:36:			'environment' => ENVIRONMENT,
+vendor\codeigniter4\framework\system\Debug\Toolbar\Views\toolbarloader.js.php:1:<?php if (ENVIRONMENT !== 'testing') : ?>
+vendor\codeigniter4\framework\system\Debug\Toolbar.php:371:		if (ENVIRONMENT === 'testing')
+vendor\codeigniter4\framework\system\Email\Email.php:185:	 * that seems to work for all environments.
+vendor\codeigniter4\framework\system\Format\JSONFormatter.php:36:		$options = ENVIRONMENT === 'production' ? $options : $options | JSON_PRETTY_PRINT;
+vendor\codeigniter4\framework\system\HTTP\Files\UploadedFile.php:110:	 * When used in an SAPI environment where $_FILES is populated, when writing
+vendor\codeigniter4\framework\system\HTTP\Files\UploadedFileInterface.php:51:	 * When used in an SAPI environment where $_FILES is populated, when writing
+vendor\codeigniter4\framework\system\HTTP\IncomingRequest.php:37: * application from the CGI and/or PHP environment, including:
+vendor\codeigniter4\framework\system\HTTP\IncomingRequest.php:600:	 * determined from the environment as needed.
+vendor\codeigniter4\framework\system\HTTP\ResponseTrait.php:543:		// IIS environment likely? Use 'refresh' for better compatibility
+vendor\codeigniter4\framework\system\Log\Logger.php:407:		$replace['{env}']       = ENVIRONMENT;
+vendor\codeigniter4\framework\system\Log\Logger.php:418:		// Match up environment variables in {env:foo} tags.
+vendor\codeigniter4\framework\system\Router\RouteCollection.php:1156:	 * Limits the routes to a specified ENVIRONMENT or they won't run.
+vendor\codeigniter4\framework\system\Router\RouteCollection.php:1163:	public function environment(string $env, Closure $callback): RouteCollectionInterface
+vendor\codeigniter4\framework\system\Router\RouteCollection.php:1165:		if (ENVIRONMENT === $env)
+vendor\codeigniter4\framework\system\Session\Session.php:190:		if (is_cli() && ENVIRONMENT !== 'testing')
+vendor\codeigniter4\framework\system\Session\Session.php:1020:		if (ENVIRONMENT === 'testing')
+vendor\codeigniter4\framework\system\Test\bootstrap.php:23:$_SERVER['CI_ENVIRONMENT'] = 'testing';
+vendor\codeigniter4\framework\system\Test\bootstrap.php:24:define('ENVIRONMENT', 'testing');
+vendor\codeigniter4\framework\system\Test\bootstrap.php:62:// Set environment values that would otherwise stop the framework from functioning during tests.
+vendor\codeigniter4\framework\system\Test\CIUnitTestCase.php:323:	 * and gets the environment setup.
+vendor\codeigniter4\framework\system\Validation\FileRules.php:71:			if (ENVIRONMENT === 'testing')
+vendor\codeigniter4\framework\system\Validation\FileRules.php:80:				// Note: cannot unit test this; no way to over-ride ENVIRONMENT?
+vendor\composer\autoload_classmap.php:564:    'SebastianBergmann\\Environment\\Console' => $vendorDir . '/sebastian/environment/src/Console.php',
+vendor\composer\autoload_classmap.php:565:    'SebastianBergmann\\Environment\\OperatingSystem' => $vendorDir . '/sebastian/environment/src/OperatingSystem.php',
+vendor\composer\autoload_classmap.php:566:    'SebastianBergmann\\Environment\\Runtime' => $vendorDir . '/sebastian/environment/src/Runtime.php',
+vendor\composer\autoload_static.php:715:        'SebastianBergmann\\Environment\\Console' => __DIR__ . '/..' . '/sebastian/environment/src/Console.php',
+vendor\composer\autoload_static.php:716:        'SebastianBergmann\\Environment\\OperatingSystem' => __DIR__ . '/..' . '/sebastian/environment/src/OperatingSystem.php',
+vendor\composer\autoload_static.php:717:        'SebastianBergmann\\Environment\\Runtime' => __DIR__ . '/..' . '/sebastian/environment/src/Runtime.php',
+vendor\composer\installed.php:297:    'sebastian/environment' => 
+vendor\composer\InstalledVersions.php:321:    'sebastian/environment' => 
+vendor\fakerphp\faker\src\Faker\Provider\en_US\Company.php:45:        'Earth Driller', 'Economics Teacher', 'Economist', 'Editor', 'Education Administrator', 'Education Teacher', 'Educational Counselor OR Vocationall Counselor', 'Educational Psychologist', 'Electric Meter Installer', 'Electric Motor Repairer', 'Electrical and Electronic Inspector and Tester', 'Electrical and Electronics Drafter', 'Electrical Drafter', 'Electrical Engineer', 'Electrical Engineering Technician', 'Electrical Parts Reconditioner', 'Electrical Power-Line Installer', 'Electrical Sales Representative', 'Electrician', 'Electrician', 'Electrolytic Plating Machine Operator', 'Electromechanical Equipment Assembler', 'Electro-Mechanical Technician', 'Electronic Drafter', 'Electronic Engineering Technician', 'Electronic Equipment Assembler', 'Electronic Masking System Operator', 'Electronics Engineer', 'Electronics Engineering Technician', 'Electrotyper', 'Elementary and Secondary School Administrators', 'Elementary School Teacher', 'Elevator Installer and Repairer', 'Eligibility Interviewer', 'Embalmer', 'Embossing Machine Operator', 'Emergency Management Specialist', 'Emergency Medical Technician and Paramedic', 'Employment Interviewer', 'Engine Assembler', 'Engineer', 'Engineering', 'Engineering Manager', 'Engineering Teacher', 'Engineering Technician', 'English Language Teacher', 'Engraver', 'Entertainer and Performer', 'Entertainment Attendant', 'Environmental Compliance Inspector', 'Environmental Engineer', 'Environmental Engineering Technician', 'Environmental Science Teacher', 'Environmental Science Technician', 'Environmental Scientist', 'Epidemiologist', 'Equal Opportunity Representative', 'Etcher', 'Etcher and Engraver', 'Event Planner', 'Excavating Machine Operator', 'Executive Secretary', 'Exhibit Designer', 'Explosives Expert', 'Extraction Worker', 'Extruding and Drawing Machine Operator', 'Extruding Machine Operator',
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\content\LargeFileContentTestCase.php:27:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\content\StringBasedFileContentTestCase.php:27:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\DirectoryIterationTestCase.php:21:     * clean up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\FilenameTestCase.php:24:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\PermissionsTestCase.php:24:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\QuotaTestCase.php:26:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamContainerIteratorTestCase.php:36:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamContainerIteratorTestCase.php:54:     * clean up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamDirectoryIssue134TestCase.php:23:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamDirectoryIssue18TestCase.php:26:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamDirectoryTestCase.php:24:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamExLockTestCase.php:20:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamFileTestCase.php:24:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamResolveIncludePathTestCase.php:27:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamResolveIncludePathTestCase.php:38:     * clean up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamTestCase.php:20:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamUmaskTestCase.php:21:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamUmaskTestCase.php:29:     * clean up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamWrapperAlreadyRegisteredTestCase.php:34:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamWrapperAlreadyRegisteredTestCase.php:44:     * clean up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamWrapperBaseTestCase.php:66:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamWrapperDirSeparatorTestCase.php:27:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamWrapperFileTimesTestCase.php:38:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamWrapperFlockTestCase.php:30:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamWrapperLargeFileTestCase.php:30:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamWrapperQuotaTestCase.php:26:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamWrapperSetOptionTestCase.php:28:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamWrapperWithoutRootTestCase.php:17:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\vfsStreamZipTestCase.php:19:     * set up test environment
+vendor\mikey179\vfsstream\src\test\php\org\bovigo\vfs\visitor\vfsStreamAbstractVisitorTestCase.php:31:     * set up test environment
+vendor\phpspec\prophecy\src\Prophecy\Doubler\Generator\ClassCreator.php:18: * Creates specific class in current environment.
+vendor\phpunit\php-code-coverage\src\Driver\Selector.php:17:use SebastianBergmann\Environment\Runtime;
+vendor\phpunit\php-code-coverage\src\Report\Html\Renderer.php:22:use SebastianBergmann\Environment\Runtime;
+vendor\phpunit\php-code-coverage\src\Report\Xml\BuildInformation.php:16:use SebastianBergmann\Environment\Runtime;
+vendor\phpunit\php-code-coverage\src\Report\Xml\Facade.php:39:use SebastianBergmann\Environment\Runtime;
+vendor\phpunit\phpunit\src\TextUI\DefaultResultPrinter.php:39:use SebastianBergmann\Environment\Console;
+vendor\phpunit\phpunit\src\TextUI\Help.php:22:use SebastianBergmann\Environment\Console;
+vendor\phpunit\phpunit\src\TextUI\TestRunner.php:80:use SebastianBergmann\Environment\Runtime;
+vendor\phpunit\phpunit\src\Util\ExcludeList.php:41:use SebastianBergmann\Environment\Runtime;
+vendor\phpunit\phpunit\src\Util\ExcludeList.php:133:        // sebastian/environment
+vendor\phpunit\phpunit\src\Util\PHP\AbstractPhpProcess.php:37:use SebastianBergmann\Environment\Runtime;
+vendor\phpunit\phpunit\src\Util\PHP\AbstractPhpProcess.php:139:     * Sets the array of environment variables to start the child process with.
+vendor\phpunit\phpunit\src\Util\PHP\AbstractPhpProcess.php:149:     * Returns the array of environment variables to start the child process with.
+vendor\phpunit\phpunit\src\Util\PHP\WindowsPhpProcess.php:39:                'A temporary file could not be created; verify that your TEMP environment variable is writable'
+vendor\phpunit\phpunit\src\Util\Test.php:55:use SebastianBergmann\Environment\OperatingSystem;
+vendor\sebastian\environment\src\Console.php:3: * This file is part of sebastian/environment.
+vendor\sebastian\environment\src\Console.php:10:namespace SebastianBergmann\Environment;
+vendor\sebastian\environment\src\OperatingSystem.php:3: * This file is part of sebastian/environment.
+vendor\sebastian\environment\src\OperatingSystem.php:10:namespace SebastianBergmann\Environment;
+vendor\sebastian\environment\src\Runtime.php:3: * This file is part of sebastian/environment.
+vendor\sebastian\environment\src\Runtime.php:10:namespace SebastianBergmann\Environment;
+vendor\sebastian\environment\src\Runtime.php:34: * Utility class for HHVM/PHP environment handling.
+vendor\sebastian\resource-operations\src\ResourceOperations.php:1166:            'ingres_set_environment',

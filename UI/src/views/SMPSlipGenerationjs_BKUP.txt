@@ -1,0 +1,223 @@
+import React, { Fragment, useEffect } from "react";
+import { useFormik } from "formik";
+import { validation, Yup } from "./forms/custom-form";
+import { useHistory, useParams } from "react-router";
+import { apiBaseUrl,evaUrl } from "../urlConstants";
+import { useLoader } from "../utility/hooks/useLoader";
+import { addOption } from "./common/Utils";
+
+import { apiPostMethod } from "@helpers/axiosHelper";
+import { errorToast, ShowToast } from "@helpers/appHelper";
+import { CancelSubmitButtons } from "./forms/custom-button";
+import { CardComponent } from "./common/CardComponent";
+import moment from "moment"; 
+////import SlipForm from "./SlipForm";
+import { Row, Col,Button } from "reactstrap";
+import { CustomDropdownInput, CustomTextInput } from "./forms/custom-form";
+
+import { eadUrl,tblSTMUrl,BASE_URL } from "../urlConstants";
+const SlipForm = ({ form,onSubmit }) => {
+  const history = useHistory();
+  let { id } = useParams();
+  let refid='';
+  if(id){
+  refid = id.replace(":", "");
+  }
+  let { showLoader, hideLoader } = useLoader();
+  useEffect(() => {
+    if (id) {
+      onFetchSDIdetailsById();
+   
+    }
+  }, [id]);
+  const onFetchSDIdetailsById = () => {
+    
+    let fdata = {
+      ID: refid,
+      formType: "QCDET",
+      plantIds:[],
+      startCount:0
+    };
+    //showLoader();
+    //alert("ok")
+    apiPostMethod(tblSTMUrl, fdata)
+      .then((response) => {
+        const { data } = response;
+        console.log(JSON.stringify(response));
+        if (data.success) {
+          form.setValues({
+            ZVA_NUMBER:data.results[0].ZVA_NUMBER,
+            TRUCK_NO:data.results[0].TRUCK_NO,
+            GateOutDateTime:data.results[0].GateOutDateTime,
+            PickslipDateTime:data.results[0].PickslipDateTime,
+            VADate:data.results[0].VADate,
+            SendingPlantName:data.results[0].PLANT_NAME,
+            ZSUPPLIER_INV_NO:data.results[0].ZSUPPLIER_INV_NO,
+            
+            
+
+            WheatVariety:data.DispDetRecords[0].WheatVariety,
+           
+            StoPoNo:data.DispDetRecords[0].ZPO_NUMBER,
+            SendingStorageLocationName:data.DispDetRecords[0].StorageLocation,
+           DeliveryNo:data.DispDetRecords[0].DeliveryNo,
+            Transporter:data.DispDetRecords[0].Transporter,
+            DeliveryDate:data.DispDetRecords[0].DeliveryDate,
+            ReceivingPlantName:data.DispDetRecords[0].ReceivingPlantName,
+            PickSlipNo:data.DispDetRecords[0].PickSlipNo,
+            ReceivingStorageLocationName:data.DispDetRecords[0].ReceivingStorageLocationName,
+            BagType:data.DispDetRecords[0].BagType,
+            WbEmptyWt:data.DispDetRecords[0] ? data.DispDetRecords[0].FirstWeight:"",
+            no_bags:data.DispDetRecords[0].no_bags,
+            no_bags2:data.DispDetRecords[0].no_bags2,
+            no_bags3:data.DispDetRecords[0].no_bags3,
+            WbLoadWt:data.DispDetRecords[0] ? data.DispDetRecords[0].SecondWeight:"",
+            GunnyWt:"0",
+            WbNetWt:data.DispDetRecords[0] ? data.DispDetRecords[0].NetWeight:"",
+            GunnyLessNetWt:data.DispDetRecords[0] ? data.DispDetRecords[0].NetWeight:"",
+            
+            LoadingVendor:data.DispDetRecords[0].LoadingVendor,
+            LastMileTransporter:data.DispDetRecords[0].LastMileTransporter,
+            LoadedLotNo:data.DispDetRecords[0].LoadedLotNo,
+
+            
+            intrastate_gateout_infoCount:data.silotomillunload_gateout_info ? data.silotomillunload_gateout_info.length : 0,
+
+            RWbTicketNumber:data.silotomillunload_gateout_info[0] ? data.silotomillunload_gateout_info[0].WbTicketNumber: "",
+            RBagType:data.silotomillunload_gateout_info[0] ? data.silotomillunload_gateout_info[0].BagType: "",
+            RWbEmptyWt:data.silotomillunload_gateout_info[0] ? data.silotomillunload_gateout_info[0].SecondWeight: "",
+            RWbLoadWt:data.silotomillunload_gateout_info[0] ? data.silotomillunload_gateout_info[0].FirstWeight: "",
+            RGunnyWt:"",
+            RWbNetWt:data.silotomillunload_gateout_info[0] ? data.silotomillunload_gateout_info[0].NetWeight: "",
+            RUnloadedLotNo:data.silotomillunload_gateout_info[0] ? data.silotomillunload_gateout_info[0].UnloadedLotNo: "",
+            RUnLoadingVendor:data.silotomillunload_gateout_info[0] ? data.silotomillunload_gateout_info[0].UnLoadingVendor: "",
+            RGunnyLessNetWt:data.silotomillunload_gateout_info[0] ? data.silotomillunload_gateout_info[0].NetWeight: "",
+            RInsDt:data.silotomillunload_gateout_info[0] ? data.silotomillunload_gateout_info[0].InsDt: "",
+             })
+             console.log("test 1")
+             console.log(data.silotomillunload_gateout_info.length)
+            
+             window.print();
+        }
+      })
+      .catch((error) => {
+        console.log(error);
+        errorToast("Something went wrong, please try again after sometime");
+      })
+      .finally((a) => {
+        hideLoader();
+        
+      });
+  };
+  
+  console.log("form:"+JSON.stringify(form));
+  const trstyle={height:"40px"};
+  const subheadingstyle1={textAlign:"center",fontSize:"18px"};
+  const subheadingstyle2={textAlign:"left",fontSize:"18px"};
+
+  return (
+   <div>
+     <table style={{width:"100%",height:"287mm",fontSize:"12px",border:"1px solid #000"}} border={0} >
+     <thead>
+         <tr><td style={{padding:"0px"}} >
+           
+          
+           <table  style={{width:"100%"}} border={0}>
+             <tr>
+               <td> 
+           <img style={{width:"150px",height:"auto"}} src={BASE_URL+"/api/upload/images/Address.png"}></img>
+           </td>
+           <td style={{textAlign:"center"}}>
+<span style={{fontSize:"24px"}}><strong>NAGA LIMITED</strong></span><br></br>
+<span style={{fontSize:"18px"}}><strong>FOODS DIVISION</strong></span><br></br>
+
+<span style={{fontSize:"14px"}}><strong>FSSAI Lic No 10017042003098</strong></span><br></br>
+<span style={{fontSize:"13px"}}>Branch/Depot:Naga Limited-Foods,No.1,Trichy Road,Dindigul - 624005<br></br>
+Ph:0451-2411123/2410121,Mo:9944990043,7708111317,7708111321 Fax: 2410122<br></br>
+GSTIN:33AAACN2369L1zD,PAN:AAACN2369L,CIN:U24246TN1991PLC020409, State Code:3310017<br></br></span>
+
+           </td>
+           <td style={{textAlign:"right"}}> 
+           <img style={{width:"240px",height:"auto",marginBottom:"-23px"}} src={BASE_URL+"/api/upload/images/Logo2.png"}></img>
+           </td></tr>
+           </table>
+           </td></tr>
+         {/*<tr><td style={{textAlign:"center"}}><strong>Unit Address</strong></td></tr>
+         <tr><td style={{textAlign:"center"}}><strong>Stock Transfer Form</strong></td></tr>*/}
+       </thead>
+       <tbody>
+       <tr ><td><hr></hr></td></tr>
+        <tr><td style={{padding:"5px"}}><table  style={{width:"100%"}} border={0}>
+        <tr style={trstyle}><td colSpan={6} style={subheadingstyle1}><strong><u>Stock Transfer Form</u></strong></td></tr>
+        <tr style={trstyle}><td style={{width:"13%"}}><strong>VA No</strong></td> <td  style={{width:"20%"}}>{form.values.ZVA_NUMBER}</td><td  style={{width:"13%"}}><strong>Wheat Variety</strong></td><td  style={{width:"20%"}}>{form.values.WheatVariety}</td><td  style={{width:"13%"}}><strong>Sending Plant</strong></td><td  style={{width:"20%"}}>{form.values.SendingPlantName}</td></tr>
+         <tr style={trstyle}><td><strong>VA Date</strong></td><td>{form.values.VADate}</td><td><strong>STO PO No</strong></td><td>{form.values.StoPoNo}</td><td><strong>Sending Str. Loc.</strong></td><td>{form.values.SendingStorageLocationName}</td></tr>
+         <tr style={trstyle}><td><strong>Vehicle No</strong></td><td>{form.values.TRUCK_NO}</td><td><strong>Delivery No</strong></td><td>{form.values.DeliveryNo}</td><td><strong>Sending Plant Lot No</strong></td><td>{form.values. LoadedLotNo}</td></tr>
+         <tr style={trstyle}><td><strong>Transporter</strong></td><td>{form.values.LastMileTransporter}</td><td><strong>Delivery Date</strong></td><td>{form.values.DeliveryDate}</td><td><strong>Rec. Plant</strong></td><td>{form.values.ReceivingPlantName}</td></tr>
+         <tr style={trstyle}><td><strong>Loading Vendor</strong></td><td>{form.values. LoadingVendor}</td><td><strong>Pickslip No</strong></td><td>{form.values.PickSlipNo}</td><td><strong>Rec. Storage Loc.</strong></td><td>{form.values.ReceivingStorageLocationName}</td></tr>
+         <tr style={trstyle}><td><strong>Gate Out Date & Time</strong></td><td>{form.values.GateOutDateTime}</td><td><strong>Pickslip Date</strong></td><td>{form.values.PickslipDateTime}</td><td></td><td></td></tr>
+          </table>
+          </td></tr>
+        <tr><td ><hr></hr></td></tr>
+
+          <tr><td style={{padding:"5px"}}><table  style={{width:"100%"}} border={0}>
+          <tr style={trstyle}><td colSpan={6} style={subheadingstyle2}><u><strong>Weightment Details</strong></u></td></tr>
+          <tr style={trstyle}><td style={{width:"13%"}}><strong>Ticket No</strong></td><td style={{width:"20%"}}></td><td style={{width:"13%"}}><strong>Bage Type</strong></td><td style={{width:"20%"}}>{form.values.BagType}</td><td style={{width:"13%"}}><strong>Empty Weight</strong></td><td style={{width:"20%"}}>{form.values.WbEmptyWt}</td></tr>
+          <tr style={trstyle}><td><strong>Ticket Date</strong></td><td></td><td><strong>No of Bags</strong></td><td></td><td><strong>Load Weight</strong></td><td>{form.values.WbLoadWt}</td></tr>
+          <tr style={trstyle}><td><strong>Ticket Time</strong></td><td></td><td><strong>Gunny Weight</strong></td><td>{form.values.GunnyWt}</td><td><strong>Net Weight</strong></td><td>{form.values.WbNetWt}</td></tr>
+          <tr style={trstyle}><td></td><td></td><td></td><td></td><td><strong>Gunny Less Net Weight</strong></td><td>{form.values.GunnyLessNetWt}</td></tr>
+          <tr style={trstyle}><td><strong>Printed on</strong></td><td>{form.values.PickslipDateTime}</td><td></td><td></td><td></td><td></td></tr>
+          <tr style={trstyle}><td>WH Incharge Sign</td><td></td><td></td><td></td><td>Security Sign</td><td></td></tr>
+          </table></td></tr>
+
+  {form.values.intrastate_gateout_infoCount > 0 && (
+    <>
+
+<tr style={trstyle}><td><hr></hr></td></tr>
+
+<tr><td style={{padding:"5px"}}><table  style={{width:"100%"}} border={0}>
+<tr style={trstyle}><td colSpan={6} style={subheadingstyle2}><u><strong>Receving Details</strong></u></td></tr>
+<tr style={trstyle}><td style={{width:"13%"}}><strong>Ticket No.</strong></td><td style={{width:"20%"}}>{form.values.RWbTicketNumber}</td><td style={{width:"13%"}}><strong>Bage Type</strong></td><td style={{width:"20%"}}>{form.values.RBagType}</td><td style={{width:"13%"}}><strong>Empty Weight</strong></td><td style={{width:"20%"}}>{form.values.RWbEmptyWt}</td></tr>
+<tr style={trstyle}><td><strong>Ticket Date</strong> </td><td></td><td><strong>No. of Bags</strong></td><td></td><td>Load Weight</td><td>{form.values.RWbLoadWt}</td></tr>
+<tr style={trstyle}><td><strong>Ticket Time</strong></td><td></td><td><strong>Gunny Weight</strong></td><td>{form.values.GunnyWt}</td><td><strong>Net Weight</strong></td><td>{form.values.RWbNetWt}</td></tr>
+<tr style={trstyle}><td><strong>Rec. Lot No.</strong></td><td>{form.values.RUnloadedLotNo}</td><td><strong>GR No.</strong></td><td></td><td><strong>Gunny Less Net Weight</strong></td><td>{form.values.RGunnyLessNetWt}</td></tr>
+<tr style={trstyle}><td><strong>Unloading Vendor</strong></td><td>{form.values.RUnLoadingVendor}</td><td><strong>GR Date</strong></td><td></td><td></td><td></td></tr>
+<tr style={trstyle}><td><strong>Printed on</strong></td><td>{form.values.RInsDt}</td><td></td><td></td><td></td><td></td></tr>
+</table></td></tr>
+</>
+) }
+         
+       </tbody>
+     </table>
+   </div>
+  );
+};
+
+
+const SMPSlipGeneration = () => {
+  const { showLoader, hideLoader } = useLoader();
+  const dateFormat = "YYYY-MM-DD";
+  const today = moment().format(dateFormat);
+  const isToday = (date) => {
+    return moment(date).format(dateFormat) == today;
+  };
+  const form = useFormik({
+    isInitialValid: false,
+    initialValues: {},
+   
+  });
+  const values = form.values;
+ 
+  
+ 
+  return (
+    <Fragment>
+      
+      <CardComponent >
+        <SlipForm form={form} />
+      </CardComponent>
+      
+    </Fragment>
+  );
+};
+
+export default SMPSlipGeneration;

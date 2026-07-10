@@ -1,0 +1,3 @@
+Po number,PO Line item no,Vendor code,Vendor Name,Supplier code,Supplier Name,Supplier Quantity,Unit of Measurement,Wheat Variety,Material Code,Stock Segment,PO Rate,Plant,Storage Location,PO Deletion Flag,PP update,Inco terms,PO TYPE,Po_Loading date,Number of vehicles,Purchase Group,Purchase Group Description,Po Bag type
+2800000003,10,219077,PARESH TRADERS,220299,DALAL VELJI GHELABHAI,50,TON,GUJARAT-JUNAGADH-PD,WHR-D,RGURKJUSD01,29000,1119,GJP1,x,x,OW1,LP,01-02-2021,3,14,Truck,N1
+2800000250,10,219178,PARESH TRADERS,210383,JOTHIMANI-CONTRACTOR,50,TON,GUJARAT-JUNAGADH-PD,WHR-D,RGURKJUSD01,23000,1119,GJP1,,,OW1,LP,01-02-2021,3,14,Truck,N1

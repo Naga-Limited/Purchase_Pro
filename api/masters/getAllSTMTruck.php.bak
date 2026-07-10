@@ -1,0 +1,631 @@
+<?php
+include_once APIPATH. "/helper/sessionHelper.php";
+//include DB File
+include_once APIPATH. "/db_connection.php";
+include_once APIPATH."/helper/appHelper.php";
+$entityVAContent = json_decode(file_get_contents("php://input"));
+if($entityVAContent->formType=="QCDET" || $entityVAContent->formType=="QCDET_STM"){
+  echo fetchAllTruckArrivalDet($connect, $entityVAContent);
+}else if($entityVAContent->formType=="WEIGHTENTRYDET"){
+  echo fetchAllTruckArrival_WeightDet($connect, $entityVAContent);
+}else{
+echo fetchAllTruckArrival($connect, $entityVAContent);
+}
+$connect->close();
+
+function fetchAllTruckArrival_WeightDet($connect, $record)
+{
+  $screenType = mysqli_real_escape_string($connect, $record->SCREEN_TYPE);
+  $ScreenName=$record->ScreenName;
+  
+  $conditions = count($record->plantIds)<=0? []: ["PLANT_ID in ('" . join("','", $record->plantIds) . "')"];
+  
+  if(isset($record->status) && $record->status){
+     array_push($conditions, "VEHICLE_STATUS IN ($record->status)");
+  }
+  $st = "";
+ 
+  if (isset($record->searchTxt)) {
+    $st = "'%" . mysqli_real_escape_string($connect, trim($record->searchTxt)) . "%'";
+    if ($screenType == "EVAOY") {
+      
+      array_push(
+        $conditions,
+        "(ZVA_NUMBER like " . $st ."
+         or TRAILER_NO like " .$st ." 
+         or TRUCK_NO like " .$st ." 
+         or CONTAINER_NO like " .
+          $st .
+          " or DRIVER_NO like " .
+          $st .
+          " or WB_NAME like " .
+          $st .
+          " or PLANT_ID like " .
+          $st .
+          ")"
+      );
+    } elseif ($screenType == "EVADP") {
+      array_push($conditions, "(ZVA_NUMBER like " .
+      $st .
+      " or TRAILER_NO like " . $st . "   or TRUCK_NO like " .$st ." or DRIVER_NO like " . $st . " or PLANT_ID like " . $st . ")");
+    } elseif ($screenType == "EVAWH") {
+      array_push(
+        $conditions,
+        "(ZVA_NUMBER like " .
+        $st .
+        " or TRUCK_NO like " .
+          $st .
+          " or DRIVER_NO like " .
+          $st .
+          " or WB_TICKET_NO like " .
+          $st .
+          " or WB_NAME like " .
+          $st .
+          " or PLANT_ID like " .
+          $st .
+          ")"
+      );
+    }
+  }
+ 
+  //array_push($conditions, "SCREEN_TYPE='$screenType'");
+ 
+  if ($screenType == "SILOTOMILL") {
+  array_push($conditions, "(SCREEN_TYPE='SILOTOMILL')");
+  }
+
+  if($record->TRUCK_NO){
+    array_push($conditions, "TRUCK_NO='".$record->TRUCK_NO."'");
+  }
+  
+  if($screenType==="EVADP" && isset($record->isTruck) ){
+    if($record->isTruck){
+      array_push($conditions, "(TRUCK_NO<>'' or TRUCK_NO is not null)");
+    }
+    else{
+      array_push($conditions, "(TRAILER_NO<>'' or TRAILER_NO is not null)");
+    }
+  }
+  
+  if(isset($record->otherfilter)){
+    $FromDt=$record->otherfilter->otherfilter->from;
+    $ToDt=$record->otherfilter->otherfilter->to;
+   //  $PlantId=$record->otherfilter->otherfilter->PlantId;
+   // echo $FromDt;
+    array_push($conditions,"DATE(DateAdded) >= '".$FromDt."'");
+    array_push($conditions,"DATE(DateAdded) <= '".$ToDt."'");
+    if($PlantId!=""){
+    array_push($conditions,"PLANT_ID = '".$PlantId."'");
+    }
+    //var_dump($filter);
+
+    if($record->otherfilter->otherfilter->PlantIdArr!=null && sizeof($record->otherfilter->otherfilter->PlantIdArr)>0){
+      $PlantIdArray=$record->otherfilter->otherfilter->PlantIdArr;
+     $PlantIdArrFilter=" (";
+     for($i=0;$i<sizeof($PlantIdArray);$i++){
+        $PlantIdArrFilter.="a.WERKS = '".$PlantIdArray[$i]->value."' OR ";
+     }
+     $PlantIdArrFilter=rtrim($PlantIdArrFilter,"OR ");
+     $PlantIdArrFilter.=")";
+     array_push($filters,$PlantIdArrFilter);
+    }
+  }
+  
+  if(isset($record->PurchaseInfoId) && $record->PurchaseInfoId>0){
+    array_push($conditions,"PI_REFID = '".$record->PurchaseInfoId."'");
+  }
+  else if(isset($record->ID)){
+    array_push($conditions,"ID = '".$record->ID."'");
+  }
+
+  if(isset($record->PurchaseInfoId) && $record->PurchaseInfoId>0){
+    array_push($conditions,"PI_REFID = '".$record->PurchaseInfoId."'");
+    $countsql = "select count(PI_REFID) as total from purchase_info where ".join(" and ", $conditions);
+  }else{
+    $countsql = "select count(ID) as total from empty_vehicle_arrival where ".join(" and ", $conditions);
+  }
+  
+ // echo $countsql;exit();
+  $total = getFieldValue($connect, $countsql, 0);
+
+  $pageSize =50;
+  if(isset($record->pageSize)){
+    $pageSize =$record->pageSize;
+  }
+
+  if(isset($record->PurchaseInfoId) && $record->PurchaseInfoId>0){
+    
+    $fetchsql =
+    "select *,'$ScreenName' as ScreenName,date_format(DateAdded,'%d-%m-%Y %h:%i %p') as VADate,
+    date_format(GateOutDt,'%d-%m-%Y %h:%i %p') as GateOutDateTime
+    
+    from purchase_info where ". join(" and ", $conditions) . " order by PI_REFID desc limit " . $record->startCount . ",$pageSize";
+   // echo $fetchsql;exit();
+    $tableRecords = getResultAsObjectArray($connect, $fetchsql);
+  }else{
+    $fetchsql =
+    "select *,'$ScreenName' as ScreenName,date_format(DateAdded,'%d-%m-%Y %h:%i %p') as VADate,
+    date_format(GateOutDt,'%d-%m-%Y %h:%i %p') as GateOutDateTime
+    
+    from empty_vehicle_arrival where ". join(" and ", $conditions) . " order by ID desc limit " . $record->startCount . ",$pageSize";
+    //echo $fetchsql;exit();
+    $tableRecords = getResultAsObjectArray($connect, $fetchsql);
+  }
+  
+ 
+
+
+  $DispDet =
+    "SELECT * FROM `silotomill_dispatch_info` where VehicleArrivalId='".$record->ID."'";
+  $DispDetRecords = getResultAsObjectArray($connect, $DispDet);
+
+ // var_dump($tableRecords);
+  $QCDataQ =
+  "SELECT * FROM `stm_silotomillqcdet` where VANumber='".$tableRecords[0]['ZVA_NUMBER']."'";
+$QCData = getResultAsObjectArray($connect, $QCDataQ);
+
+$Weight =
+"SELECT * FROM `pp_silotomillweights` where VANumber='".$tableRecords[0]['ZVA_NUMBER']."'";
+$WeightDetails = getResultAsObjectArray($connect, $Weight);
+
+$Weight =
+"SELECT * FROM `pp_silotomillweights_unload` where VANumber='".$tableRecords[0]['ZVA_NUMBER']."'";
+$UnloadWeightDetails = getResultAsObjectArray($connect, $Weight);
+
+$Weight =
+"SELECT * FROM `silotomill_gateout_info` where EmptyVehicleArrivalId='".$tableRecords[0]['ID']."'";
+$silotomillunload_gateout_info = getResultAsObjectArray($connect, $Weight);
+
+
+$Weight =
+"SELECT VECHICAL_STATUS FROM `purchase_info` where EMPTY_VEHICLE_ARRIVAL_ID='".$tableRecords[0]['ID']."'";
+$poresults = getResultAsObjectArray($connect, $Weight);
+ 
+ 
+  return json_encode(["success" => 1,"UnloadWeightDetails"=>$UnloadWeightDetails,"poresults"=>$poresults,"silotomillunload_gateout_info"=>$silotomillunload_gateout_info, "WeightDetails"=>$WeightDetails,"results" => $tableRecords,"QCData"=>$QCData, "DispDetRecords"=>$DispDetRecords,"count" => $total]);
+
+}
+function fetchAllTruckArrivalDet($connect, $record)
+{
+ // echo "test";exit();
+  $screenType = mysqli_real_escape_string($connect, $record->SCREEN_TYPE);
+  $ScreenName=$record->ScreenName;
+
+  $conditions = count($record->plantIds)<=0? []: ["PLANT_ID in ('" . join("','", $record->plantIds) . "')"];
+  
+  if(isset($record->status) && $record->status){
+     array_push($conditions, "VEHICLE_STATUS IN ($record->status)");
+  }
+  $st = "";
+ 
+  if (isset($record->searchTxt)) {
+    $st = "'%" . mysqli_real_escape_string($connect, trim($record->searchTxt)) . "%'";
+    if ($screenType == "EVAOY") {
+      
+      array_push(
+        $conditions,
+        "(ZVA_NUMBER like " . $st ."
+         or TRAILER_NO like " .$st ." 
+         or TRUCK_NO like " .$st ." 
+         or CONTAINER_NO like " .
+          $st .
+          " or DRIVER_NO like " .
+          $st .
+          " or WB_NAME like " .
+          $st .
+          " or PLANT_ID like " .
+          $st .
+          ")"
+      );
+    } elseif ($screenType == "EVADP") {
+      array_push($conditions, "(ZVA_NUMBER like " .
+      $st .
+      " or TRAILER_NO like " . $st . "   or TRUCK_NO like " .$st ." or DRIVER_NO like " . $st . " or PLANT_ID like " . $st . ")");
+    } elseif ($screenType == "EVAWH") {
+      array_push(
+        $conditions,
+        "(ZVA_NUMBER like " .
+        $st .
+        " or TRUCK_NO like " .
+          $st .
+          " or DRIVER_NO like " .
+          $st .
+          " or WB_TICKET_NO like " .
+          $st .
+          " or WB_NAME like " .
+          $st .
+          " or PLANT_ID like " .
+          $st .
+          ")"
+      );
+    }
+  }
+ 
+  //array_push($conditions, "SCREEN_TYPE='$screenType'");
+ 
+  if ($screenType == "SILOTOMILL") {
+  array_push($conditions, "(SCREEN_TYPE='SILOTOMILL')");
+  }
+
+  if($record->TRUCK_NO){
+    array_push($conditions, "TRUCK_NO='".$record->TRUCK_NO."'");
+  }
+  
+  if($screenType==="EVADP" && isset($record->isTruck) ){
+    if($record->isTruck){
+      array_push($conditions, "(TRUCK_NO<>'' or TRUCK_NO is not null)");
+    }
+    else{
+      array_push($conditions, "(TRAILER_NO<>'' or TRAILER_NO is not null)");
+    }
+  }
+  
+  if(isset($record->otherfilter)){
+    $FromDt=$record->otherfilter->otherfilter->from;
+    $ToDt=$record->otherfilter->otherfilter->to;
+   //  $PlantId=$record->otherfilter->otherfilter->PlantId;
+   // echo $FromDt;
+    array_push($conditions,"DATE(DateAdded) >= '".$FromDt."'");
+    array_push($conditions,"DATE(DateAdded) <= '".$ToDt."'");
+    if($PlantId!=""){
+    array_push($conditions,"PLANT_ID = '".$PlantId."'");
+    }
+    //var_dump($filter);
+
+    if($record->otherfilter->otherfilter->PlantIdArr!=null && sizeof($record->otherfilter->otherfilter->PlantIdArr)>0){
+      $PlantIdArray=$record->otherfilter->otherfilter->PlantIdArr;
+     $PlantIdArrFilter=" (";
+     for($i=0;$i<sizeof($PlantIdArray);$i++){
+        $PlantIdArrFilter.="a.WERKS = '".$PlantIdArray[$i]->value."' OR ";
+     }
+     $PlantIdArrFilter=rtrim($PlantIdArrFilter,"OR ");
+     $PlantIdArrFilter.=")";
+     array_push($filters,$PlantIdArrFilter);
+    }
+  }
+  
+  if($record->ID){
+    array_push($conditions,"ID = '".$record->ID."'");
+  }
+ 
+  $countsql = "select count(ID) as total from empty_vehicle_arrival where ".join(" and ", $conditions);
+ // echo $countsql;
+  //exit();
+  $total = getFieldValue($connect, $countsql, 0);
+
+  $pageSize =50;
+  if(isset($record->pageSize)){
+    $pageSize =$record->pageSize;
+  }
+
+  $fetchsql =
+    "select *,'$ScreenName' as ScreenName,date_format(DateAdded,'%d-%m-%Y %h:%i %p') as VADate,
+    date_format(GateOutDt,'%d-%m-%Y %h:%i %p') as GateOutDateTime
+    
+    from empty_vehicle_arrival where ". join(" and ", $conditions) . " order by ID desc limit " . $record->startCount . ",$pageSize";
+    //echo $fetchsql;exit();
+    $tableRecords = getResultAsObjectArray($connect, $fetchsql);
+
+    $VaNumber=$tableRecords[0]['ZVA_NUMBER'];
+    $EmptyVehArrivalId=$tableRecords[0]['ID'];
+
+
+  $DispDet =
+    "SELECT a.*,
+    concat(a.ReceivingPlant,'-',b.PLANT_NAME) as ReceivingPlantName,
+    concat(a.StorageLocation,'-',c.STORAGE_LOCATION) as ReceivingStorageLocationName,date_format(a.DeliveryDate,'%d-%m-%Y') as DeliveryDate
+    FROM `silotomill_dispatch_info` a 
+    LEFT JOIN master_plant b ON a.ReceivingPlant=b.WERKS
+    LEFT JOIN master_storage c ON a.StorageLocation=c.LGORT
+    where a.VehicleArrivalId='".$EmptyVehArrivalId."'";
+    //echo $DispDet;exit();
+  $DispDetRecords = getResultAsObjectArray($connect, $DispDet);
+  //var_dump($DispDetRecords);
+
+   $Whtdt = "SELECT * FROM `pp_silotomillpoline` where PONumber='".$DispDetRecords[0]['ZPO_NUMBER']."' and LineItem='".$DispDetRecords[0]['PO_LINE_ITEM']."'";
+  $WheatData = getResultAsObjectArray($connect, $Whtdt);
+  $DispDetRecords[0]['WheatSegment']=$WheatData[0]['Segment'];
+
+ // var_dump($tableRecords);
+  $QCDataQ =
+  "SELECT *,2_3_MM as MM23,1000Kernel as Kernel1000 FROM `stm_silotomillqcdet` where VANumber='".$tableRecords[0]['ZVA_NUMBER']."'";
+$QCData = getResultAsObjectArray($connect, $QCDataQ);
+
+$QCDataQ =
+  "SELECT * FROM `quality_info` where STM_VehicleArrivalId='$EmptyVehArrivalId'";
+$QualityInfo = getResultAsObjectArray($connect, $QCDataQ);
+
+
+
+$Weight =
+"SELECT * FROM `pp_silotomillweights` where VANumber='".$tableRecords[0]['ZVA_NUMBER']."'";
+$WeightDetails = getResultAsObjectArray($connect, $Weight);
+
+$Weight =
+"SELECT * FROM `pp_silotomillweights_unload` where VANumber='".$tableRecords[0]['ZVA_NUMBER']."'";
+$UnloadWeightDetails = getResultAsObjectArray($connect, $Weight);
+
+$Weight =
+"SELECT *,date_format(DateModified,'%d-%m-%Y %h:%i %p') as InsDt FROM `silotomill_gateout_info` where EmptyVehicleArrivalId='".$tableRecords[0]['ID']."'";
+$silotomillunload_gateout_info = getResultAsObjectArray($connect, $Weight);
+
+
+$Weight =
+"SELECT VECHICAL_STATUS FROM `purchase_info` where EMPTY_VEHICLE_ARRIVAL_ID='".$tableRecords[0]['ID']."'";
+$poresults = getResultAsObjectArray($connect, $Weight);
+ 
+ //For Qc Details
+
+  
+ $qt =  "nir_foss = 'Yes'";
+ //$qt = $poData[0]["DEVICE_TYPE"] . " = 'Yes'";
+ $fields = "QCM_REFID, MIC, MIC_DESC, MIN_VALUE, MAX_VALUE, UOM, FIELD_MAP, PreferredMin, PreferredMax";
+ $fetchsql1 =
+   "select " .
+   $fields .
+   ", '' as qvalue,'' as qlabel from master_quality_check_stm qc
+   left join master_quality_preferred qp on qc.field_map = qp.fieldMap
+   where IDNLF = '" .
+   $DispDetRecords[0]['WheatVariety'] .
+   "' and " .
+   $qt .
+   " ORDER BY qp.FieldOrder";
+  
+ $qmResults = getResultAsObjectArray($connect, $fetchsql1);
+ //echo $fetchsql1;
+// exit();
+ 
+
+ $Qry="SELECT * FROM `stm_silotomillqcdet` where VANumber='$VaNumber'";
+
+$QCDet = getResultAsObjectArray($connect, $Qry);
+
+ $Qry="SELECT * FROM `quality_info`  where purchase_info_id='".$record->id."'";
+ if($record->formType=="QCDET_STM"){
+  $Qry="SELECT * FROM `quality_info`  where STM_VehicleArrivalId='".$record->ID."'";
+ }
+ //echo $Qry;
+$QCDet_QInfo= getResultAsObjectArray($connect, $Qry);
+
+//exit();
+if(sizeof($QCDet_QInfo)>0){
+  // var_dump($qmResults);
+ // exit();
+  for($i=0;$i<sizeof($qmResults);$i++){
+  //  echo sizeof($QCDet_QInfo);exit();
+    if($qmResults[$i]['FIELD_MAP']=="infestation_quality"){  
+      $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['infestation_quality']; 
+      $qmResults[$i]['qlabel']=$QCDet_QInfo[0]['infestation_quality'];
+    }
+    if($qmResults[$i]['FIELD_MAP']=="protein_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['protein_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="moisture_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['moisture_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="ash_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['ash_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="wet_gluten_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['wet_gluten_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="dry_gluten_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['dry_gluten_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="sv_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['sv_quality'];  }
+    
+    if($qmResults[$i]['FIELD_MAP']=="hl_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['hl_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="foreign_matter_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['foreign_matter_quality'];  }
+  
+    if($qmResults[$i]['FIELD_MAP']=="fungus_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['fungus_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="rain_damage_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['rain_damage_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="mixed_wheat_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['mixed_wheat_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="protein_type_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['protein_type_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="kernel_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['kernel_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="fn_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['fn_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="mm_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['mm_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="mudballs_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['mudballs_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="broken_wheat_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['broken_wheat_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="black_wheat_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['black_wheat_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="soft_wheat_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['soft_wheat_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="shriveled_wheat_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['shriveled_wheat_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="immature_wheat_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['immature_wheat_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="insect_damage_wheat_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['insect_damage_wheat_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="kernel_bunt_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['kernel_bunt_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="red_grain_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['red_grain_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="ofg_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['ofg_quality'];  }
+
+   // if($qmResults[$i]['FIELD_MAP']=="Bad_smell"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['Bad_smell'];  }
+    if($qmResults[$i]['FIELD_MAP']=="Bad_smell"){  
+      $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['Bad_smell']; 
+      $qmResults[$i]['qlabel']=$QCDet_QInfo[0]['Bad_smell'];
+    }
+    
+    if($qmResults[$i]['FIELD_MAP']=="dust_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['dust_quality'];  }
+   // if($qmResults[$i]['FIELD_MAP']=="seive_size_quality"){  $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['seive_size_quality'];  }
+    if($qmResults[$i]['FIELD_MAP']=="seive_size_quality"){  
+      $qmResults[$i]['qvalue']=$QCDet_QInfo[0]['seive_size_quality']; 
+      $qmResults[$i]['qlabel']=$QCDet_QInfo[0]['seive_size_quality'];
+    }
+    //var_dump($qmResults[$i]);
+  
+  
+  }
+}else{
+ 
+  for($i=0;$i<sizeof($qmResults);$i++){
+    //var_dump($qmResults);exit();
+    if($qmResults[$i]['FIELD_MAP']=="infestation_quality"){  
+      $qmResults[$i]['qvalue']=$QCDet[0]['Infestation']; 
+      $qmResults[$i]['qlabel']=$QCDet[0]['Infestation'];
+    }
+    if($qmResults[$i]['FIELD_MAP']=="Bad_smell"){  
+      $qmResults[$i]['qvalue']=$QCDet[0]['BadSmell']; 
+      $qmResults[$i]['qlabel']=$QCDet[0]['BadSmell'];
+    }
+
+    if($qmResults[$i]['FIELD_MAP']=="dust_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['Dust'];  }
+    //if($qmResults[$i]['FIELD_MAP']=="seive_size_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['SeiveSize'];  }
+    if($qmResults[$i]['FIELD_MAP']=="seive_size_quality"){  
+      $qmResults[$i]['qvalue']=$QCDet[0]['SeiveSize']; 
+      $qmResults[$i]['qlabel']=$QCDet[0]['SeiveSize'];
+    }
+    if($qmResults[$i]['FIELD_MAP']=="protein_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['Protein'];  }
+    if($qmResults[$i]['FIELD_MAP']=="moisture_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['Moisture'];  }
+    if($qmResults[$i]['FIELD_MAP']=="ash_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['Ash'];  }
+    if($qmResults[$i]['FIELD_MAP']=="wet_gluten_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['Wetgluten'];  }
+    if($qmResults[$i]['FIELD_MAP']=="dry_gluten_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['Drygluten'];  }
+    if($qmResults[$i]['FIELD_MAP']=="sv_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['SV'];  }
+    
+    if($qmResults[$i]['FIELD_MAP']=="hl_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['HLWeight'];  }
+    if($qmResults[$i]['FIELD_MAP']=="foreign_matter_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['ForeignMatter'];  }
+  
+    if($qmResults[$i]['FIELD_MAP']=="fungus_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['fungus'];  }
+    if($qmResults[$i]['FIELD_MAP']=="rain_damage_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['RainDamage'];  }
+    if($qmResults[$i]['FIELD_MAP']=="mixed_wheat_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['MixedWheat'];  }
+    if($qmResults[$i]['FIELD_MAP']=="protein_type_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['ProteinType'];  }
+    if($qmResults[$i]['FIELD_MAP']=="kernel_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['1000Kernel'];  }
+    if($qmResults[$i]['FIELD_MAP']=="fn_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['FN'];  }
+    if($qmResults[$i]['FIELD_MAP']=="mm_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['2_3_MM'];  }
+    if($qmResults[$i]['FIELD_MAP']=="mudballs_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['MudBalls'];  }
+    if($qmResults[$i]['FIELD_MAP']=="broken_wheat_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['BrokenWheat'];  }
+    if($qmResults[$i]['FIELD_MAP']=="black_wheat_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['BlackWheat'];  }
+    if($qmResults[$i]['FIELD_MAP']=="soft_wheat_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['SoftWheat'];  }
+    if($qmResults[$i]['FIELD_MAP']=="shriveled_wheat_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['ShriveledWheat'];  }
+    if($qmResults[$i]['FIELD_MAP']=="immature_wheat_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['ImmatureWheat'];  }
+    if($qmResults[$i]['FIELD_MAP']=="insect_damage_wheat_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['InsectDamageWheat'];  }
+    if($qmResults[$i]['FIELD_MAP']=="kernel_bunt_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['KernalBunt'];  }
+    if($qmResults[$i]['FIELD_MAP']=="red_grain_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['RainGrain'];  }
+    if($qmResults[$i]['FIELD_MAP']=="ofg_quality"){  $qmResults[$i]['qvalue']=$QCDet[0]['OFG'];  }
+
+    
+   
+  
+  
+  }
+}
+
+  return json_encode(["success" => 1,"QualityInfo"=>$QualityInfo,"qmResults"=>$qmResults,"UnloadWeightDetails"=>$UnloadWeightDetails,"poresults"=>$poresults,"silotomillunload_gateout_info"=>$silotomillunload_gateout_info, "WeightDetails"=>$WeightDetails,"results" => $tableRecords,"QCData"=>$QCData, "DispDetRecords"=>$DispDetRecords,"count" => $total]);
+}
+function fetchAllTruckArrival($connect, $record)
+{
+ 
+  
+  $screenType = mysqli_real_escape_string($connect, $record->screenType);
+  $ScreenName=$record->ScreenName;
+  
+  $conditions = count($record->plantIds)<=0? []: ["PLANT_ID in ('" . join("','", $record->plantIds) . "')"];
+  
+  if(isset($record->status) && $record->status){
+     array_push($conditions, "VEHICLE_STATUS IN ($record->status)");
+  }
+  $st = "";
+ 
+  if (isset($record->searchTxt)) {
+   // echo $screenType;exit();
+    $st = "'%" . mysqli_real_escape_string($connect, trim($record->searchTxt)) . "%'";
+    if ($screenType == "EVAOY" || $screenType == "SILOTOMILL") {
+      
+      array_push(
+        $conditions,
+        "(ZVA_NUMBER like " . $st ."
+         or TRAILER_NO like " .$st ." 
+         or TRUCK_NO like " .$st ." 
+         or CONTAINER_NO like " .
+          $st .
+          " or DRIVER_NO like " .
+          $st .
+          " or WB_NAME like " .
+          $st .
+          " or PLANT_ID like " .
+          $st .
+          ")"
+      );
+    } elseif ($screenType == "EVADP") {
+      array_push($conditions, "(ZVA_NUMBER like " .
+      $st .
+      " or TRAILER_NO like " . $st . "   or TRUCK_NO like " .$st ." or DRIVER_NO like " . $st . " or PLANT_ID like " . $st . ")");
+    } elseif ($screenType == "EVAWH") {
+      array_push(
+        $conditions,
+        "(ZVA_NUMBER like " .
+        $st .
+        " or TRUCK_NO like " .
+          $st .
+          " or DRIVER_NO like " .
+          $st .
+          " or WB_TICKET_NO like " .
+          $st .
+          " or WB_NAME like " .
+          $st .
+          " or PLANT_ID like " .
+          $st .
+          ")"
+      );
+    }
+  }
+ 
+  //array_push($conditions, "SCREEN_TYPE='$screenType'");
+ 
+  array_push($conditions, "(SCREEN_TYPE='SILOTOMILL')");
+  
+  if($screenType==="EVADP" && isset($record->isTruck) ){
+    if($record->isTruck){
+      array_push($conditions, "(TRUCK_NO<>'' or TRUCK_NO is not null)");
+    }
+    else{
+      array_push($conditions, "(TRAILER_NO<>'' or TRAILER_NO is not null)");
+    }
+  }
+  
+  if(isset($record->otherfilter)){
+    $FromDt=$record->otherfilter->from;
+    $ToDt=$record->otherfilter->to;
+   //  $PlantId=$record->otherfilter->otherfilter->PlantId;
+   // echo $FromDt;
+   if($FromDt!=""){
+    array_push($conditions,"DATE(DateAdded) >= '".$FromDt."'");
+   }
+   if($ToDt!=""){
+    array_push($conditions,"DATE(DateAdded) <= '".$ToDt."'");
+   }
+  
+   
+    if($PlantId!=""){
+    array_push($conditions,"PLANT_ID = '".$PlantId."'");
+    }
+    //var_dump($filter);
+    
+    if($record->otherfilter->PlantIdArr!=null && sizeof($record->otherfilter->PlantIdArr)>0){
+    
+      $PlantIdArray=$record->otherfilter->PlantIdArr;
+     $PlantIdArrFilter=" (";
+     for($i=0;$i<sizeof($PlantIdArray);$i++){
+        $PlantIdArrFilter.="PLANT_ID = '".$PlantIdArray[$i]->value."' OR ";
+     }
+   
+     $PlantIdArrFilter=rtrim($PlantIdArrFilter,"OR ");
+     $PlantIdArrFilter.=")";
+    //var_dump($conditions);
+    
+     array_push($conditions,$PlantIdArrFilter);
+    }
+  
+  }
+
+  if($record->ID){
+    array_push($conditions,"ID = '".$record->ID."'");
+  }
+ 
+  $countsql = "select count(ID) as total from empty_vehicle_arrival where ".join(" and ", $conditions);
+ //echo $countsql;
+  //exit();
+  //exit();
+  $total = getFieldValue($connect, $countsql, 0);
+
+  $pageSize =50;
+  if(isset($record->pageSize)){
+    $pageSize =$record->pageSize;
+  }
+  
+  $fetchsql =
+    "select *,'$ScreenName' as ScreenName
+    
+    from empty_vehicle_arrival where ". join(" and ", $conditions) . " order by ID desc limit " . $record->startCount . ",$pageSize";
+  //echo $fetchsql;
+    $tableRecords = getResultAsObjectArray($connect, $fetchsql);
+ 
+  return json_encode(["success" => 1, "results" => $tableRecords, "count" => $total]);
+}
+
+?>

@@ -1,0 +1,405 @@
+<?php
+  include_once APIPATH. "/db_connection.php";
+  include_once APIPATH. "/helper/fileHelper.php";
+  date_default_timezone_set("Asia/Calcutta");
+  
+  //Added 25092021 for save the file in NAS SERVER
+  $server = '192.168.1.104' ;//Address of ftp server
+  $user_name = 'Digi'; // Username
+  $password = 'Digi@2021'; // Password
+  $location = "/Digigate/Digi/NLFD/";
+  $location="/Digigate/Purchasepro";
+  $fileLocation = "/var/www/purchasepro/sapfileshare";
+  
+  $ponumber = $_POST['ponumber'];
+  $file_from = $_POST['form_name'];
+  $SubFolder="";
+  if(isset($_POST['SubFolder'])){
+	if($_POST['SubFolder']!=""){
+	  $SubFolder=$_POST['SubFolder'];
+	}
+  }
+  $VANumber="";
+  
+  if(isset($_POST['ZPO_NUMBER']) && $_POST['ZPO_NUMBER']!="undefined"){
+      $VANumber=$_POST['ZPO_NUMBER'];
+  }
+  
+  /*
+  Commented by Seeni
+  $connection = ftp_connect($server,21); 
+  ftp_login($connection, $user_name, $password);
+  */
+
+  $file = $_FILES["files"]; 
+  $filepath = upload_folder("supdis", $fileLocation);
+  //var_dump($_POST);exit();
+  $ZPO_NUMBER = $_POST["ZPO_NUMBER"];
+  $ZPO_LINE_ITEM = $_POST["ZPO_LINE_ITEM"];
+  $ZSUPPLIER_CODE = $_POST["ZSUPPLIER_CODE"];
+  $ZSUPPLIER_NAME = $_POST["ZSUPPLIER_NAME"];
+  $ZSUPPLIER_LOAD_DT = $_POST["ZSUPPLIER_LOAD_DT"];
+  $ZSUPPLIER_LOAD_POINT = $_POST["ZSUPPLIER_LOAD_POINT"];
+  $LINER_NAME = $_POST["LINER_NAME"];
+  //$sup_inv_copy_NAS=$_POST["sup_inv_copy_attach"];
+  //$sup_wb_copy_NAS=$_POST["sup_wb_copy_attach"];
+
+  $VESSEL_NO = (isset($_POST["VESSEL_NO"]))?$_POST["VESSEL_NO"]:'';
+  // $ZSUPPLIER_INV_RATE = $_POST['ZSUPPLIER_INV_RATE'];
+  // $ZSUPPLIER_INV_NO = $_POST['ZSUPPLIER_INV_NO'];
+  // $ZSUPPLIER_INV_DT = $_POST['ZSUPPLIER_INV_DT'];
+  // $ZSUPPLIER_INV_QTY = $_POST['ZSUPPLIER_INV_QTY'];
+  $VEHICLE_TYPE = $_POST["VEHICLE_TYPE"];
+  $WERKS = $_POST["WERKS"];
+  if (strpos($WERKS, '-') !== false)
+  {
+    $WERKS=explode("-",$WERKS)[0];
+  }
+  $IDNLF = $_POST["IDNLF"];
+  $INCO1 = $_POST["INCO1"];
+  $VESSEL_NAME = isset($_POST["VESSEL_NAME"]) ? $_POST["VESSEL_NAME"] : "";
+  $FUMIGATION = isset($_POST["FUMIGATION"]) ? $_POST["FUMIGATION"] : "";
+  //exit();
+  //json_decode($_POST["sdinfo"]);exit();
+  $sdi_vehical_info = json_decode($_POST["sdinfo"][0]);
+
+  $EDA = $_POST["EDA"];
+  $edan = date("Y-m-d", strtotime($EDA));  
+
+  $name_array = $file["name"];
+  $tmp_name_array = $file["tmp_name"];
+
+  $filenamePO = preg_replace("/[^A-Za-z0-9. ]/", "", $ZPO_NUMBER);
+   // OLD UPLOAD
+    
+  if(isset($file["name"])){
+	  
+  $count_tmp_name_array = count($tmp_name_array);
+	
+    if($count_tmp_name_array>0){
+    $newFileNames = [];
+    for ($j = 0; $j < $count_tmp_name_array; $j++) {
+      $date2 = date("YmdHis")."".$j+1;
+      $extension = pathinfo($name_array[$j], PATHINFO_EXTENSION);
+      $org_filename = pathinfo($name_array[$j], PATHINFO_FILENAME);
+      $org_filename = preg_replace("/[^A-Za-z0-9. ]/", "", $org_filename);
+      $org_filename = str_replace(" ", "_", $org_filename);
+      $newstorepath = $filepath . $filenamePO . "_" . $org_filename . "-" . $date2."." . $extension;
+      array_push($newFileNames, $newstorepath);
+    }
+	
+    for ($i = 0; $i < $count_tmp_name_array; $i++) {
+      $storepath = $newFileNames[$i];
+	  
+	  
+      move_uploaded_file($tmp_name_array[$i], $storepath);
+    }
+  }
+  }
+
+  /*
+    Commented by Seeni
+
+  $newFileNames = [];
+  if(isset($_FILES['files'])){
+    
+    $file = $_FILES['files'];
+
+
+    $date2 = date("YmdHis");
+    $filepath = upload_folder($file_from,"../api/upload");
+    $filepath_NAS = "upload/";
+
+    //$filepath = upload_folder($file_from,"Z:/api/upload");
+    //print_r($filepath);
+    $name_array = $file['name'];
+    $tmp_name_array = $file['tmp_name'];
+    $static_ponumber = preg_replace("/[^A-Za-z0-9. ]/", '', $ponumber);
+    if($VANumber!=""){
+        $static_ponumber=$VANumber;
+    }
+    //var_dump($tmp_name_array);
+    //exit();
+    $count_tmp_name_array = count($tmp_name_array);
+
+    $file_save_arr = array();
+    $file_err_arr = array();
+
+
+
+    $extension = pathinfo($name_array[$i], PATHINFO_EXTENSION);
+    $filepath_NAS = upload_folder_NAS($file_from,$SubFolder,$location,$connection);
+    for ($i = 0; $i < $count_tmp_name_array; $i++) {
+      
+        $extension = pathinfo($name_array[$i], PATHINFO_EXTENSION);
+        $org_file_name = pathinfo($name_array[$i], PATHINFO_FILENAME);
+        if (!in_array(strtolower($extension), ['csv','pdf','jpeg','png','jpg'])) {
+            $file_err_arr[$i]['orgname']=$name_array[$i];
+        } 
+        else {
+            $org_file_name = preg_replace("/[^A-Za-z0-9. ]/", '', $org_file_name);
+            $org_file_name = str_replace(' ', '_',$org_file_name);        
+            $storepath = $filepath . $static_ponumber."_".$org_file_name . "-" . $date2 . "." . $extension;
+            //NAS
+            //$storepath_NAS = $location.$filepath_NAS . $static_ponumber."_".$org_file_name . "-" . $date2 . "." . $extension;
+            $storepath_NAS = $filepath_NAS . $static_ponumber."_".$org_file_name . "-" . $date2 . "." . $extension;
+          
+            if(ftp_put($connection,$storepath_NAS,$tmp_name_array[$i],FTP_BINARY)){
+                
+            } 
+            
+          //echo $storepath;
+        // var_dump(move_uploaded_file($tmp_name_array[$i], $storepath));
+            move_uploaded_file($tmp_name_array[$i], $storepath);
+            //exit();
+          
+          // $file_save_arr[$i]['updname']= substr($storepath,7); //OLD SERVER
+          $file_save_arr[$i]['updname_OLDSERVER']= substr($storepath,7); //OLD SERVER
+          $file_save_arr[$i]['updname']= $storepath_NAS; //NAS SERVER PATH
+          $file_save_arr[$i]['orgname']=$name_array[$i];
+          // $newFileNames=$storepath_NAS;
+          array_push($newFileNames, $storepath_NAS);
+        }
+      
+    }
+  }
+
+  */
+
+
+  //var_dump($newFileNames);
+  //exit();
+  $qaStatus = $VEHICLE_TYPE === "Rake" ? "" : "A";
+  
+  //echo "Session Details";print_r($_SESSION);exit;
+
+  $SupplierDispatchInfoSubmitDt=date("Y-m-d H:i:s");
+  //echo $SupplierDispatchInfoSubmitDt."";
+  $session = session();
+  //$SessionUser=$_SESSION["USERID"];
+  //$SessionUserName=$_SESSION["FIRSTNAME"];
+  
+  $SessionUser=1;
+  $SessionUserName="Admin Testing";
+
+  $sql =
+    "INSERT INTO supplier_dispatch_info(LINER_NAME,VESSEL_NO,ZPO_NUMBER,ZSUPPLIER_CODE,ZSUPPLIER_NAME,ZPO_LINE_ITEM,ZSUPPLIER_LOAD_DT,ZSUPPLIER_LOAD_POINT,VEHICLE_TYPE, WERKS, VESSEL_NAME, FUMIGATION, QA_APPROVER_STATUS, EDA,SupplierDispatchInfoSubmitDt,SupplierDispatchInfoSubmitInsBy,SupplierDispatchInfoSubmitInsByName) VALUES('" .
+    mysqli_real_escape_string($connect, trim($LINER_NAME)) .
+    "','" .
+    mysqli_real_escape_string($connect, trim($VESSEL_NO)) .
+    "','" .
+    mysqli_real_escape_string($connect, trim($ZPO_NUMBER)) .
+    "','" .
+    mysqli_real_escape_string($connect, trim($ZSUPPLIER_CODE)) .
+    "','" .
+    mysqli_real_escape_string($connect, trim($ZSUPPLIER_NAME)) .
+    "','" .
+    mysqli_real_escape_string($connect, trim($ZPO_LINE_ITEM)) .
+    "','" .
+    mysqli_real_escape_string($connect, trim($ZSUPPLIER_LOAD_DT)) .
+    "','" .
+    mysqli_real_escape_string($connect, trim($ZSUPPLIER_LOAD_POINT)) .
+    "','" .
+    mysqli_real_escape_string($connect, trim($VEHICLE_TYPE)) .
+    "','" .
+    mysqli_real_escape_string($connect, trim($WERKS)) .
+    "','" .
+    mysqli_real_escape_string($connect, trim($VESSEL_NAME)) .
+    "','" .
+    mysqli_real_escape_string($connect, trim($FUMIGATION)) .
+    "','" .
+    mysqli_real_escape_string($connect, trim($qaStatus)) .
+    "','" .
+    mysqli_real_escape_string($connect, trim($edan)) .
+    "','".$SupplierDispatchInfoSubmitDt."','".$SessionUser."','$SessionUserName')";
+ //echo "DDD1--"; echo $sql;exit();
+
+  mysqli_query($connect, $sql);//uncomment
+
+  $last_id = $connect->insert_id;
+ // echo "DDD--";echo $last_id;exit;
+  if ($last_id) { //uncomment
+    $xy = 0;
+    // echo "S2";
+    $Att_index=0;
+    foreach ($sdi_vehical_info as $row3) {
+      $sdi_id = $last_id;
+      // echo "S3";
+      
+      $vehical_no = $row3->vehical_no;
+      $supplier_wb_qty = isset($row3->supplier_wb_qty) ? $row3->supplier_wb_qty : "";
+      $supplier_wb_date =
+        isset($row3->supplier_wb_date) && $row3->supplier_wb_date != ""
+          ? "'" . mysqli_real_escape_string($connect, trim($row3->supplier_wb_date)) . "'"
+          : "NULL";
+      $seal_no = isset($row3->seal_no) ? $row3->seal_no : "";
+      $no_of_wagon = isset($row3->no_of_wagon) ? $row3->no_of_wagon : "";
+      $sup_inv_copy="";
+      $sup_wb_copy="";
+      if($row3->sup_inv_Imgcopy==""){
+        //$sup_inv_copy = substr($newFileNames[$xy], 7);
+        $sup_inv_copy = $newFileNames[$xy];
+        $xy++;  
+      }
+      
+      if($row3->sup_wb_Imgcopy==""){
+      if($VEHICLE_TYPE !== 'Rake' && isset($newFileNames[$xy])){
+      // $sup_wb_copy =  substr($newFileNames[$xy], 7);
+        $sup_wb_copy =  $newFileNames[$xy];
+      }
+      else{
+        $sup_wb_copy = "";
+        $xy--;
+      }
+    }
+    // echo "test";
+  //echo $sup_inv_copy.",,";
+  //echo $row3->sup_inv_Imgcopy;
+    if(isset($row3->sup_inv_Imgcopy) && $row3->sup_inv_Imgcopy!="" && $sup_inv_copy=="" ){
+
+      //$localfolder = dirname(__FILE__)."./upload/"; 
+	  $localfolder = $fileLocation;
+      $location="/Digigate/Purchasepro";
+      $connection = ftp_connect($server); 
+      //ftp_login($connection, $user_name, $password);
+
+      $folderPath2 = upload_folder_NAS($file_from,$SubFolder,$location,$connection); 
+      $file_save_arr = array();
+      $img = $row3->sup_inv_Imgcopy; 
+      $image_parts = explode(";base64,", $img);
+      $image_type_aux = explode("image/", $image_parts[0]);
+      $image_type = $image_type_aux[1];
+    
+      $image_base64 = base64_decode($image_parts[1]);
+      $fileName = uniqid() . '.jpg';
+      $NAS_PATH = $folderPath2 . $fileName;   
+      $LOCALPATH = $localfolder . $fileName;   
+
+      //file_put_contents($LOCALPATH, $image_base64);
+      move_uploaded_file($fileName, $LOCALPATH);
+
+      //ftp_put($connection,$NAS_PATH,$LOCALPATH,FTP_BINARY); 
+  
+      $file_save_arr[$i]['updname']= $NAS_PATH; //NAS SERVER PATH
+      //$file_save_arr[$i]['updname']= $LOCALPATH; //NAS SERVER PATH
+      $sup_inv_copy_NAS=$NAS_PATH;
+    }else{
+      $sup_inv_copy_NAS=$sup_inv_copy;
+    }
+
+    if(isset($row3->sup_wb_Imgcopy) && $row3->sup_wb_Imgcopy!="" && $sup_wb_copy=="" ){
+
+      $localfolder = dirname(__FILE__)."./upload/"; 
+
+      $location="/Digigate/Purchasepro";
+      //ftp_login($connection, $user_name, $password);//Uncomment
+      $folderPath2 = upload_folder_NAS($file_from,$SubFolder,$location,$connection); //Uncomment
+
+
+      $file_save_arr = array();
+      $img = $row3->sup_wb_Imgcopy; 
+      $image_parts = explode(";base64,", $img);
+      $image_type_aux = explode("image/", $image_parts[0]);
+      $image_type = $image_type_aux[1];
+
+      $image_base64 = base64_decode($image_parts[1]);
+      $fileName = uniqid() . '.jpg';
+      $NAS_PATH = $folderPath2 . $fileName;   
+      $LOCALPATH = $localfolder . $fileName;   
+
+      file_put_contents($LOCALPATH, $image_base64);
+
+      //ftp_put($connection,$NAS_PATH,$LOCALPATH,FTP_BINARY); //uncomment
+
+      $file_save_arr[$i]['updname']= $NAS_PATH; //NAS SERVER PATH
+      //$file_save_arr[$i]['updname']= $LOCALPATH; //NAS SERVER PATH
+      $sup_wb_copy_NAS=$LOCALPATH;
+    }else{
+      $sup_wb_copy_NAS=$sup_wb_copy;
+    }
+
+      
+
+      $ZSUPPLIER_INV_RATE = isset($row3->ZSUPPLIER_INV_RATE)?$row3->ZSUPPLIER_INV_RATE:'';
+      $ZSUPPLIER_INV_NO = isset($row3->ZSUPPLIER_INV_NO)?$row3->ZSUPPLIER_INV_NO:'';
+      $ZSUPPLIER_INV_DT = isset($row3->ZSUPPLIER_INV_DT)?$row3->ZSUPPLIER_INV_DT:'';
+      $ZSUPPLIER_INV_QTY = isset($row3->ZSUPPLIER_INV_QTY)?$row3->ZSUPPLIER_INV_QTY:'';
+      $LINE_ITEM = $row3->LINE_ITEM;
+    
+      $sql1 =
+        "INSERT INTO supplier_vehical_info(LINE_ITEM, PLANT_ID,SUPPLIER_ID,VEHICAL_NO,WB_QTY,WB_DT,SEAL_NO,NO_OF_WAGON,INV_COPY,WB_COPY,ZSUPPLIER_INV_RATE,ZSUPPLIER_INV_NO,ZSUPPLIER_INV_DT,ZSUPPLIER_INV_QTY, SupplierDispatchRedirectBy) VALUES('" .
+        mysqli_real_escape_string($connect, trim($LINE_ITEM)) .
+        "','" .
+        mysqli_real_escape_string($connect, trim($WERKS)) .
+        "','" .
+        mysqli_real_escape_string($connect, trim($sdi_id)) .
+        "','" .
+        mysqli_real_escape_string($connect, trim($vehical_no)) .
+        "','" .
+        mysqli_real_escape_string($connect, trim($supplier_wb_qty)) .
+        "'," .
+        $supplier_wb_date .
+        ",'" .
+        mysqli_real_escape_string($connect, trim($seal_no)) .
+        "','" .
+        mysqli_real_escape_string($connect, trim($no_of_wagon)) .
+        "','" .
+        mysqli_real_escape_string($connect, trim($sup_inv_copy_NAS)) .
+        "','" .
+        mysqli_real_escape_string($connect, trim($sup_wb_copy_NAS)) .
+        "','" .
+        mysqli_real_escape_string($connect, trim($ZSUPPLIER_INV_RATE)) .
+        "','" .
+        mysqli_real_escape_string($connect, trim($ZSUPPLIER_INV_NO)) .
+        "','" .
+        mysqli_real_escape_string($connect, trim($ZSUPPLIER_INV_DT)) .
+        "','" .
+        mysqli_real_escape_string($connect, trim($ZSUPPLIER_INV_QTY)) .
+        "','0')";
+      //echo $sql1;
+    //  exit();
+      mysqli_query($connect, $sql1);//uncomment
+
+      if ($no_of_wagon) {
+        for ($r = 0; $r < $no_of_wagon; $r++) {
+          $rrno = $vehical_no . "-WA-" . ($r + 1);
+          // echo $rrno;
+          $ZVA_NUMBER = $ZPO_NUMBER."-".$rrno;
+          $sqlqc =
+            "INSERT INTO purchase_info (ZVA_NUMBER, ZPO_NUMBER, ZSUPPLIER_CODE, ZSUPPLIER_NAME, TRUCK_NO, VECHICAL_STATUS, WERKS, IDNLF,INCO1,VEHICLE_TYPE, PO_LINE_ITEM, SCREEN_TYPE, IsFromSDT ) VALUES ( '" .
+            mysqli_real_escape_string($connect, trim($ZVA_NUMBER)) .
+            "','" .
+            mysqli_real_escape_string($connect, trim($ZPO_NUMBER)) .
+            "','" .
+            mysqli_real_escape_string($connect, trim($ZSUPPLIER_CODE)) .
+            "','" .
+            mysqli_real_escape_string($connect, trim($ZSUPPLIER_CODE)) .
+            "','" .
+            mysqli_real_escape_string($connect, trim($rrno)) .
+            "','2', '" .
+            mysqli_real_escape_string($connect, trim($WERKS)) .
+            "','" .
+            mysqli_real_escape_string($connect, trim($IDNLF)) .
+            "','" .
+            mysqli_real_escape_string($connect, trim($INCO1)) .
+            "','" .
+            mysqli_real_escape_string($connect, trim($VEHICLE_TYPE)) .
+            "','" .
+            mysqli_real_escape_string($connect, trim($ZPO_LINE_ITEM)) .
+            "','" .
+            mysqli_real_escape_string($connect, trim("SDI")) .
+            "',1)";
+        mysqli_query($connect, $sqlqc);//uncomment
+         // echo $sqlqc;exit;
+        }
+      }
+
+      $xy++;
+    }
+    echo json_encode(["success" => 1]);//uncomment
+  } else {
+    echo json_encode(["success" => 0]);//uncomment
+  }
+  //ftp_close($connection); //uncomment
+
+?>

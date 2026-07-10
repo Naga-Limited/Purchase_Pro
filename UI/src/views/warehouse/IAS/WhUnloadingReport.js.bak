@@ -1,0 +1,384 @@
+import React, { useState, useEffect } from "react";
+import { useHistory } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { useLoader } from "../../../utility/hooks/useLoader";
+
+import { Card, CardBody, CardHeader, CardTitle } from "reactstrap";
+import { Button, Row, Col } from "reactstrap";
+import { CustomDropdownInput, CustomTextInput } from "../../forms/custom-form";
+import TableComponent from "../../common/TableComponent";
+import { useFormik } from "formik";
+import { RefreshBlock } from "../../common/RefreshBlock";
+import { BASE_URL, apiBaseUrl } from "../../../urlConstants";
+import { errorToast, ShowToast } from "../common/appHelper";
+import { apiPostMethod } from "../../../helper/axiosHelper";
+
+
+const filter_Id={
+    
+    VA_No:"",
+    SendingPlant_id:"",
+    SendingPlant:"",
+    ReceivingPlant_id:"",
+    ReceivingPlant:"",
+    FromDt:"",
+    ToDt:"",
+    Truck_No_id:"",
+    Truck_No:"",
+    screenType:"IAS_REPORT",
+}
+
+const WhUnloadingReport = () => {
+    let { showLoader, hideLoader } = useLoader();
+    const [FilterData, setFilterData] = useState({ ...filter_Id });  
+    
+    const form = useFormik({
+        initialErrors : false,
+        initialValues: {},
+        // validationSchema: getValidationSchema(dispatchDetails, isReceivingGateOut),
+    });
+
+    let id=0;
+    useEffect(() => { 
+        
+        getReportDetails(FilterData);
+      }, [FilterData]);
+
+
+    const taColumns = [
+        {
+            name: "VA No",
+            selector: "VA_No",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Vehicle No",
+            selector: "Truck_No",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Delivery No",
+            selector: "DeliveryNo",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Eway Bill No",
+            selector: "EWayBillNo",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Sending Plant",
+            selector: "S_Plant",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Sending Storage Location",
+            selector: "S_Location",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Sending Lot1",
+            selector: "Lot1_Lot_No",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Sending Wheatvariety1",
+            selector: "S_WheatVariety1",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Sending Lot2",
+            selector: "Lot2_Lot_No",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Sending Wheatvariety2",
+            selector: "S_WheatVariety2",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Sending Lot3",
+            selector: "Lot3_Lot_No",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Sending Wheatvariety3",
+            selector: "S_WheatVariety3",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Sending Empty Weight",
+            selector: "S_WbEmptyWt",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Sending Load Weight",
+            selector: "S_WbLoadWt",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Sending Net Weight",
+            selector: "S_WbNetWt",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Sending Gunny Weight",
+            selector: "S_GunnyWt",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Sending Gunnyless Weight",
+            selector: "S_GunnyLessNetWt",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Receiving Plant",
+            selector: "R_Plant",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Receiving Storage Location",
+            selector: "R_Location",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Receiving Lot1",
+            selector: "Lot1_Lot_No",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Receiving Wheatvariety1",
+            selector: "R_WheatVariety1",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Receiving Lot2",
+            selector: "Lot2_Lot_No",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Receiving Wheatvariety2",
+            selector: "R_WheatVariety2",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Receiving Lot3",
+            selector: "Lot3_Lot_No",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Receiving Wheatvariety3",
+            selector: "R_WheatVariety3",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Receiving Empty Weight",
+            selector: "R_WbEmptyWt",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Receiving Load Weight",
+            selector: "R_WbLoadWt",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Receiving Net Weight",
+            selector: "R_WbNetWt",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Receiving Gunny Weight",
+            selector: "R_GunnyWt",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Receiving Gunnyless Weight",
+            selector: "R_GunnyLessNetWt",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Diff",
+            selector: "R_GunnyLessNetWt",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Unloading Lot No",
+            selector: "R_GunnyLessNetWt",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Sending GateIn Time",
+            selector: "R_GunnyLessNetWt",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Sending GateOut Time",
+            selector: "R_GunnyLessNetWt",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Receiving GateIn Time",
+            selector: "R_GunnyLessNetWt",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Receiving GateOut Time",
+            selector: "R_GunnyLessNetWt",
+            sortable: true,
+            minWidth: "150px",
+        },
+        {
+            name: "Action",
+            selector: "",
+            minWidth: "150px",
+            cell: (row) => {
+                return  (
+                  <Button.Ripple color="primary"  /*onClick={() => ViewRelot(row.RelotId)}*/ >
+                    {"Edit"}
+                  </Button.Ripple>
+                );
+            }
+        },
+    ];
+
+    
+
+    const getReportDetails = (FilterData)=>{
+        let fdata = {FilterData};
+        showLoader();
+        apiPostMethod(apiBaseUrl+'warehouse/Master/getReportDetails', fdata)
+          .then((response) => {
+            const { data } = response;
+            if (data.success) {
+                form.setValues({
+                    ...form.values, CheckList: data.results
+                });
+            }else{
+                errorToast("Data Not Found !!!");      
+            }
+        })
+        .catch((error) => {
+          errorToast("Something went wrong, please try again after sometime");
+        })
+        .finally((a) => {
+          hideLoader();
+        });
+    }
+
+    const onVANoChange=(e)=>{
+        const { value, label } = e;
+        
+        setFilterData({...FilterData, VA_No:e.value});
+        form.setFieldValue('VANumber',{value:e.value, label:e.label});
+
+        console.log(FilterData);
+        
+    }
+
+    const onSendingPlantChange=(e)=>{
+        const { value, label } = e;
+        form.setFieldValue('SendingPlant',{value:e.value, label:e.label});
+        setFilterData({...FilterData, SendingPlant_id:e.value, SendingPlant:e.label});
+        console.log(FilterData);
+    }
+
+    const onReceivingPlantChange=(e)=>{
+        const { value, label } = e;
+        form.setFieldValue('ReceivingPlant',{value:e.value, label:e.label});
+        setFilterData({...FilterData, ReceivingPlant_id:e.value, ReceivingPlant:e.label});
+        console.log(FilterData);
+    }
+
+    const onVehicleChange=(e)=>{
+        const { value, label } = e;
+        form.setFieldValue('VehicleNo',{value:e.value, label:e.label});
+        setFilterData({...FilterData, Truck_No_id:e.value, Truck_No:e.label});
+        console.log(FilterData);
+    }
+
+    return (
+        <div>
+            <RefreshBlock />
+            <Card>
+                <CardHeader>
+                    <CardTitle>{"Unloading WH Incharge - Report"}</CardTitle>
+                </CardHeader>
+                <CardBody>
+                    <Row>
+                        <Col md="4" sm="12">
+                            <CustomDropdownInput options={""} label={"VA No"} form={form} id="VANumber" 
+                                url={`${apiBaseUrl}warehouse/Master/getVANumber`}
+                                onChange = {(e)=>onVANoChange(e)}/>
+                        </Col>
+                        <Col md="4" sm="12">
+                            <CustomDropdownInput options={""} label={"Sending Plant"} form={form} id="SendingPlant"
+                                url={`${apiBaseUrl}warehouse/Master/getSendingPlant`}
+                                onChange = {(e)=>onSendingPlantChange(e)}/>
+                        </Col>
+                        <Col md="4" sm="12">
+                            <CustomDropdownInput options={""} label={"Receiving Plant"} form={form} id="ReceivingPlant" 
+                                url={`${apiBaseUrl}warehouse/Master/getReceivingPlant`}
+                                onChange = {(e)=>onReceivingPlantChange(e)}/>
+                        </Col>
+                    </Row>
+                    <Row>
+                        <Col md="4" sm="12">
+                            <CustomTextInput label={"From Date"} form={form} id="FromDate" type="date" />
+                        </Col>
+                        <Col md="4" sm="12">
+                            <CustomTextInput label={"To Date"} form={form} id="ToDate" type="date" />
+                        </Col>
+                        <Col md="4" sm="12">
+                            <CustomDropdownInput options={""} label={"Vehicle No"} form={form} id="VehicleNo"
+                                url={`${apiBaseUrl}warehouse/Master/getVehicleNO`}
+                                onChange = {(e)=>onVehicleChange(e)}/>
+                        </Col>
+                    </Row>
+
+                </CardBody>
+            </Card>
+            <Card>
+                <CardBody>
+                    <TableComponent columns={taColumns} data={form.values.CheckList}/>
+                </CardBody>
+            </Card>
+
+        </div>
+    )
+};
+export default WhUnloadingReport;

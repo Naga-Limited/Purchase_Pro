@@ -1,0 +1,1294 @@
+import React, { Fragment, useEffect,useState } from "react";
+import { useFormik } from "formik";
+import { validation, Yup } from "../../forms/custom-form";
+import { useHistory, useParams } from "react-router";
+import { apiBaseUrl } from "../../../urlConstants";
+import { Paperclip, X, Plus } from "react-feather";
+import { useLoader } from "../../../utility/hooks/useLoader";
+import { addOption } from "../../common/Utils";
+import { RefreshBlock } from "../../common/RefreshBlock";
+import { apiPostMethod } from "@helpers/axiosHelper";
+import { errorToast, ShowToast } from "@helpers/appHelper";
+import { CancelSubmitButtons } from "../../forms/custom-button";
+import { CardComponent } from "../../common/CardComponent";
+import moment from "moment"; 
+////import STOPODeliveryCreationEditForm from "./STOPODeliveryCreationEditForm";
+import { Row, Col,Button,Table,FormGroup } from "reactstrap";
+import { Link } from "react-router-dom";
+import { CustomDropdownInput, CustomTextInput } from "../../forms/custom-form";
+import Select from "react-select";
+import {MonthArray, LastDayOfMonth} from "./../common/appHelper";
+import { WarehousePlanList, WarehousePlanList_Edit } from "./../WarehouseDropdownList";
+import { isNull } from "lodash";
+
+const Division = [
+  {
+    options: [
+      { value: "1", label: "NAGA"},
+      { value: "2", label: "MMD" },
+    ],
+  },
+];
+
+const Plan_EntryScreen_List = ({ form }) => {
+  const history = useHistory();
+  const [WarehoseOptions, setWarehouseOptions] = useState([]);
+  const [PlanDatas, setPlanData] = useState([]);
+  const [WhPlantOptions, setWhPlantOptions] = useState([]);
+  const [WhLotOptions, setWhLotOptions] = useState([]);
+  const [WhWheatvarietyOptions, setWhWheetVarietyOptions] = useState([]);
+  const [storageLocationOption,setstorageLocationOption] = useState([]); 
+  const [MonthList, setMonthList] = useState([]);
+  //const {WH_CODE}=form.values.WH_CODE;
+
+  let { id } = useParams();
+  let refid='';
+  if(id){
+  refid = id.replace(":", "");
+  }
+  let { showLoader, hideLoader } = useLoader();
+  useEffect(() => {
+    if (id) {
+      onFetchSDIdetailsById();
+    }
+   else if(!form.values.MovementGroupNumber){
+      getMovementGroupNumber();
+    }
+  }, [id]);
+
+  const getMovementGroupNumber = () =>{
+    let fdata = {
+      id: refid,
+    };
+    showLoader();
+    apiPostMethod(apiBaseUrl + "Warehouse/Master/getMovementGroupNumber", fdata)
+      .then((response) => {
+        const { data } = response;
+        console.log(JSON.stringify(response));
+        if (data.success) {
+          form.setValues({
+            MovementGroupNumber:data.results[0].MovementGroupNumber,        
+          })
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime...");
+      })
+      .finally((a) => {
+        hideLoader();
+        
+      });
+  };
+
+  const onFetchSDIdetailsById = () => {
+    let fdata = {
+      id: refid,
+    };
+    showLoader();
+    //alert("ok")
+    apiPostMethod(apiBaseUrl + "Warehouse/STOPODeliveryPlan/getPlanGroupFromPlanId", fdata)
+    
+      .then((response) => {
+        const { data } = response;
+        console.log(JSON.stringify(response));
+        if (data.success) {
+
+          let vd = [];
+          let NewData={};
+          vd = [...PlanDatas];
+          for(let i=0;i<data.results.length;i++){
+            if(data.results[i].planid!=refid){
+              NewData={
+                planid:data.results[i].planid,
+                MovementGroupNumber:data.results[i].MovementGroupNumber,
+                WeekNo:data.results[i].WeekNo,WeekNoName:data.results[i].WeekNoName,
+                date:data.results[i].date,
+                Plant:data.results[i].fromplantid,
+                StorageLocation:data.results[i].fromlocationid,
+                WareHouse:data.results[i].WareHouse,WareHouseName:data.results[i].WareHouseName,
+                PlantName:data.results[i].PLANT_NAME,
+                StorageLocation:data.results[i].fromlocationid,storagelocationName:data.results[i].StorageLocationName,
+                WheatVariety:data.results[i].WheatVariety,WheatVarietyName:data.results[i].WheatVarietyName,
+                ActualStock:data.results[i].ActualStock,
+                RandDConfirmedQty:data.results[i].RandDConfirmedQty,
+                LotNumber:data.results[i].LotNumber,LotNumberName:data.results[i].LotNumberName,
+                FumigationClearedQty:data.results[i].FumigationClearedQty,
+                Division:data.results[i].Division,
+                KeyLoanDOQty:data.results[i].KeyLoanDOQty,
+                MovementQty:data.results[i].MovementQty,
+                ActualMovementQty:data.results[i].ActualMovementQty,
+                MixingRatio:data.results[i].MixingRatio,
+                ValidFrom:data.results[i].ValidFrom,
+                ValidTo:data.results[i].ValidTo,   
+                RestrictMode:data.results[i].RestrictMode,
+                ReceivingBin:data.results[i].ReceivingBin,
+                ReceivingBinName:data.results[i].ReceivingBinName,
+                RndSkipFlag:data.results[i].RndSkipFlag,
+                FumigationSkipFlag:data.results[i].FumigationSkipFlag,
+              }
+              vd.push(NewData);
+
+            }else{
+
+              form.setValues({
+                planid:data.results[i].planid,
+                MovementGroupNumber:data.results[i].MovementGroupNumber,
+                date:data.results[i].date,
+                ActualStock:data.results[i].ActualStock,
+                RandDConfirmedQty:data.results[i].RandDConfirmedQty,
+                FumigationClearedQty:data.results[i].FumigationClearedQty,
+                Division:data.results[i].Division,
+                KeyLoanDOQty:data.results[i].KeyLoanDOQty,
+                MovementQty:data.results[i].MovementQty,
+                ActualMovementQty:data.results[i].ActualMovementQty,
+                MixingRatio:data.results[i].MixingRatio,
+                ValidFrom:data.results[i].ValidFrom,
+                ValidTo:data.results[i].ValidTo,
+                MinNumberQty:data.results[i].MovementQty,
+                RndSkipFlag:data.results[i].RndSkipFlag,
+                FumigationSkipFlag:data.results[i].FumigationSkipFlag,
+              })
+              
+              form.setFieldValue('WeekNo', {  label:data.results[i].WeekNoName,value: data.results[i].WeekNo });
+              form.setFieldValue('WareHouse', {  label:data.results[i].WareHouseName,value: data.results[i].WareHouse });
+              form.setFieldValue('storagelocationid', {  label:data.results[i].StorageLocationName,value: data.results[i].fromlocationid });
+              form.setFieldValue('WheatVariety', {  label:data.results[i].WheatVarietyName,value: data.results[i].WheatVariety });
+              form.setFieldValue('LotNumber', {  label:data.results[i].LotNumberName,value: data.results[i].LotNumber });
+              form.setFieldValue('RestrictMode', {  label:data.results[i].RestrictMode,value: data.results[i].RestrictMode });
+              form.setFieldValue('plantid', {  label:data.results[i].PLANT_NAME,value: data.results[i].fromplantid });
+              form.setFieldValue('ReceivingBin', {  label:data.results[i].ReceivingBinName,value: data.results[i].ReceivingBin });
+            }
+          }
+        setPlanData(vd);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      })
+      .finally((a) => {
+        hideLoader();
+      });
+  };
+
+  const clearALL = () => {
+    //form.setFieldValue('PlanMonth',  '');
+    form.setFieldValue('ValidFrom',  '');
+    form.setFieldValue('ValidTo',  '');
+    form.setFieldValue('WeekNo',  '');
+    form.setFieldValue('LotNumber',  '');
+    //form.setFieldValue('WheatVariety',  '');
+    form.setFieldValue('WareHouse', '');
+    form.setFieldValue('ReceivingBin', '');
+    form.setFieldValue('storagelocationid', '');
+    form.setFieldValue('Division', '');
+    form.setFieldValue('plantid', '');
+    form.setFieldValue('MovementGroupNumber', '');
+    form.setFieldValue('ActualStock', '');
+    form.setFieldValue('ReservedQty', '');
+    form.setFieldValue('AvailableQty', '');
+    form.setFieldValue('RandDConfirmedQty', '');
+
+    form.setFieldValue('KeyLoanDOQty', '');
+    form.setFieldValue('FumigationClearedQty', '');
+    form.setFieldValue('MovementQty', '');
+    form.setFieldValue('MixingRatio', '');
+    form.setFieldValue('ExpectedArrival', '');
+  
+    setWhPlantOptions([]);
+    setWhLotOptions([]);
+    setWhWheetVarietyOptions([]);
+  }
+
+
+  const CheckPlanLotDuplicate = async () => {
+    let fdata = {PlanMonth:form.values.ValidFrom,
+      warehouseid:form.values.WareHouse.value,
+      plantid:form.values.plantid.value,
+      storagelocationid:form.values.storagelocationid.value,
+      lotid:form.values.LotNumber.value,
+      wheatvarietyid:form.values.WheatVariety.value,
+    };
+    let TmpPlanDatas = [];
+    console.log(JSON.stringify(PlanDatas));
+  
+    TmpPlanDatas = [...PlanDatas];
+    showLoader();
+    //alert("ok")
+    let retval=false;
+
+
+    await apiPostMethod(apiBaseUrl + "warehouse/STOPODeliveryPlan/checkPlanLotDuplicate", fdata)
+      .then((response) => {
+        const { data } = response;
+        console.log(data.DuplicateRecord);
+        if (data.success) {
+          if(parseInt(data.DuplicateRecord)>0){
+          //errorToast("Plan already for this wheat variety/lot ");
+          retval= false;
+          }
+          else{
+            retval= true;
+          }
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+        return false;
+      })
+      .finally((a) => {
+        hideLoader();
+        //return retval;  
+      });
+
+      // Mohan 02062022 Checking in Local table please dont change the position to top of API Call, it will not work sometimes
+      const filteredUsers = TmpPlanDatas.filter(item => {
+        return (
+            item.ValidFrom.indexOf(fdata.PlanMonth) >= 0 
+            && item.WareHouse.indexOf(fdata.warehouseid) >= 0 
+            && item.Plant.indexOf(fdata.plantid) >= 0 
+            && item.LotNumber.indexOf(fdata.lotid) >= 0 
+            && item.StorageLocation.indexOf(fdata.storagelocationid) >= 0 
+            && item.WheatVariety.indexOf(fdata.wheatvarietyid) >= 0
+        )
+      })
+ // console.log(filteredUsers);
+  //return false;
+  if(filteredUsers.length>0){
+    retval=false;
+  }
+      return retval;
+  };
+
+  const addTblRecord = async () => {
+    //000
+
+    showError('MovementGroupNumber_Error','',0);
+    showError('WeekNo_Error','',0);
+    showError('date_Error','',0);
+    showError('WareHouse_Error','',0);
+    showError('WheatVariety_Error','',0);
+    showError('ActualStock_Error','',0);
+    showError('RandDConfirmedQty_Error','',0);
+    showError('LotNumber_Error','',0);
+    showError('FumigationClearedQty_Error','',0);
+    showError('Division_Error','',0);
+    showError('KeyLoanDOQty_Error','',0);
+    showError('MovementQty_Error','',0);
+    showError('ActualMovementQty_Error','',0);
+    /*
+    showError('MixingRatio_Error','',0);
+    showError('ValidFrom_Error','',0);
+    showError('ValidTo_Error','',0);
+    showError('RestrictMode_Error','',0);
+    */
+
+    let RetFalse=0;
+
+    //if(!form.values.MovementGroupNumber || form.values.MovementGroupNumber==''){ showError('MovementGroupNumber_Error','Enter Movement Group Number',1); RetFalse=1; }
+    //if(!form.values.WeekNo || form.values.WeekNo.value==''){ showError('WeekNo_Error','Select Week No',1);RetFalse=1;}
+    //if(!form.values.date || form.values.date==''){ showError('date_Error','Enter date',1); RetFalse=1;}
+    
+    if(!form.values.WheatVariety || form.values.WheatVariety.value==''){ showError('WheatVariety_Error','Select Wheat Variety',1); RetFalse=1;}
+    
+    if(!form.values.LotNumber || form.values.LotNumber.value==''){ showError('LotNumber_Error','Select Lot Number',1); RetFalse=1;}
+    if(!form.values.storagelocationid  || form.values.storagelocationid.value==''){ showError('WareHouse_Error','Select Storage Location',1); RetFalse=1;}
+    if(!form.values.plantid  || form.values.plantid.value==''){ showError('WareHouse_Error','Select Plant',1); RetFalse=1;}
+    if(!form.values.WareHouse || form.values.WareHouse.value==''){ showError('WareHouse_Error','Select WareHouse',1); RetFalse=1;}
+    //if(!form.values.ActualStock || form.values.ActualStock==''){ showError('ActualStock_Error','Enter Actual Stock',1); RetFalse=1;}
+    //if(!form.values.RandDConfirmedQty || form.values.RandDConfirmedQty==''){ showError('RandDConfirmedQty_Error','Enter RandD Confirmed Qty',1); RetFalse=1;}
+    //if(!form.values.FumigationClearedQty || form.values.FumigationClearedQty==''){ showError('FumigationClearedQty_Error','Enter Fumigation Cleared Qty',1); RetFalse=1;}
+    if(!form.values.Division || form.values.Division==''){ showError('Division_Error','Enter Division',1); RetFalse=1;}
+    //if(!form.values.KeyLoanDOQty || form.values.KeyLoanDOQty==''){ showError('KeyLoanDOQty_Error','Enter KeyLoan DO Qty',1); RetFalse=1;}
+    if(!form.values.MovementQty || form.values.MovementQty==''){ showError('MovementQty_Error','Enter Movement Qty',1); RetFalse=1;}
+    //if(!form.values.ActualMovementQty || form.values.ActualMovementQty==''){ showError('ActualMovementQty_Error','Enter Actual Movement Qty',1); RetFalse=1;}
+    //if(!form.values.MixingRatio || form.values.MixingRatio==''){ showError('MixingRatio_Error','Enter Mixing Ratio',1); RetFalse=1;}
+    if(!form.values.ValidFrom || form.values.ValidFrom==''){ showError('ValidFrom_Error','Enter Valid From',1); RetFalse=1;}
+    if(!form.values.ValidTo || form.values.ValidTo==''){ showError('ValidTo_Error','Enter Valid To',1); RetFalse=1;}
+    //if(!form.values.RestrictMode || form.values.RestrictMode.value==''){ showError('RestrictMode_Error','Enter Restrict Mode',1); return false}
+    
+    if(parseFloat(form.values.MovementQty)>parseFloat(form.values.AvailableStock) ){ showError('ValidTo_Error','Movement Qty Greater than Available  Stock',1); RetFalse=1;}
+    
+    const NotDuplicateRecord=await CheckPlanLotDuplicate();
+    //console.l og(DuplicateRecord);
+    if(NotDuplicateRecord==false){showError('LotNumber_Error','Lot/Wheat variety already exists',1); RetFalse=1; }
+    
+    if(RetFalse==1){
+      return false;
+    } 
+
+    console.log("start")
+    console.log(JSON.stringify(PlanDatas));
+    console.log("form");
+    console.log(JSON.stringify(form));
+    let Len=parseFloat(PlanDatas.length) + parseFloat(1);
+    
+    let NewData={
+      PlanMonth:form.values.PlanMonth.value,  PlanMonthName:form.values.PlanMonth.label,
+      MovementGroupNumber:form.values.MovementGroupNumber,
+      WeekNo:form.values.WeekNo.value,  WeekNoName:form.values.WeekNo.label,
+      date:form.values.date,
+
+      WareHouse:form.values.WareHouse?form.values.WareHouse.value:0,  
+      WareHouseName:form.values.WareHouse?form.values.WareHouse.label:'None',
+      
+      Plant:form.values.plantid?form.values.plantid.value:0,  
+      PlantName:form.values.plantid?form.values.plantid.label:'None',
+
+      StorageLocation:form.values.storagelocationid?form.values.storagelocationid.value:0,  
+      storagelocationName:form.values.storagelocationid?form.values.storagelocationid.label:'None',
+      
+      WheatVariety:form.values.WheatVariety.value,  
+      WheatVarietyName:form.values.WheatVariety.label,
+      ActualStock:form.values.ActualStock?form.values.ActualStock:0,
+      ReservedQty:form.values.ReservedQty,
+      AvailableQty:form.values.AvailableQty,
+      MovementQty:form.values.MovementQty,
+      /*Difference Oty => (MovementQty - AvailableQty)*/
+      DifferenceQty:parseFloat(form.values.MovementQty) - parseFloat(form.values.AvailableQty),
+      ExpectedArrival:form.values.ExpectedArrival,
+      /*Purchase Plan*/
+      PurchasePlan:(parseFloat(form.values.MovementQty) - parseFloat(form.values.AvailableQty)) - parseFloat(form.values.ExpectedArrival),
+      /*Release*/
+      Release:"None",
+
+      Division: form.values.Division?form.values.Division.label:'None',
+      
+      RandDConfirmedQty:form.values.RandDConfirmedQty,
+      LotNumber:form.values.LotNumber.value,  
+      LotNumberName:form.values.LotNumber.label,
+      FumigationClearedQty:form.values.FumigationClearedQty,
+      KeyLoanDOQty:form.values.KeyLoanDOQty,
+      ActualMovementQty:form.values.ActualMovementQty ? form.values.ActualMovementQty:0,
+      MixingRatio:form.values.MixingRatio ? form.values.MixingRatio: 0,
+      ValidFrom:form.values.ValidFrom,
+      ValidTo:form.values.ValidTo,
+      /*RestrictMode:form.values.RestrictMode.value,*/
+      ReceivingBin:form.values.ReceivingBin?form.values.ReceivingBin.value:0,
+      ReceivingBinName:form.values.ReceivingBin?form.values.ReceivingBin.label:0,
+      RndSkipFlag:form.values.RndSkipFlag,
+      FumigationSkipFlag:form.values.FumigationSkipFlag,
+    };
+
+    let vd = [];
+    console.log(JSON.stringify(NewData));
+  
+      vd = [...PlanDatas];
+
+    vd.push(NewData);
+
+    setPlanData(vd);
+    console.log(JSON.stringify(PlanDatas));
+    console.log("OK");
+
+    let MgNo=form.values.MovementGroupNumbe;
+    let MoveQty=form.values.MovementQty;
+    form.setValues({
+      MovementGroupNumber:MgNo,
+      MovementQty:MoveQty
+    });
+
+    form.setValues({
+      ...form.values,
+      //PlanMonth:"",
+      //PlanMonthName:"",
+      MovementGroupNumber:"",
+      WeekNo:"",  
+      WeekNoName:"",
+      date:"",
+
+      //LotNumber:"",  
+      //LotNumberName:"",
+      
+      //WareHouse:"",  
+      //WareHouseName:"",
+      
+      //Plant:"",  
+      //PlantName:"",
+      
+      //StorageLocation:"",  
+      //storagelocationName:"",
+      
+      //WheatVariety:"",  
+      //WheatVarietyName:"",
+      
+      ActualStock:"",
+      ReservedQty:"",
+      AvailableQty:"",
+      MovementQty:"",
+      DifferenceQty:"",
+      ExpectedArrival:"",
+      PurchasePlan:"",
+      Release:"",
+      Division:"",
+      RandDConfirmedQty:"",
+      
+      FumigationClearedQty:"",
+      KeyLoanDOQty:"",
+      // ActualMovementQty:form.values.ActualMovementQty ? form.values.ActualMovementQty:0,
+      // MixingRatio:form.values.MixingRatio ? form.values.MixingRatio: 0,
+      //ValidFrom:"",
+      //ValidTo:"",
+      /*RestrictMode:form.values.RestrictMode.value,*/
+      ReceivingBin:"",
+      ReceivingBinName:"",
+      RndSkipFlag:"",
+      FumigationSkipFlag:""
+    });
+    //document.getElementById("MovementQty").disabled=true;
+
+    // form.setFieldValue('PlanMonth',  '');
+     form.setFieldValue('LotNumber',  '');
+    // form.setFieldValue('WheatVariety',  '');
+     form.setFieldValue('WareHouse', '');
+    // form.setFieldValue('ReceivingBin', '');
+     form.setFieldValue('storagelocationid', '');
+     form.setFieldValue('plantid','');
+    // setWhPlantOptions([]);
+    // setWhLotOptions([]);
+    // setWhWheetVarietyOptions([]);
+
+    //Mohan 06-06-2022 Do not enable clearALL();
+    console.log(JSON.stringify(form.values));
+
+    //setPlanData(newVal);
+
+  };
+
+  const showError = (Id,Msg,show) => {
+    if(document.getElementById(Id)) { 
+      document.getElementById(Id).innerHTML="";
+    if(show==1){
+      console.log("SHOW ERROR:"+Id);
+    document.getElementById(Id).innerHTML=Msg;
+    }
+  }
+  }
+
+  const EditRow = (item,i) =>{
+    console.log(JSON.stringify(item));
+    form.setValues({
+      PlanMonth:item.PlanMonth,
+      MovementGroupNumber:item.MovementGroupNumber,
+      date:item.date,
+      ActualStock:item.ActualStock,
+      RandDConfirmedQty:item.RandDConfirmedQty,
+      FumigationClearedQty:item.FumigationClearedQty,
+      Division:item.Division,
+      KeyLoanDOQty:item.KeyLoanDOQty,
+      MovementQty:item.MovementQty,
+      ExpectedArrival:item.ExpectedArrival,
+      ActualMovementQty:item.ActualMovementQty,
+      MixingRatio:item.MixingRatio,
+      ValidFrom:item.ValidFrom,
+      ValidTo:item.ValidTo,
+    })
+
+    form.setFieldValue('WeekNo', {  label: item.WeekNoName,value: item.WeekNo });
+    form.setFieldValue('Division', {  label: item.Division,value: item.Division });
+    form.setFieldValue('WareHouse',  {  label: item.WareHouseName,value: item.WareHouse });
+    form.setFieldValue('storagelocationid', {  label:item.storagelocationName,value: item.StorageLocation});
+    form.setFieldValue('WheatVariety', {  label: item.WheatVarietyName,value: item.WheatVariety });
+    form.setFieldValue('LotNumber', {  label: item.LotNumberName,value: item.LotNumber });
+    form.setFieldValue('RestrictMode', {  label: item.RestrictMode,value: item.RestrictMode });
+    form.setFieldValue('PlanMonth', {  label:item.PlanMonthName,value: item.PlanMonth});
+    form.setFieldValue('plantid', {  label:item.PlantName,value: item.Plant});
+    form.setFieldValue('ReceivingBin', {  label: item.ReceivingBinName,value: item.ReceivingBin });
+    
+    let vdata = [...PlanDatas];
+    vdata.splice(i, 1);
+    setPlanData(vdata);
+
+  }
+  const DeleteRow = (i) =>{
+    let vdata = [...PlanDatas];
+    vdata.splice(i, 1);
+    setPlanData(vdata);
+  }
+  const AddValue = ()=>{
+    if(form.values.WeekNo && form.values.WeekNo!=""){
+      return true;
+    }else{
+      return false;
+    }
+  }
+
+  const   onSubmit = () => {
+    const postdata = {
+      PlanDatas
+    }
+    //  alert(JSON.stringify(postdata)) ;
+    // alert("3");
+   console.log(JSON.stringify(postdata))
+   
+    showLoader();
+    apiPostMethod(apiBaseUrl + "Warehouse/STOPODeliveryPlan/AddUpdateSTOPODeliveryPlan", postdata)
+      .then((response) => {
+        const { data } = response;
+        console.log(JSON.stringify(response))
+        let UsrId = data.success;
+        if(data.success){
+          ShowToast("Saved Successfully...");
+          //history.push(`/master/ead:`+UsrId);
+          history.push(`/warehouse/Plan_List`);
+        }else{
+          errorToast("Enter Atleast One Entry");  
+        }
+      })
+      .catch((error) => {
+        console.log(JSON.stringify(error))
+        errorToast("Something went wrong, please try again after sometime");
+      })
+      .finally((a) => {
+        hideLoader();
+      });
+  }
+  const RefreshPage = () => {
+    history.push(`/master/stopodeliverycreation`);
+  };
+  
+  const onDateChange = (e) => {
+    console.log(e.target.value);
+    var dt1 = new Date(e.target.value);
+    const wkno = getWeek(dt1);
+    console.log("WeekNo" + wkno);
+    //form.values.date=e.target.value; PVS Date
+
+    form.values.ValidFrom=e.target.value;
+    let result=new Date(e.target.value);
+    //const dateFormat = "YYYY-MM-DD";
+    for(let i=1;i<=7;i++){
+      result.setDate(result.getDate() + 1);
+     
+      if(result.getDay()==6){
+        console.log(result);
+        console.log(result.getDay());
+        let month=(result.getMonth())+1;
+        if(month<10){
+          month=0+""+month;
+        }
+        let dt=result.getDate();
+        if(dt<10){
+          dt=0+""+dt;
+        }
+
+        form.values.ValidTo=result.getFullYear()+"-"+month+"-"+dt;
+      }
+    }
+
+    form.setFieldValue('WeekNo', {  label: "W-"+wkno,value: wkno });
+    console.log("WeekNo 1 " + getWeek(dt1));
+  };
+
+  const onWarehouseChange = (e) => {
+    const { value, label } = e;  
+    form.setFieldValue('WareHouse', {  label: label,value: value });
+    //setFormData({ ...formData, WH_CODE: value, WH_Name:label });
+
+    /**************RESET**************** */
+   // form.setFieldValue('LotNumber','');
+    // form.setFieldValue('storagelocationid','');
+  //  form.setFieldValue('plantid','');
+   //form.setFieldValue('WareHouse','');
+    /********************************** */
+
+    FillPlantList(value); 
+  };
+
+  const FillPlantList = (WH_CODE) => {
+    let fdata = { WH_CODE: WH_CODE, screenType: "FUMIGATION" };
+    apiPostMethod(apiBaseUrl+'warehouse/master/getWHplantList', fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          setWhPlantOptions([{ options: data.results }]);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });
+  };
+  
+  const onStorageLocationChange=(e)=>{
+    const {value,label} = e; 
+    form.setFieldValue('storagelocationid', {  label: label,value: value });     
+   // setStockEntryfromData({ ...stockEntryformData, locationid:value , slocation:label})  
+   
+   /*****************RESET***************** */
+   form.setFieldValue('LotNumber','');
+   //form.setFieldValue('storagelocationid','');
+  //  form.setFieldValue('plantid','');
+  //  form.setFieldValue('WareHouse','');
+   /*************************************** */
+
+   FillLotList(value)
+  }
+  
+  const onPlantChange = (e) => {
+    const { value, label } = e;
+    form.setFieldValue('plantid', {  label: label,value: value });
+   // FillLotList(value);
+   
+   /***************RESET******************** */
+   form.setFieldValue('LotNumber','');
+   form.setFieldValue('storagelocationid','');
+   //form.setFieldValue('plantid','');
+  //  form.setFieldValue('WareHouse','');
+   /*************************************** */
+   
+   FillStorageLocationList(value)
+
+   
+  };
+   
+  const FillStorageLocationList=(PlantId)=>{
+    let fdata = { PlantId, screenType: "RND" };
+    apiPostMethod(apiBaseUrl+'warehouse/master/getStorageLocationListFromPlant', fdata)
+    .then((response) => {
+    const { data } = response;
+    if (data.success) {
+   
+      setstorageLocationOption([{ options: data.results }]);
+   
+    //getLotInfo(paramLotId,type);
+    
+    }
+    })
+    .catch((error) => {
+    errorToast("Something went wrong, please try again after sometime");
+    });
+  };
+
+  const FillLotList = (sLocId) => {
+    //let fdata = { plantid: paramPlantid, screenType: "FUMIGATION" };
+    let fdata = {  storagelocationId:sLocId,plantid: form.values.plantid.value, screenType: "FUMIGATION" };
+    apiPostMethod(apiBaseUrl+'warehouse/master/getWHLotList', fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          setWhLotOptions([{ options: data.results }]);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });
+  };
+
+  const onLotChange = (e) => {
+    const { value, label } = e;
+    
+    form.setFieldValue('LotNumber', { label: label,value: value });
+    getSublotData(form.values.WheatVariety.value, form.values.WheatVariety.label, label, value
+      ,form.values.plantid.value, form.values.storagelocationid.value);
+    //FillWheatVarityList(value);
+  };
+
+  const FetchStockDet = (paramLotId, paramLotNo) => {
+    /*
+    let fdata = { lotid: paramLotId, screenType: "INVENTORY" };
+    setwheatvarietyidoption([]);
+    apiPostMethod(apiBaseUrl+'warehouse/master/getWHWheatvarityList', fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          setwheatvarietyidoption([{ options: data.results }]);
+          console.log(data.results);
+          form.setValues(
+            {...form.values, lotid: {value:paramLotId, label:paramLotNo},
+            plantname: data.results[0].plantname,
+            plantid: data.results[0].plantid,
+            storagelocationname: data.results[0].storagelocationname,
+            storagelocationid: data.results[0].storagelocationid,
+            wh_refid: data.results[0].wh_refid,
+            warehousename: data.results[0].wh_name,
+            wh_code: data.results[0].wh_code,
+            SAP_Qty: data.results[0].SAP_Qty,
+            init_lot_qty: data.results[0].init_lot_qty,
+            allowed_diff_in_percent: data.results[0].allowed_diff_in_percent,
+            totalcapacity: data.results[0].totalcapacity,
+            wheatqty: data.results[0].wheatqty,
+            }
+            );
+            form.setFieldValue("lotid", {value:paramLotId, label:paramLotNo});
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });*/
+  };
+  
+  const FillWheatVarityList = (paramLotId) => {
+    let fdata = { lotid: paramLotId, screenType: "FUMIGATION" };
+    apiPostMethod(apiBaseUrl+'warehouse/master/getWHWheatvarityList', fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          setWhWheetVarietyOptions([{ options: data.results }]);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });
+  };
+  
+  function getDifferenceInDays(date1, date2) {
+    const diffInMs = Math.abs(date2 - date1);
+    return diffInMs / (1000 * 60 * 60 * 24);
+  }
+  
+  const getMoveQty=(e)=>{
+    let newDate = new Date();
+    let ValidFromDt=new Date(form.values.ValidFrom);
+    console.log(newDate)
+    console.log(ValidFromDt);
+    let Diff=getDifferenceInDays(newDate, ValidFromDt);
+    Diff=Math.ceil(Diff);
+    Diff=parseFloat(Diff)+1;
+ 
+    console.log(Diff);
+    let MinQty = form.values.ActualStock;
+
+    if(Diff>=7 || 1==1){  // 1==1 => Always true weekwise validation not required
+      //MinQty=form.values.ActualStock;
+      console.log(MinQty, e.target.value);
+      // if(parseFloat(e.target.value) > parseFloat(MinQty)){
+      //   errorToast("Movement Qty Less than or Equal to  "+ MinQty);
+      //   return false;
+      // }
+
+      form.setValues({
+        ...form.values,
+        MovementQty:e.target.value
+      })
+      return false;
+    }else{
+ 
+      if((parseFloat(form.values.FumigationClearedQty) < parseFloat(MinQty)) && (form.values.FumigationSkipFlag==0)){
+        MinQty=form.values.FumigationClearedQty;
+        console.log("Fumiation  Qty")
+      }
+
+      if((parseFloat(form.values.RandDConfirmedQty) < parseFloat(MinQty)) && (form.values.RndSkipFlag==0)){
+        MinQty=form.values.RandDConfirmedQty
+        console.log("RND Qty")
+      }
+      if(parseFloat(form.values.KeyLoanDOQty) < parseFloat(MinQty)){
+        MinQty=form.values.KeyLoanDOQty
+        console.log("Key loan Qty")
+      }
+      if(parseFloat(e.target.value)>parseFloat(MinQty)){
+        errorToast("Movement Qty Less than or Equal to  "+ MinQty);
+        return false;
+      }
+   
+      form.setValues({
+        ...form.values,
+        MovementQty:e.target.value
+      })
+    }
+  }
+
+
+  const getActualQty =(e)=>{
+    let ActualMovementQty1=(e.target.value/100)*form.values.MovementQty;
+    //let ActualMovementQty1=(e.target.value/100)*form.values.KeyLoanDOQty;
+let totalQty=ActualMovementQty1;
+    for(let i=0;i<PlanDatas.length;i++){
+      totalQty= parseFloat(PlanDatas[i].ActualMovementQty)+parseFloat(totalQty);
+    }
+    if(totalQty > form.values.MovementQty){
+      errorToast("Invalid Mixing %, Actual Qty is Greater than Movement Qty");
+      return false;
+    }
+
+    form.setValues({
+      ...form.values,
+      MixingRatio:e.target.value,
+      ActualMovementQty:ActualMovementQty1
+    })
+  }
+  const onWheatvarietyChange = (e) => {
+    const { value, label } = e;
+    
+    //FillWheatVarityList(value);
+    //getSublotData(label,value);
+  Fill_WH_Plant_Lot_Wheatvariety(e.value, e.label);
+};
+
+const Fill_WH_Plant_Lot_Wheatvariety = (pWheatVarietyId, pWheatVarietyName) => {
+  let fdata = { WheatVarietyId: pWheatVarietyId, screenType: "WEEKLYPLAN" };
+
+  //apiPostMethod(apiBaseUrl+'warehouse/master/getWH_Plant_Lot_Wheatvariety', fdata)getWH_Plant_SL_Lot_WheatvarietyId
+  apiPostMethod(apiBaseUrl+'warehouse/master/getWH_Plant_SL_Lot_WheatvarietyId', fdata)
+    .then((response) => {
+      const { data } = response;
+      if (data.success) {
+        setWarehouseOptions([{ options: data.results.warehouse }]);
+        setWhPlantOptions([{ options: data.results.plant }]);
+        setstorageLocationOption([{ options: data.results.slocation }]);
+        setWhLotOptions([{ options: data.results.lot }]);
+        form.setFieldValue("WheatVariety",{value: pWheatVarietyId, label: pWheatVarietyName})
+        form.setFieldValue('WareHouse', {   });
+        form.setFieldValue('plantid', {   });
+        form.setFieldValue('storagelocationid', {  });
+        form.setFieldValue('LotNumber', {   });
+
+      }
+    })
+    .catch((error) => {
+      errorToast("Something went wrong, please try again after sometime");
+    });
+};
+
+
+  const getSublotData = (WheatVarietyId,WheatVariety,LotNo, LotId, plantid, locationid) => {
+    let fdata = { 
+      //warehouseid: form.values.WareHouse.value, 
+      plantid: plantid, 
+      locationid: locationid, 
+      lotid: LotId,  
+      WheatVarietyId: WheatVarietyId, 
+
+      screenType: "WEEKLYPLAN",
+    };
+
+    apiPostMethod(apiBaseUrl+'warehouse/STOPODeliveryPlan/getsublotDet', fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+         // setWhWheetVarietyOptions([{ options: data.results }]); parseFloat(myNumber).toFixed(2)
+          form.setValues({
+            ...form.values,
+
+            ActualStock:parseFloat(data.results[0].SAP_Qty).toFixed(3),
+            
+            RandDConfirmedQty:data.results[0].Rndreleasedqty,
+            FumigationClearedQty:data.results[0].FumigationClearedQty,
+            KeyLoanDOQty:data.results[0].Unpledgeqty,
+            
+            ReservedQty:data.results[0].Reserved_Stock,
+            AvailableQty:parseFloat(data.results[0].SAP_Qty) - parseFloat(data.results[0].Reserved_Stock), 
+            FumigationSkipFlag:data.results[0].FumigationSkipFlag,
+            RndSkipFlag:data.results[0].RndSkipFlag,
+          })
+          let locationoption=[], warehouseoption=[], plantoption=[], r=0;
+          for(r=0;r<data.results.length;r++)
+          {
+            locationoption.push({  label: data.results[r].STORAGE_LOCATION,value: data.results[r].StorageLocationId });
+            warehouseoption.push({  label: data.results[r].WH_NAME,value: data.results[r].warehouseid });
+            plantoption.push({  label: data.results[r].PLANT_NAME,value: data.results[r].plantid });
+          }
+          setstorageLocationOption(locationoption);
+          setWhPlantOptions(plantoption);
+          setWarehouseOptions(warehouseoption);
+          
+         form.setFieldValue('WareHouse', {  label: data.results[0].WH_NAME,value: data.results[0].warehouseid });
+         form.setFieldValue('plantid', {  label: data.results[0].PLANT_NAME,value: data.results[0].plantid });
+         form.setFieldValue('storagelocationid', {  label: data.results[0].STORAGE_LOCATION,value: data.results[0].StorageLocationId });
+         form.setFieldValue('LotNumber', {  label: LotNo, value: LotId });
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });
+    };
+  
+  const getWeek = (dt1) => {
+    var onejan = new Date(dt1.getFullYear(),0,1);
+    var today = new Date(dt1.getFullYear(),dt1.getMonth(),dt1.getDate());
+    var dayOfYear = ((today - onejan + 86400000)/86400000);
+    return Math.ceil(dayOfYear/7)
+  };
+  
+  const onPlanMonthChange = (e) =>{
+    let {value, label}=e;
+    let year=value.split("-")[1];
+    let month=value.split("-")[0];
+    let MonthIdx = MonthArray.indexOf(month)+1;
+    let ToDate;
+    let FromDate;
+    if(MonthIdx>9)
+    {
+     ToDate=year + "-"+MonthIdx+"-"+LastDayOfMonth(year, MonthIdx-1);
+     FromDate=year + "-"+MonthIdx+"-01";
+    }
+    else
+    {
+      ToDate=year + "-0"+MonthIdx+"-"+LastDayOfMonth(year, MonthIdx-1);
+      FromDate=year + "-0"+MonthIdx+"-01";
+      }
+    form.setFieldValue("ValidFrom",FromDate);
+    form.setFieldValue("ValidTo",ToDate);
+    form.setFieldValue("PlanMonth",{label:label,value:value});
+
+    //Week No Auto Fetch
+    var dt1 = new Date(FromDate);
+    const wkno = getWeek(dt1);
+    form.setFieldValue('WeekNo', {  label: "W-"+wkno,value: wkno });
+
+    planMonthList(FromDate);
+  }
+
+  const planMonthList = (inputDate)=>{
+    var dateList = [];
+    var Dt = new Date(inputDate);
+    for (let i = 1; i <= 4; i++) {
+      /*
+      //const date = `${Dt.getDate()}-${Dt.getMonth()+i}-${Dt.getFullYear()}`;
+      //String(number).padStart(2, '0')
+
+      current.setMonth(current.getMonth()-1);
+      const previousMonth = current.toLocaleString('default', { month: 'long' });
+      console.log(previousMonth); // "September"
+      */
+      const date = `${String(Dt.getFullYear()).padStart(2, '0')}-${String(Dt.getMonth()+i).padStart(2,'0')}-${String(Dt.getDate()).padStart(2,'0')}`;
+      dateList.push(date);
+      //alert(date, " #" ,inputDate);
+    }
+    console.log(dateList);
+    setMonthList(dateList);
+  };
+
+  return (
+    <Fragment >
+      <div>
+      <Row>
+      <Col md="12" sm="12">
+      <Table className='table-sm'>
+        <tbody>
+          <tr>
+            {/* <td style={{minWidth:"200px"}}>
+              <CustomTextInput label={"Date"}  form={form} id="date" value={form.values.date} type="date" onChange={onDateChange} />
+              <span id='date_Error' style={{color: 'red'}} ></span>
+            </td> */}
+                
+                {/* 0000 */}
+            <td style={{minWidth:"200px"}} >
+              <CustomDropdownInput label={"Plan Month"} id="PlanMonth" 
+                url={`${apiBaseUrl}warehouse/master/getPlanMonth`} 
+                style={{zIndex:'1000'}} 
+                form={form} 
+                onChange={ (e)=> onPlanMonthChange(e)}
+              />
+              <span id='PlanMonth_Error' style={{color: 'red',}} ></span>
+            </td>
+
+            <td style={{minWidth:"200px", "display":"none"}}>
+              <CustomTextInput  label={"Valid From"} id="ValidFrom" 
+                form={form} 
+                type="date" 
+                onChange={onDateChange} 
+              />
+              <span id='ValidFrom_Error' style={{color: 'red'}} ></span>
+            </td>
+
+            <td style={{minWidth:"200px", "display":"none"}}>
+              <CustomTextInput  label={"Valid To"} form={form} id="ValidTo" type="date"  />
+              <span id='ValidTo_Error' style={{color: 'red'}} ></span>
+            </td>
+
+            <td style={{minWidth:"200px", "display":"none"}} >
+              <CustomDropdownInput label={"Week"} id="WeekNo"
+                url={`${apiBaseUrl}warehouse/master/getWeekNo`} 
+                style={{zIndex:'1000'}}  
+                form={form}  
+              />
+              <span id='WeekNo_Error' style={{color: 'red',}} ></span>
+            </td>
+
+            <td style={{minWidth:"200px"}}>
+              <CustomDropdownInput label={"Wheat Variety"} id={"WheatVariety"}
+                  style={{"width":"170px"}}
+                  url={`${apiBaseUrl}warehouse/STOPODeliveryPlan/getPlanWheatvarityList`}
+                  options_DUMMY={WhWheatvarietyOptions}
+                  className="react-select"
+                  classNamePrefix="select"
+                  form={form}
+                  onChange={(e) => onWheatvarietyChange(e)}
+                />
+              <span id='WheatVariety_Error' style={{color: 'red'}} ></span>
+            </td>
+
+            <td style={{minWidth:"200px"}}>
+              <CustomDropdownInput  label={"Division"} id="Division" 
+                options={Division} 
+                form={form} 
+                className="react-select"
+                classNamePrefix="select"
+              />
+              <span id='Division_Error' style={{color: 'red'}} ></span>
+            </td>
+          
+            <td style={{minWidth:"200px"}}>
+            <CustomDropdownInput
+                  options={WhPlantOptions}
+                  id={"plantid"}  
+                  label={"Plant"}
+                  className="react-select"
+                  classNamePrefix="select"
+                  form={form}
+                  onChange={(e) => onPlantChange(e)}
+                />
+            </td>
+
+            <td style={{minWidth:"200px"}}>
+              <CustomDropdownInput
+                options={storageLocationOption}
+                id={"storagelocationid"}
+                label={"Storage Location"}
+                className="react-select"
+                classNamePrefix="select"
+                form={form}
+                onChange={(e) => onStorageLocationChange(e)}
+
+              />
+            </td>
+
+            <td  style={{minWidth:"200px"}}>
+              <CustomDropdownInput 
+                options={WhLotOptions} 
+                form={form} 
+                id="LotNumber" 
+                className="react-select"
+                label={"Lot Number"}
+                classNamePrefix="select"
+              
+                onChange={(e) => onLotChange(e)}
+              />
+              <span id='LotNumber_Error' style={{color: 'red'}} ></span>
+            </td>
+
+           
+
+            <td style={{minWidth:"200px"}}>
+              <CustomDropdownInput label={"WH.Name"} id="WareHouse"
+                url={`${apiBaseUrl}marketdata/master/getwarehouses`} 
+                form={form} 
+                onChange={onWarehouseChange}
+                options={WarehoseOptions}
+              />
+              <span id='WareHouse_Error' style={{color: 'red'}} ></span>
+              <CustomTextInput form={form} id="MovementGroupNumber" disabled type="hidden" decimalFormat="10,0"/>
+              <CustomTextInput form={form} id="PlanId" type="hidden"  />
+            </td>
+            
+            <td  style={{minWidth:"210px"}}>
+              <CustomDropdownInput label={"Receiving Bin"} id="ReceivingBin"
+                url={`${apiBaseUrl}warehouse/master/getReceivingBinwithValue`}
+                form={form}
+              /> 
+            </td>
+          </tr>
+        
+          <tr>
+          <td style={{minWidth:"200px"}}>
+            <CustomTextInput  label={"SAP Stock"} disabled form={form} id="ActualStock" type="text"  isNumberOnly decimalFormat="10,0"/>
+            <span id='ActualStock_Error' style={{color: 'red'}} ></span>
+          </td>
+            
+          <td style={{minWidth:"200px"}}>
+            <CustomTextInput   label={"Reserved Stock"} disabled form={form} id="ReservedQty" type="text" isNumberOnly decimalFormat="10,0"/>
+            <span id='ReservedQty_Error' style={{color: 'red'}} ></span>
+          </td>
+
+          <td style={{minWidth:"200px"}}>
+            <CustomTextInput   label={"Available Stock"} disabled form={form} id="AvailableQty" type="text" isNumberOnly decimalFormat="10,0"/>
+            <span id='AvailableQty_Error' style={{color: 'red'}} ></span>
+          </td>
+
+          <td style={{minWidth:"200px"}}>
+            <CustomTextInput   label={"QC Cleared Qty"} disabled form={form} id="RandDConfirmedQty" type="text"  isNumberOnly decimalFormat="10,0"/>
+            <span id='RandDConfirmedQty_Error' style={{color: 'red'}} ></span>
+          </td>
+
+          <td style={{minWidth:"200px"}}>
+            <CustomTextInput  label={"Key Loan DO Qty"} disabled form={form} id="KeyLoanDOQty" type="text"  isNumberOnly decimalFormat="10,0"/>
+            <span id='KeyLoanDOQty_Error' style={{color: 'red'}} ></span>
+          </td> 
+
+          <td style={{minWidth:"200px"}}>
+          <CustomTextInput  label={"Fumi. Cleared Qty "} disabled form={form} id="FumigationClearedQty" type="text"  isNumberOnly decimalFormat="10,0"/>
+          <span id='FumigationClearedQty_Error' style={{color: 'red'}} ></span>
+          </td>
+
+          <td style={{minWidth:"200px"}}>
+            <CustomTextInput  label={"Movement Qty"} form={form} id="MovementQty"
+              onChange={(e) => getMoveQty(e)}
+              MinNumberVal={form.values.MinNumberQty ? form.values.MinNumberQty: "-1"} 
+              type="text"  
+              isNumberOnly decimalFormat="10,3"
+            />
+            <span id='MovementQty_Error' style={{color: 'red'}} ></span>
+            <CustomTextInput  label={""} form={form} id="MixingRatio"
+              type="hidden" 
+              onChange={(e) => getActualQty(e)}
+              isNumberOnly decimalFormat="10,0"/>
+            <CustomTextInput label={""} disabled form={form} id="ActualMovementQty" type="hidden"  isNumberOnly decimalFormat="10,0"/>
+          </td>
+
+          <td  style={{minWidth:"200px"}}>
+            <CustomTextInput  label={"Expected Arrival"} id="ExpectedArrival"
+              form={form}
+              type="text" decimalFormat="10,0"
+            />
+            <span id='ExpectedArrival_Error' style={{color: 'red'}} ></span>
+          </td>
+          </tr>
+
+          <tr>
+            <td style={{Width:"200px"}}>
+              <Button.Ripple className="btn-icon" color="primary" minWidth = "200px"
+                onClick={(e) => {addTblRecord();}}> 
+                <Plus size={14}/>
+              <span className="align-middle ml-25">Add</span>
+            </Button.Ripple> &nbsp; 
+            <Button.Ripple className="btn-icon" color="primary"
+                onClick={(e) => { clearALL();}}
+              > 
+              <span className="align-middle ml-25">Clear Filter</span>
+              </Button.Ripple>
+            </td>
+        </tr>
+      </tbody>
+    </Table>
+  </Col>
+  </Row>
+  </div>
+
+  <div>  
+  <Row>
+    <Col md="12" sm="12" /*style={{height:"260px",overflowY:"auto",width:"1110px",overflowX:"scroll",fontSize:"12px"}}*/>
+    <table className='table-sm'> 
+        <thead className='bg-primary text-white ' style={{height:"50px",textAlign:"center"}}> 
+          <tr>
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Priority (edit)</th>
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Planing Month</th>
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Wheat Variety</th>
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Receiving Bin</th>
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Plant</th>
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Storage Location</th>
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Lot No</th>
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Warehouse</th>
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">SAP Stock (MTS)</th>
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Reserved Stock (MTS)</th>              
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Available Stock (MTS)</th> 
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Movement Qty (MTS)</th>
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Diff (MTS)=Mvmt.Qty-SAP.Qty</th>             
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Expected Arrival</th>             
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Purchase Plan(MTS)</th>             
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Release</th>             
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Division</th>
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">QC Cleared Qty(MTS)</th>
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Fumi. Cleared Qty</th>
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">DO Cleared Qty</th>
+            <th style={{backgroundColor:"#7367f0",color:"#fff",textTransform:"none",fontWeight:"500"}} className="custom-width">Update</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {PlanDatas && PlanDatas.length>0 && PlanDatas.map((item,  i) => {
+            return(
+              <tr>
+                <td>
+                  <Button.Ripple className="btn-icon" color="primary"
+                    onClick={(e) => {EditRow(item,i);}}
+                  >
+                    <span className="align-middle ml-25">Edit</span>
+                  </Button.Ripple>
+                </td>
+                
+                <td>{item.PlanMonth}</td>
+                <td>{item.WheatVarietyName}</td>
+                <td>{item.ReceivingBinName}</td>
+                <td>{item.PlantName}</td>
+                <td>{item.storagelocationName}</td>
+                <td>{item.LotNumberName}</td>
+                <td>{item.WareHouseName}</td>
+                <td>{item.ActualStock}</td>
+                <td>{item.ReservedQty}</td>
+                <td>{item.AvailableQty}</td>
+                <td>{item.MovementQty}</td>
+                <td>{item.DifferenceQty}</td>
+                <td>{item.ExpectedArrival}</td>
+                <td>{item.PurchasePlan}</td>
+                <td>{item.Release}</td>
+                <td>{item.Division}</td>
+                <td>{item.RandDConfirmedQty}</td>
+                <td>{item.FumigationClearedQty}</td>
+                <td>{item.KeyLoanDOQty}</td>
+
+                <td><Button.Ripple
+                      className="btn-icon"
+                      color="primary"
+                      onClick={(e) => {DeleteRow(i);}}
+                    >
+                      <span className="align-middle ml-25">Delete</span>
+                    </Button.Ripple></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </Col>
+    </Row>
+    </div>
+    <br/><br/><br/>
+    <div>
+    <Row>
+    <Col sm="12">
+        <FormGroup className="d-flex mb-0 justify-content-end">
+          <Button.Ripple outline color="secondary" tag={Link} to={`/warehouse/Plan_List`} type="reset" className="mr-2">
+            Cancel
+          </Button.Ripple>
+          <Button.Ripple color="primary" type="button" disabled={AddValue()} onClick={(e) => onSubmit()}>
+            Submit
+          </Button.Ripple>
+        </FormGroup>
+      </Col>
+    </Row>
+    </div>
+    </Fragment>
+  );
+};
+
+
+const Plan_EntryScreen = () => {
+  const { showLoader, hideLoader } = useLoader();
+  const dateFormat = "YYYY-MM-DD";
+  const today = moment().format(dateFormat);
+  const isToday = (date) => {
+    return moment(date).format(dateFormat) == today;
+  };
+  const form = useFormik({
+    isInitialValid: false,
+    initialValues: {},
+    validationSchema: Yup.object().shape({
+      date: validation.required({ message:"Date should not be empty", isObject: false }),
+      /*From_Location: validation.required({  message:"From Location should not be empty",isObject: true }),
+      To_Location: validation.required({ message:"To Location should not be empty", isObject: false }),
+      Mode_Of_Transport: validation.required({ message:"Mode of Transport should not be empty", isObject: false }),
+      EAD: validation.required({  message:"Ead should not be empty",isObject: false  }),*/
+    }),
+    onSubmit(values) {},
+  });
+  const values = form.values;
+  
+  const history = useHistory();
+  const resetForm = () => {
+    history.push(`/master/stopodeliverycreation`);
+  };
+ 
+  return (
+    <Fragment >
+      
+      <CardComponent header="Wheat Movement 32 Bin Fillup Plan" children="WheatMovement WeeklyPlan" >
+      <RefreshBlock />
+        <div style={{overflowY:'auto',overflowX:'auto',maxWidth:'100vw',minHeight:'450px'}}>
+        <Plan_EntryScreen_List form={form}  />
+        </div>
+      </CardComponent>
+      
+    </Fragment>
+  );
+};
+
+export default Plan_EntryScreen;

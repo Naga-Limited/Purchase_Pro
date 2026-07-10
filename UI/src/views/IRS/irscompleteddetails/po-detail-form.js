@@ -1,0 +1,272 @@
+import { Card, CardBody, FormGroup, Row, Col, Button } from "reactstrap";
+import { apiPostMethod } from "@helpers/axiosHelper";
+import React, { useEffect, useState } from "react";
+import { apiBaseUrl, irsUrl, masterUrl } from "../../../urlConstants";
+import { errorToast } from "@helpers/appHelper";
+import { getNewId } from "../../../utility/Common";
+import { roundOf } from "../../../helper/appHelper";
+import { CustomDropdownInput, CustomTextInput } from "../../forms/custom-form";
+const bagedOrLooseOption = [
+  {
+    value: "Loose",
+    label: "Loose",
+  },
+  {
+    value: "Baged",
+    label: "Baged",
+  },
+];
+export const PoDetailForm = (props) => {
+  let { form, index, viewOnly,data } = props;
+  let values = form.values.poList[index];
+  useEffect(() => {
+    if (values.packedType) {
+      if (values.noOfBags && !isNaN(values.noOfBags) && values.bagType) {
+        form.setFieldValue(`poList.${index}.gunnyWt`, roundOf(values.noOfBags * Number(values.bagType.weight)));
+      } else {
+        form.setFieldValue(`poList.${index}.gunnyWt`, "");
+      }
+    }
+  }, [values.noOfBags, values.packedType]);
+ 
+  //form.setFieldValue(`poList.${index}.packedType`,{label:data.packedType,value:data.packedType});
+  //form.setFieldValue(`poList.${index}.bagType`, {label:data.bagType,value:data.bagType});
+ 
+ 
+ 
+  const renderField = (label, id, props) => {
+    return (
+      <Col md="4" sm="12">
+        <CustomTextInput label={label} form={form} id={`poList.${index}.${id}`} disabled {...props} />
+      </Col>
+    );
+  };
+  return (
+    <Row>
+      {renderField("Inter Com PO No", "poNumber",{"value":data.PoNumber})}
+      {renderField("PO Line Item", "poLineItem",{"value":data.LineItem})}
+      {renderField("Delivery No", "deliveryNo",{"value":data.DeliveryNo})}
+      {renderField("Sisterconcern From", "sisterConcernFromDesc",{"value":data.SisterConcernFrom})}
+      {renderField("Sending storage location", "sendingStorageLocationDesc",{"value":data.SendingStorageLocation})}
+      {renderField("Sisterconcern To", "sisterConcernToDesc",{"value":data.SisterConcernTo})}
+      {renderField("Receiving Storage Location", "receivingStorageLocationDesc",{"value":data.ReceivingStorageLocation})}
+      {renderField("Material No", "materialNo",{"value":data.MaterialNo})}
+      {renderField("Wheat Variety", "wheatVariety",{"value":data.WheatVariety})}
+      {renderField("Packed Type - Loose/Baged", "PackedType",{"value":data.PackedType})}
+      {renderField("If Baged - Bag Type", "BagType",{"value":data.BagType})}
+     
+   
+      
+     {/*{renderField("No Of Bags", "noOfBags", { isNumberOnly: true, disabled: viewOnly,"value":data.NoOfBags })}*/}
+      {renderField("No Of Bags", "noOfBags", { "value":data.NoOfBags })}
+      {renderField("Gunny Wt (In Kgs)", "gunnyWt",{"value":data.GunnyWt})}
+      <Col sm={12}>
+        <hr />
+      </Col>
+    </Row>
+  );
+};
+
+export const PoDetails = (props) => {
+  let { form } = props;
+  let { values } = form;
+  const getNew = () => {
+    return { id: getNewId() };
+  };
+  const [poNoOptions] = useState([]);
+  const getOptions = () => {
+    let pos = values.poList ? values.poList.filter((a) => a.interComPoNo).map((a) => a.interComPoNo.label): "";
+    return poNoOptions.filter((a) => {
+      return !pos.includes(a.label);
+    });
+  };
+  const onRemove = (e, index) => {
+    let newData = [...values.truckList];
+    newData.splice(index, 1);
+    form.setFieldValue("truckList", newData);
+  };
+  const onAdd = () => {
+    let newData = [...values.truckList, getNew()];
+    form.setFieldValue("truckList", newData);
+  };
+  useEffect(() => {
+    return false;
+    if (values.invoiceNo) {
+      apiPostMethod(`${irsUrl}`, {
+        formType: "GetPoDetailsBySaleInvoiceNo",
+        id: values.invoiceNo.value,
+      })
+        .then((response) => {
+          const { data } = response;
+          if (data.success) {
+            form.setFieldValue(
+              "poList",
+              data.results.map((p) => ({ ...p, id: getNewId() }))
+            );
+          }
+        })
+        .catch((error) => {
+          errorToast("Something went wrong, please try again after sometime");
+        });
+    } else {
+      form.setFieldValue("poList", []);
+    }
+  }, [values.invoiceNo]);
+
+  useEffect(() => {
+    let total = values.truckList ? values.truckList
+      .map((a) => Number(a.noOfBags || 0))
+      .reduce((p, c) => {
+        return p + c;
+      }, 0): "";
+    form.setFieldValue("totalBags", total);
+  }, [values.truckList]);
+  const poOptn = getOptions();
+ // const poOptn ="";
+  const isCrossing = values.selection && values.selection === "CROSSING";
+  if(values.selection){
+    console.log(JSON.stringify(values));
+    console.log("isCrossing:"+values.selection.value);
+  }
+  
+  console.log("isCrossing:"+isCrossing);
+  return (
+    <div>
+      <Card>
+        <CardBody>
+          <Row>
+            <Col md="12" sm="12">
+              <h5>Inter Com PO Details</h5>
+            </Col>
+          </Row>
+          <Row>
+         
+            <Col md="3" sm="12">
+              <CustomTextInput maxLength={200} label={"Trailer No"} disabled form={form} id="TrailorNumber" />
+            </Col>
+          <Col md="3" sm="12">
+              <CustomTextInput maxLength={200} label={"Container No"} disabled form={form} id="ContainerNumber" />
+            </Col>
+
+            <Col md="3" sm="12">
+              <CustomTextInput maxLength={200} label={"Plant Name"} disabled form={form} id="PlantName" />
+            </Col>
+            <Col md="3" sm="12">
+              {/*<CustomDropdownInput
+                label={"Sale Invoice Number"}
+                url={`${masterUrl}?formType=GetSalesInvoiceNo`}
+                form={form}
+               
+                id="invoiceNo"
+              />*/}
+              <CustomTextInput maxLength={200} label={"Sale Invoice Number"}  disabled form={form} id="invoiceNo" />
+            </Col>
+            <Col md="3" sm="12">
+              <CustomTextInput maxLength={200} label={"Supplier Name"} disabled form={form} id="supplierName" />
+            </Col>
+            <Col md="3" sm="12">
+             {/* <CustomDropdownInput
+                label={"Loading Type"}
+                options={[
+                  {
+                    label: "Crossing",
+                    value: "Crossing",
+                  },
+                  {
+                    label: "Warehouse",
+                    value: "Warehouse",
+                  },
+                ]}
+                form={form}
+               
+                id="selection"
+              />*/}
+              <CustomTextInput maxLength={200} label={"Loading Type"}  disabled form={form} id="selection" />
+            </Col>
+
+            <Col md="3" sm="12">
+              <CustomTextInput label={"Total Bags"} form={form} id="totalBags_1" disabled />
+            </Col>
+          </Row>
+          <>
+            {values.selection && (
+              <>
+                <Row md="12" sm="12">
+                  <Col>
+                    <hr />
+                  </Col>
+                </Row>
+                <>
+                  {values.truckList &&
+                    values.truckList.map((f, i) => {
+                      return (
+                        <Row key={f.id}>
+                          {isCrossing ? (
+                            <>
+                              <Col md="3" sm="12">
+                                <CustomTextInput label={"Vehicle No"} disabled value={f.TruckNumber} form={form} id={`truckList.${i}.truckNumber`} />
+                              </Col>
+                            </>
+                          ) : (
+                            <>
+                              <Col md="3" sm="12">
+                                {/*<CustomDropdownInput
+                                  label={"Warehouse Name"}
+                                  url={`${apiBaseUrl}master/getWarehouse`}
+                                  form={form}
+                                  disabled
+                                  id={`truckList.${i}.warehouseName`}
+                                />*/}
+                                
+                                <CustomTextInput label={"Warehouse Name"}  disabled value={f.WarehouseName} form={form} id={`truckList.${i}.warehouseName`} />
+                             
+                              </Col>
+
+                              <Col md="3" sm="12">
+                                <CustomTextInput label={"Lot Number"}  disabled value={f.LotNumber} form={form} id={`truckList.${i}.lotNumber`} />
+                              </Col>
+                            </>
+                          )}
+                          <Col md="3" sm="12">
+                            <CustomTextInput label={"No of bags"} disabled value={f.NoOfBags} form={form} id={`truckList.${i}.noOfBags`} />
+                          </Col>
+                          {/*i > 0 && (
+                            <Col md="3" sm="12">
+                              <FormGroup>
+                                <Button.Ripple outline color="secondary" type="reset" className="mr-2" onClick={(e) => onRemove(e, i)}>
+                                  Remove
+                                </Button.Ripple>
+                              </FormGroup>
+                            </Col>
+                          )*/}
+                        </Row>
+                      );
+                    })}
+                </>
+                {/*<Row>
+                  <Col md="12" sm="12">
+                    <Button.Ripple color="primary" type="button" onClick={onAdd}>
+                      {isCrossing ? "Add Truck" : "Add Lot"}
+                    </Button.Ripple>
+                  </Col>
+                </Row>*/}
+                <Row md="12" sm="12">
+                  <Col>
+                    <hr />
+                  </Col>
+                </Row>
+              </>
+            )}
+          </>
+          {values.poList && values.poList.map((f, i) => {
+            return (
+              <div key={f.id}>
+                <PoDetailForm form={form} data={f} index={i} poOptions={poOptn} />
+              </div>
+            );
+          })}
+        </CardBody>
+      </Card>
+    </div>
+  );
+};

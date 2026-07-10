@@ -1,0 +1,820 @@
+<?php
+
+namespace App\Models\Warehouse;
+
+use CodeIgniter\Model;
+
+class RndConfirmationPlanModel extends Model
+{
+
+  public function getsublotDetByLotId($Id)
+  {
+    if (isset($Id) && $Id != "") {
+      $fetchsql = "SELECT 
+                        a.StorageLocationId,
+                        b.STORAGE_LOCATION,
+                        a.plantid,
+                        c.PLANT_NAME,
+                        a.warehouseid,
+                        d.WH_NAME,
+                        a.wheatvarietyid,
+                        e.WheatVariety
+                        FROM `ngw_sublot` a
+                        JOIN master_storage b ON a.StorageLocationId = b.STORAGE_REFID
+                        JOIN master_plant c ON a.plantid = c.ID
+                        JOIN warehouse_master d ON a.warehouseid = d.wh_refid
+                        JOIN master_mrc_wheat_variety e ON a.wheatvarietyid = e.id
+
+                        WHERE lotid =" . $Id;
+
+      //echo $fetchsql; exit();           
+
+      $builder =  $this->db->query($fetchsql);
+      return  $builder->getResultArray();
+    }
+  }
+
+  public function getStorageLocationByLotId($Id)
+  {
+    if (isset($Id) && $Id != "") {
+      $fetchsql = "SELECT DISTINCT a.StorageLocationId as value, b.STORAGE_LOCATION as label
+                        FROM `ngw_sublot` a
+                        JOIN master_storage b ON a.StorageLocationId = b.STORAGE_REFID
+                        WHERE a.lotid ='" . $Id . "'";
+
+      //echo $fetchsql; exit();           
+
+      $builder =  $this->db->query($fetchsql);
+      return  $builder->getResultArray();
+    };
+  }
+
+  public function getPlantByLocationId($Id)
+  {
+    if (isset($Id) && $Id != "") {
+      $fetchsql = "SELECT DISTINCT a.plantid as value, b.PLANT_NAME as label
+                        FROM `ngw_sublot` a
+                        JOIN master_plant b ON a.plantid = b.ID
+                        WHERE a.StorageLocationId ='" . $Id . "'";
+
+      //echo $fetchsql; exit();           
+
+      $builder =  $this->db->query($fetchsql);
+      return $builder->getResultArray();
+    };
+  }
+
+  public function getWHByPlantId($Id)
+  {
+    if (isset($Id) && $Id != "") {
+      $fetchsql = "SELECT DISTINCT a.warehouseid as value, b.WH_NAME as label
+                        FROM `ngw_sublot` a
+                        JOIN warehouse_master b ON a.warehouseid = b.wh_refid
+                        WHERE a.plantid ='" . $Id . "'";
+
+      //echo $fetchsql; exit();           
+
+      $builder =  $this->db->query($fetchsql);
+      return  $builder->getResultArray();
+    };
+  }
+
+  public function getWheatVariety($Lot_id, $sl_id, $plant_id, $wh_id)
+  {
+    $cnd = "";
+    if (isset($sl_id) && $sl_id != "") {
+      $cnd .= " AND a.StorageLocationId ='" . $sl_id . "'";
+    }
+    if (isset($plant_id) && $plant_id != "") {
+      $cnd .= " AND a.plantid ='" . $plant_id . "'";
+    }
+    if (isset($wh_id) && $wh_id != "") {
+      $cnd .= " AND a.warehouseid ='" . $wh_id . "'";
+    }
+
+    $fetchsql = "SELECT DISTINCT a.wheatvarietyid as value, b.WheatVariety as label
+                    FROM `ngw_sublot` a
+                    JOIN master_mrc_wheat_variety b ON a.wheatvarietyid = b.Id
+                    WHERE a.lotid ='" . $Lot_id . "'" . $cnd;
+
+    //echo $fetchsql; exit();           
+
+    $builder =  $this->db->query($fetchsql);
+    return  $builder->getResultArray();
+  }
+
+  //28072022 Plan un plan list separated as 
+  ///getWarehousePlanUnPlanList For Only Plan List
+  ///getWarehouseUnPlanList For Only UNPlan List
+  public function getWarehousePlanUnPlanList(
+    $ScreenType,
+    $Monthyear,
+    $LotId,
+    $StorageLocationId,
+    $PlantId,
+    $WarehouseId,
+    $WheatVarietyId,
+    $Division
+  ) {
+
+
+    //var_dump($WarehouseId); exit();
+    //echo $ScreenType; exit();
+
+    $cnd = "";
+    $Filter_Lotid = "";
+
+    if ((isset($LotId)) && sizeof((array)$LotId) > 0) {
+      for ($i = 0; $i < sizeof((array)$LotId); $i++) {
+        $Filter_Lotid .= "'" . $LotId[$i]->value . "',";
+      }
+      $Filter_Lotid = rtrim($Filter_Lotid, ",");
+      $cnd .= " AND a.fromlotid IN($Filter_Lotid) ";
+    }
+
+    $Filter_Locationid = "";
+    if ((isset($StorageLocationId)) && sizeof((array)$StorageLocationId) > 0) {
+      for ($i = 0; $i < sizeof((array)$StorageLocationId); $i++) {
+        $Filter_Locationid .= "'" . $StorageLocationId[$i]->value . "',";
+      }
+      $Filter_Locationid = rtrim($Filter_Locationid, ",");
+      $cnd .= " AND a.fromlocationid IN($Filter_Locationid) ";
+    }
+
+    $Filter_Plantid = "";
+    if ((isset($PlantId)) && sizeof((array)$PlantId) > 0) {
+      for ($i = 0; $i < sizeof((array)$PlantId); $i++) {
+        $Filter_Plantid .= "'" . $PlantId[$i]->value . "',";
+      }
+      $Filter_Plantid = rtrim($Filter_Plantid, ",");
+      $cnd .= " AND a.fromplantid IN($Filter_Plantid) ";
+    }
+
+    $Filter_WarehouseId = "";
+    if ((isset($WarehouseId)) && sizeof((array)$WarehouseId) > 0) {
+      for ($i = 0; $i < sizeof((array)$WarehouseId); $i++) {
+        $Filter_WarehouseId .= "'" . $WarehouseId[$i]->value . "',";
+      }
+      $Filter_WarehouseId = rtrim($Filter_WarehouseId, ",");
+      $cnd .= " AND a.fromwarehouseid IN($Filter_WarehouseId) ";
+    }
+
+    $Filter_VarietyId = "";
+    if ((isset($WheatVarietyId)) && sizeof((array)$WheatVarietyId) > 0) {
+      for ($i = 0; $i < sizeof((array)$WheatVarietyId); $i++) {
+        $Filter_VarietyId .= "'" . $WheatVarietyId[$i]->value . "',";
+      }
+      $Filter_VarietyId = rtrim($Filter_VarietyId, ",");
+      $cnd .= " AND a.wheatvarityid IN($Filter_VarietyId) ";
+    }
+
+    // echo  " LOT => ".$Filter_Lotid. 
+    //       " LOC => ". $Filter_Locationid. 
+    //       " PLANT =>".$Filter_Plantid. 
+    //       " WH=> ".$Filter_WarehouseId.
+    //       " WV => ".$Filter_VarietyId;
+
+    //     echo "CONNECTION => ", $cnd;
+
+
+    // if ((isset($LotId)) && ($LotId!="")) {
+    //   $cnd .= " AND a.fromlotid='$LotId' ";
+    // }
+    // if ((isset($StorageLocationId)) && ($StorageLocationId!="")){
+    //   $cnd .= " AND a.fromlocationid='$StorageLocationId' ";
+    // }
+    // if ((isset($PlantId)) && ($PlantId!="")){
+    //   $cnd .= " AND a.fromplantid='$PlantId' ";
+    // }
+    // if ((isset($WarehouseId)) && ($WarehouseId!="")){
+    //   $cnd .= " AND a.fromwarehouseid='$WarehouseId' ";
+    // }
+    // if ((isset($WheatVarietyId))&& ($WheatVarietyId!="")){
+    //   $cnd .= " AND a.wheatvarityid='$WheatVarietyId' ";
+    // }
+
+    $cnd_1 = "";
+    $FilterMonthyear = "";
+    //var_dump($Monthyear->value);exit();
+    if ((isset($Monthyear)) && !empty($Monthyear) && ($Monthyear != "")) {
+      //var_dump($Monthyear);
+      //Mohan 28072022  Commented to calcuate Reserve stock $cnd_1 = " AND wp.plandate < DATE_FORMAT('$Monthyear','%Y-%m-%d') ";
+
+      for ($i = 0; $i < sizeof((array)$Monthyear); $i++) {
+        $FilterMonthyear .= " OR (
+          a.plandate >= DATE_FORMAT('$Monthyear', '%Y-%m-%d') AND 
+          a.plandate < date_add(str_to_date('01-" . $Monthyear[$i]->value . "','%d-%M-%Y'), INTERVAL 1 month) ) ";
+      }
+
+      $cnd_1 .= " AND " . Trim($FilterMonthyear, " OR ");
+    }
+    $FilterMonthyear = "";
+    if ((isset($Monthyear)) && !empty($Monthyear) && ($Monthyear != "")) {
+
+      for ($i = 0; $i < sizeof((array)$Monthyear); $i++) {
+        $FilterMonthyear .= " OR (a.plandate >= str_to_date('01-" . $Monthyear[$i]->value . "','%d-%M-%Y')
+AND a.plandate < date_add(str_to_date('01-" . $Monthyear[$i]->value . "','%d-%M-%Y'), INTERVAL 1 month) ) ";
+      }
+      $cnd .= " AND " . Trim($FilterMonthyear, " OR ");
+    }
+    //echo "<Br>".$cnd_1;
+    //for RND Confirmation Screen
+    $join_L = "";
+    $join_R = "";
+    // if (isset($ScreenType)) {
+    //   switch ($ScreenType) {
+    //     case "PLAN_LIST":
+    //     case "RND_SCREEN":
+    //     case "COMMERCIAL_SCREEN":
+    //     case "APPROVAL_SCREEN":
+    //       $join_L="LEFT";
+    //       $join_R="LEFT";
+    //       $cnd .= " AND a.plandate >= DATE_FORMAT('$Monthyear', '%Y-%m-%d')
+    //                 AND a.plandate < date_add(DATE_FORMAT('$Monthyear','%Y-%m-%d'), INTERVAL 1 month) "; 
+    //       break;
+
+    //     case "PLANED_AND_UNPLANED": 
+    $join_R = "RIGHT";
+    $join_L = "LEFT";
+    if ((isset($Division)) && ($Division != "")) {
+      $cnd .= " AND a.Division ='" . $Division->label . "' ";
+    }
+    //       break;
+
+    //     default:
+    //       $cnd .= " AND a.plandate >= DATE_FORMAT('$Monthyear', '%Y-%m-%d')
+    //                 AND a.plandate < date_add(DATE_FORMAT('$Monthyear','%Y-%m-%d'), INTERVAL 1 month) "; 
+    //       break;
+    //   }
+    // }
+
+
+
+    //echo $cnd; exit();
+
+    /*
+-- IF(a.status =1, '',
+--   IF(a.status =2, 'R&D Approved',
+--     IF(a.status =-2, 'R&D Reject',
+--       IF(a.status =3, 'Commercial Approval',
+--         IF(a.status =-3, 'Commercial Reject',''))))) as Status_String,
+*/
+    // Change mohan on 28072022 This is fetch Planned records only
+    $fetchsql = "SELECT
+a.planid,
+a.plandate,
+DATE_FORMAT(a.plandate, '%M-%Y') AS PlanMonth,
+a.Priority, 
+a.planqty AS Movement_Qty, 
+a.ManualReleaseQty AS Release_Qty,
+a.wheatvarityid,
+a.ReceivingBin AS ReceivingBinId,
+k.BulksiloNo AS ReceivingBinName,
+
+b.wh_refid AS wh_nameID,  
+b.WH_NAME AS wh_name,  
+
+c.ID AS plant_nameID,
+c.PLANT_NAME AS plant_name,
+
+f.Id AS WheatvarietyNameID,    
+f.WheatVariety AS WheatvarietyName,    
+
+g.lotid as lotid,
+g.lotno as lotno,
+
+j.STORAGE_REFID AS storage_locationID,    
+j.STORAGE_LOCATION AS storage_location,   
+
+h.SAP_Qty,
+h.wheatqty, 
+DATE_FORMAT(h.degassingdate, '%d-%m-%Y') AS Next_QC_date,
+DATE_FORMAT(h.nextfumigationdate, '%d-%m-%Y') AS Next_Fumigation_Date,
+
+@Reserved_Stock :=( SELECT SUM(IF((ManualReleaseQty > 0),planqty-ManualReleaseQty,planqty))
+FROM ngw_weeklyplan wp
+WHERE wp.RecStatus =1 AND (wp.wheatvarityid,wp.fromplantid,wp.fromlocationid,wp.fromlotid) =
+ (a.wheatvarityid,a.fromplantid,a.fromlocationid,a.fromlotid) 
+ AND (wp.plandate >= DATE_FORMAT(CURRENT_DATE,'%Y-%m-01') $cnd_1)
+) AS Reserved_Stock,
+
+@AvailabelQty:=(h.SAP_Qty - ifnull(@Reserved_Stock,0) ) AS AvailabelQty,
+
+@Actual_Movement_Qty :=( SELECT SUM(IF(MovementQty IS NULL,'0',MovementQty))
+FROM ngw_weeklyplan_actual wpa
+WHERE wpa.RecStatus =1 AND (wpa.WheatVarietyId,wpa.PlantId,wpa.StorageLocationId,wpa.LotId)=
+(a.wheatvarityid,a.fromplantid,a.fromlocationid,a.fromlotid) 
+AND wpa.MovementDate >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01')) AS Actual_Movement_Qty,
+
+(ifnull(a.planqty,0) - @AvailabelQty) AS Diff_for_Mvmt_Qty_SAP_QTY, 
+a.Expected_Arrival, 
+IF(a.Purchase_Plan<=0,'--', a.Purchase_Plan) AS Purchase_Plan ,
+a.Division,
+
+@FumigatedDaysCount:=(TIMESTAMPDIFF(DAY,CURRENT_DATE,date(h.nextfumigationdate))) as FumigatedDaysCount,
+
+@Fumi_Cleared_Qty:= IF((@FumigatedDaysCount>0 and @FumigatedDaysCount<=ifnull(mb.FumigationValidity,30)) OR (h.fumigationstatus = 9), h.wheatqty,
+IF(h.FumigationSkipFlag=1 and h.FumigationSkipDate>=current_date, h.wheatqty, 0)) AS Fumi_Cleared_Qty, 
+
+@QC_Cleared_Qty:= IF(h.nextrnddate>=current_date,h.wheatqty,
+IF(h.RndSkipFlag=1 and h.RndSkipDate>=current_date, h.wheatqty, 0)) AS QC_Cleared_Qty, 
+
+@Keyloan_Cleared_Qty:= IF(IFNULL(h.Keyloan_Pledge_Status,'NO')='YES',h.Keyloan_Release_Qty,h.wheatqty )  AS Keyloan_Cleared_Qty,
+IF((a.planqty - if(@Actual_Movement_Qty is null,0,@Actual_Movement_Qty)) <= @Fumi_Cleared_Qty, '#00A000', '#A00000') FumigationClearedColor,
+IF((a.planqty - if(@Actual_Movement_Qty is null,0,@Actual_Movement_Qty)) <= @QC_Cleared_Qty, '#00A000', '#A00000') QCClearedColor,
+IF((a.planqty - if(@Actual_Movement_Qty is null,0,@Actual_Movement_Qty)) <= @Keyloan_Cleared_Qty, '#00A000', '#A00000') KeyloanClearedColor,
+'#00D084' as ApprovalColor,'#FA6C3F' as PendingColor,
+
+IF((a.Priority='1' or a.Priority='2') and (
+              (a.planqty - if(@Actual_Movement_Qty is null,0,@Actual_Movement_Qty)) > @Fumi_Cleared_Qty or 
+              (a.planqty - if(@Actual_Movement_Qty is null,0,@Actual_Movement_Qty)) > @QC_Cleared_Qty or 
+              (a.planqty - if(@Actual_Movement_Qty is null,0,@Actual_Movement_Qty)) > IF(IFNULL(h.Keyloan_Pledge_Status,'NO')='YES',h.Keyloan_Release_Qty,h.wheatqty)
+            ), 0, 1) AS ApprovalEnableFlag,
+
+(CASE 
+WHEN a.status = 0 THEN 'Priority Pending'
+WHEN a.status = 1 THEN 'R&D Pending'
+WHEN a.status = 2 THEN 'Commercial Pending'
+WHEN a.status =-2 THEN 'R&D Reject'
+WHEN a.status = 3 THEN 'Commercial Approved'
+WHEN a.status =-3 THEN 'Commercial Reject'
+END) as  Status_String,
+
+a.status,
+a.RejectReason,
+a.Commercial_RejectReason,
+@countRow := @countRow + 1 AS rowId
+
+FROM `ngw_weeklyplan` a
+
+$join_L JOIN pp_bulksilono k ON a.ReceivingBin = k.Id
+
+JOIN (SELECT @countRow := -1) tmp
+
+$join_R JOIN ngw_sublot h ON a.fromlotid = h.lotid AND a.MovementType = 'MILL'
+AND a.fromplantid = h.plantid 
+AND a.fromlocationid = h.StorageLocationId
+AND a.wheatvarityid = h.wheatvarietyid 
+AND a.fromwarehouseid = h.warehouseid 
+AND h.RecStatus = 1
+
+$join_L JOIN warehouse_master b ON h.warehouseid = b.wh_refid
+$join_L JOIN master_plant c ON    h.plantid = c.ID 
+$join_L JOIN master_storage j ON    h.StorageLocationId = j.STORAGE_REFID AND    h.plantid = j.plantid
+$join_L JOIN master_mrc_wheat_variety f ON    h.wheatvarietyid = f.Id
+$join_L JOIN ngw_lot g ON h.lotid = g.lotid AND g.plantid = h.plantid AND g.locationid = h.StorageLocationId
+$join_L JOIN master_bag mb ON h.bagtypeid = mb.BAG_REFID
+
+WHERE a.RecStatus ='1' AND a.plandate >= date_format(current_timestamp,'%Y-%m-01') AND a.planid is not null " . $cnd . " ORDER BY rowId, planid";
+
+    //echo $fetchsql; exit();
+    $builder =  $this->db->query($fetchsql);
+    return $builder->getResultArray();
+  }
+
+
+  public function getWarehouseUnPlanList(
+    $ScreenType,
+    $Monthyear,
+    $LotId,
+    $StorageLocationId,
+    $PlantId,
+    $WarehouseId,
+    $WheatVarietyId,
+    $Division) {
+
+
+    //var_dump($WarehouseId); exit();
+    //echo $ScreenType; exit();
+
+    $cnd = "";
+    $Filter_Lotid = "";
+
+    if ((isset($LotId)) && sizeof((array)$LotId) > 0) {
+      for ($i = 0; $i < sizeof((array)$LotId); $i++) {
+        $Filter_Lotid .= "'" . $LotId[$i]->value . "',";
+      }
+      $Filter_Lotid = rtrim($Filter_Lotid, ",");
+      $cnd .= " AND a.fromlotid IN($Filter_Lotid) ";
+    }
+
+    $Filter_Locationid = "";
+    if ((isset($StorageLocationId)) && sizeof((array)$StorageLocationId) > 0) {
+      for ($i = 0; $i < sizeof((array)$StorageLocationId); $i++) {
+        $Filter_Locationid .= "'" . $StorageLocationId[$i]->value . "',";
+      }
+      $Filter_Locationid = rtrim($Filter_Locationid, ",");
+      $cnd .= " AND a.fromlocationid IN($Filter_Locationid) ";
+    }
+
+    $Filter_Plantid = "";
+    if ((isset($PlantId)) && sizeof((array)$PlantId) > 0) {
+      for ($i = 0; $i < sizeof((array)$PlantId); $i++) {
+        $Filter_Plantid .= "'" . $PlantId[$i]->value . "',";
+      }
+      $Filter_Plantid = rtrim($Filter_Plantid, ",");
+      $cnd .= " AND a.fromplantid IN($Filter_Plantid) ";
+    }
+
+    $Filter_WarehouseId = "";
+    if ((isset($WarehouseId)) && sizeof((array)$WarehouseId) > 0) {
+      for ($i = 0; $i < sizeof((array)$WarehouseId); $i++) {
+        $Filter_WarehouseId .= "'" . $WarehouseId[$i]->value . "',";
+      }
+      $Filter_WarehouseId = rtrim($Filter_WarehouseId, ",");
+      $cnd .= " AND a.fromwarehouseid IN($Filter_WarehouseId) ";
+    }
+
+    $Filter_VarietyId = "";
+    if ((isset($WheatVarietyId)) && sizeof((array)$WheatVarietyId) > 0) {
+      for ($i = 0; $i < sizeof((array)$WheatVarietyId); $i++) {
+        $Filter_VarietyId .= "'" . $WheatVarietyId[$i]->value . "',";
+      }
+      $Filter_VarietyId = rtrim($Filter_VarietyId, ",");
+      $cnd .= " AND a.wheatvarityid IN($Filter_VarietyId) ";
+    }
+
+
+    $cnd_1 = "";
+    if ((isset($Monthyear)) && ($Monthyear != "")) {
+      $cnd_1 = " AND wp.plandate <= DATE_FORMAT('$Monthyear','%Y-%m-%d') ";
+    }
+
+    //for RND Confirmation Screen
+
+    $join_R = "RIGHT";
+    $join_L = "";
+    if ((isset($Division)) && ($Division != "")) {
+      $cnd .= " AND a.Division ='" . $Division->label . "' ";
+    }
+
+    // Change mohan on 28072022 This is fetch UN PLANNED records only
+    $fetchsql = "SELECT
+    a.planid, a.plandate, ifnull(DATE_FORMAT(a.plandate, '%M-%Y'),'-') AS PlanMonth,  a.Priority, 
+    a.planqty AS Movement_Qty,     a.ManualReleaseQty AS Release_Qty,    a.wheatvarityid,
+    
+    a.ReceivingBin AS ReceivingBinId, 
+    k.Id AS ReceivingBinNameID,   
+    k.BulksiloNo AS ReceivingBinName,
+
+    b.wh_refid AS wh_nameID,  
+    b.WH_NAME AS wh_name,  
+
+    c.ID AS plant_nameID,
+    c.PLANT_NAME AS plant_name,
+
+    f.Id AS WheatvarietyNameID,    
+    f.WheatVariety AS WheatvarietyName,    
+
+    g.lotid as lotid,
+    g.lotno as lotno,
+
+    j.STORAGE_REFID AS storage_locationID,    
+    j.STORAGE_LOCATION AS storage_location,    
+
+    h.SAP_Qty,    h.wheatqty, DATE_FORMAT(h.degassingdate, '%d-%m-%Y') AS Next_QC_date,
+    DATE_FORMAT(h.nextfumigationdate, '%d-%m-%Y') AS Next_Fumigation_Date,
+
+    @Reserved_Stock :=( SELECT SUM(IF((ManualReleaseQty > 0),planqty-ManualReleaseQty,planqty)) FROM ngw_weeklyplan wp
+                        WHERE wp.RecStatus =1 AND (wp.wheatvarityid,wp.fromplantid,wp.fromlocationid,wp.fromlotid) =
+                        (a.wheatvarityid,a.fromplantid,a.fromlocationid,a.fromlotid) 
+                        AND (wp.plandate > DATE_FORMAT(CURRENT_DATE,'%Y-%m-01') and wp.plandate > a.plandate $cnd_1)) AS Reserved_Stock,
+
+    @AvailabelQty:=(h.SAP_Qty - ifnull(@Reserved_Stock,0) ) AS AvailabelQty,
+
+    @Actual_Movement_Qty :=(SELECT SUM(IF(MovementQty IS NULL,'0',MovementQty)) FROM ngw_weeklyplan_actual wpa
+                            WHERE wpa.RecStatus =1 AND (wpa.WheatVarietyId,wpa.PlantId,wpa.StorageLocationId,wpa.LotId)=
+                            (a.wheatvarityid,a.fromplantid,a.fromlocationid,a.fromlotid) 
+                            AND wpa.MovementDate >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01')) AS Actual_Movement_Qty,
+
+    (ifnull(a.planqty,0) - h.SAP_Qty) AS Diff_for_Mvmt_Qty_SAP_QTY,     a.Expected_Arrival, 
+    IF(a.Purchase_Plan<=0,'--', a.Purchase_Plan) AS Purchase_Plan ,    a.Division,
+    @FumigatedDaysCount:=(TIMESTAMPDIFF(DAY,CURRENT_DATE,date(h.nextfumigationdate))) as FumigatedDaysCount,
+
+    @Fumi_Cleared_Qty:= IF((@FumigatedDaysCount>0 and @FumigatedDaysCount<=ifnull(mb.FumigationValidity,30)) OR (h.fumigationstatus = 9), h.wheatqty,
+                        IF(h.FumigationSkipFlag=1 and h.FumigationSkipDate>=current_date, h.wheatqty, 0)) AS Fumi_Cleared_Qty, 
+
+    @QC_Cleared_Qty:= IF(h.nextrnddate>=current_date,h.wheatqty,IF(h.RndSkipFlag=1 and h.RndSkipDate>=current_date, h.wheatqty, 0)) AS QC_Cleared_Qty, 
+
+    IF(IFNULL(h.Keyloan_Pledge_Status,'NO')='YES',h.Keyloan_Release_Qty,h.wheatqty )  AS Keyloan_Cleared_Qty,
+
+    IF(a.planqty>@Fumi_Cleared_Qty, '#A00000', '#00A000') FumigationClearedColor,
+    IF(a.planqty>@QC_Cleared_Qty, '#A00000', '#00A000') QCClearedColor,
+    IF(IFNULL(h.Keyloan_Pledge_Status,'NO')='YES', IF(a.planqty>h.Keyloan_Release_Qty, '#A00000', '#00A000'),'#00A000') AS KeyloanClearedColor,
+
+
+    IF((a.Priority='1' or a.Priority='2') and 
+    (a.planqty>@Fumi_Cleared_Qty or 
+    a.planqty>@QC_Cleared_Qty or 
+    a.planqty>IF(IFNULL(h.Keyloan_Pledge_Status,'NO')='YES',h.Keyloan_Release_Qty,h.wheatqty)
+    ), 0, 1) AS ApprovalEnableFlag,
+
+    (CASE 
+      WHEN a.status = 0 THEN 'Priority Pending'
+      WHEN a.status = 1 THEN 'R&D Pending'
+      WHEN a.status = 2 THEN 'Commercial Pending'
+      WHEN a.status =-2 THEN 'R&D Reject'
+      WHEN a.status = 3 THEN 'Commercial Approved'
+      WHEN a.status =-3 THEN 'Commercial Reject'
+    END) as  Status_String,
+
+    a.status,
+    a.RejectReason,
+    a.Commercial_RejectReason,
+    @countRow := @countRow + 1 AS rowId
+
+    FROM `ngw_weeklyplan` a
+    JOIN pp_bulksilono k ON a.ReceivingBin = k.Id 
+
+    
+
+    JOIN (SELECT @countRow := -1) tmp
+
+    $join_R JOIN ngw_sublot h ON a.fromlotid = h.lotid 
+    AND a.plandate >= date_format(current_timestamp,'%Y-%m-01')
+    AND a.fromplantid = h.plantid 
+    AND a.fromlocationid = h.StorageLocationId
+    AND a.wheatvarityid = h.wheatvarietyid 
+    AND a.fromwarehouseid = h.warehouseid 
+    AND h.RecStatus = 1
+
+     JOIN warehouse_master b ON h.warehouseid = b.wh_refid
+     JOIN master_plant c ON    h.plantid = c.ID 
+     JOIN master_storage j ON    h.StorageLocationId = j.STORAGE_REFID AND    h.plantid = j.plantid
+     JOIN master_mrc_wheat_variety f ON    h.wheatvarietyid = f.Id
+     JOIN ngw_lot g ON h.lotid = g.lotid AND g.plantid = h.plantid AND g.locationid = h.StorageLocationId
+    LEFT JOIN master_bag mb ON h.bagtypeid = mb.BAG_REFID
+
+    WHERE  a.PlanId is null and h.SAP_Qty>0 " . $cnd . " ORDER BY rowId, planid";
+    // echo $fetchsql; exit();
+    $builder =  $this->db->query($fetchsql);
+    return $builder->getResultArray();
+  }
+
+  public function getWarehousePlanList(
+    $ScreenType,
+    $Monthyear,
+    $LotId,
+    $StorageLocationId,
+    $PlantId,
+    $WarehouseId,
+    $WheatVarietyId,
+    $Division
+  ) {
+
+
+    //var_dump($WarehouseId); exit();
+
+    $cnd = "";
+    $Filter_Lotid = "";
+
+    if ((isset($LotId)) && sizeof((array)$LotId) > 0) {
+      for ($i = 0; $i < sizeof((array)$LotId); $i++) {
+        $Filter_Lotid .= "'" . $LotId[$i]->value . "',";
+      }
+      $Filter_Lotid = rtrim($Filter_Lotid, ",");
+      $cnd .= " AND a.fromlotid IN($Filter_Lotid) ";
+    }
+
+    $Filter_Locationid = "";
+    if ((isset($StorageLocationId)) && sizeof((array)$StorageLocationId) > 0) {
+      for ($i = 0; $i < sizeof((array)$StorageLocationId); $i++) {
+        $Filter_Locationid .= "'" . $StorageLocationId[$i]->value . "',";
+      }
+      $Filter_Locationid = rtrim($Filter_Locationid, ",");
+      $cnd .= " AND a.fromlocationid IN($Filter_Locationid) ";
+    }
+
+    $Filter_Plantid = "";
+    if ((isset($PlantId)) && sizeof((array)$PlantId) > 0) {
+      for ($i = 0; $i < sizeof((array)$PlantId); $i++) {
+        $Filter_Plantid .= "'" . $PlantId[$i]->value . "',";
+      }
+      $Filter_Plantid = rtrim($Filter_Plantid, ",");
+      $cnd .= " AND a.fromplantid IN($Filter_Plantid) ";
+    }
+
+    $Filter_WarehouseId = "";
+    if ((isset($WarehouseId)) && sizeof((array)$WarehouseId) > 0) {
+      for ($i = 0; $i < sizeof((array)$WarehouseId); $i++) {
+        $Filter_WarehouseId .= "'" . $WarehouseId[$i]->value . "',";
+      }
+      $Filter_WarehouseId = rtrim($Filter_WarehouseId, ",");
+      $cnd .= " AND a.fromwarehouseid IN($Filter_WarehouseId) ";
+    }
+
+    $Filter_VarietyId = "";
+    if ((isset($WheatVarietyId)) && sizeof((array)$WheatVarietyId) > 0) {
+      for ($i = 0; $i < sizeof((array)$WheatVarietyId); $i++) {
+        $Filter_VarietyId .= "'" . $WheatVarietyId[$i]->value . "',";
+      }
+      $Filter_VarietyId = rtrim($Filter_VarietyId, ",");
+      $cnd .= " AND a.wheatvarityid IN($Filter_VarietyId) ";
+    }
+
+    // echo  " LOT => ".$Filter_Lotid. 
+    //       " LOC => ". $Filter_Locationid. 
+    //       " PLANT =>".$Filter_Plantid. 
+    //       " WH=> ".$Filter_WarehouseId.
+    //       " WV => ".$Filter_VarietyId;
+
+    //     echo "CONNECTION => ", $cnd;
+
+
+    // if ((isset($LotId)) && ($LotId!="")) {
+    //   $cnd .= " AND a.fromlotid='$LotId' ";
+    // }
+    // if ((isset($StorageLocationId)) && ($StorageLocationId!="")){
+    //   $cnd .= " AND a.fromlocationid='$StorageLocationId' ";
+    // }
+    // if ((isset($PlantId)) && ($PlantId!="")){
+    //   $cnd .= " AND a.fromplantid='$PlantId' ";
+    // }
+    // if ((isset($WarehouseId)) && ($WarehouseId!="")){
+    //   $cnd .= " AND a.fromwarehouseid='$WarehouseId' ";
+    // }
+    // if ((isset($WheatVarietyId))&& ($WheatVarietyId!="")){
+    //   $cnd .= " AND a.wheatvarityid='$WheatVarietyId' ";
+    // }
+
+    $cnd_1 = "";
+    if ((isset($Monthyear)) && ($Monthyear != "")) {
+      $cnd_1 = " AND wp.plandate < DATE_FORMAT('$Monthyear','%Y-%m-%d') ";
+    }
+
+    //for RND Confirmation Screen
+    $join_L = "";
+    $join_R = "";
+    if (isset($ScreenType)) {
+      switch ($ScreenType) {
+        case "PLAN_LIST":
+        case "RND_SCREEN":
+        case "COMMERCIAL_SCREEN":
+        case "APPROVAL_SCREEN":
+          $join_L = "LEFT";
+          $join_R = "LEFT";
+          $cnd .= " AND a.plandate >= DATE_FORMAT('$Monthyear', '%Y-%m-%d')
+                  AND a.plandate < date_add(DATE_FORMAT('$Monthyear','%Y-%m-%d'), INTERVAL 1 month) ";
+          break;
+
+        case "PLANED_AND_UNPLANED":
+          $join_L = "LEFT";
+          $join_R = "RIGHT";
+          if ((isset($Division)) && ($Division != "")) {
+            $cnd .= " AND a.Division ='" . $Division->label . "' ";
+          }
+          break;
+
+        default:
+          $cnd .= " AND a.plandate >= DATE_FORMAT('$Monthyear', '%Y-%m-%d')
+                  AND a.plandate < date_add(DATE_FORMAT('$Monthyear','%Y-%m-%d'), INTERVAL 1 month) ";
+          break;
+      }
+    }
+
+    //echo $cnd; exit();
+
+    /*
+ -- IF(a.status =1, '',
+          --   IF(a.status =2, 'R&D Approved',
+          --     IF(a.status =-2, 'R&D Reject',
+          --       IF(a.status =3, 'Commercial Approval',
+          --         IF(a.status =-3, 'Commercial Reject',''))))) as Status_String,
+  */
+    //Mohan 26072022 Added this column in this query g.lotid,b.whref_id as warehouseid,c.id as plantid, j.STORAGE_REFID as locationid, 
+    // For Insert the plan record change when edit month name
+
+    $fetchsql = "SELECT
+          a.planid,
+          a.plandate,
+          DATE_FORMAT(a.plandate, '%M') AS PlanMonth,
+          a.Priority, 
+          a.planqty AS Movement_Qty, 
+          a.ManualReleaseQty AS Release_Qty,
+          a.wheatvarityid,
+          a.ReceivingBin AS ReceivingBinId,
+          b.WH_NAME AS wh_name,
+          c.PLANT_NAME AS plant_name,
+          f.WheatVariety AS WheatvarietyName,
+          a.fromlotno as lotno,
+          a.fromlotid as lotid,
+          b.wh_refid as warehouseid,
+          c.id as plantid, 
+          j.STORAGE_LOCATION AS storage_location,
+          j.STORAGE_REFID as locationid, 
+          h.SAP_Qty,
+          h.wheatqty, 
+          DATE_FORMAT(h.degassingdate, '%d-%m-%Y') AS Next_QC_date,
+          DATE_FORMAT(h.nextfumigationdate, '%d-%m-%Y') AS Next_Fumigation_Date,
+          
+          k.BulksiloNo AS ReceivingBinName,
+          
+          @Reserved_Stock :=ifnull(( SELECT SUM(IF((ManualReleaseQty > 0),planqty-ManualReleaseQty,planqty))
+                              FROM ngw_weeklyplan wp
+                              WHERE wp.RecStatus =1 AND (wp.wheatvarityid,wp.fromplantid,wp.fromlocationid,wp.fromlotid) =
+                                    (a.wheatvarityid,a.fromplantid,a.fromlocationid,a.fromlotid) 
+                                    AND (wp.plandate >= DATE_FORMAT(CURRENT_DATE,'%Y-%m-01') $cnd_1)
+                            ),0) AS Reserved_Stock,
+         
+          @AvailabelQty:=(h.SAP_Qty - @Reserved_Stock ) AS AvailabelQty,
+
+          @Actual_Movement_Qty :=(SELECT SUM(IF(MovementQty IS NULL,'0',MovementQty))
+                            FROM ngw_weeklyplan_actual wpa
+                            WHERE wpa.RecStatus =1 AND (wpa.WheatVarietyId,wpa.PlantId,wpa.LotId)=
+                                  (a.wheatvarityid,a.fromplantid,a.fromlotid) 
+                            AND wpa.MovementDate >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01')) AS Actual_Movement_Qty,
+
+          @Diff_for_Mvmt_Qty_SAP_QTY:=(a.planqty - @AvailabelQty) AS Diff_for_Mvmt_Qty_SAP_QTY, 
+          a.Expected_Arrival, 
+          
+          IF((@Diff_for_Mvmt_Qty_SAP_QTY-a.Expected_Arrival)<=0,'--', (@Diff_for_Mvmt_Qty_SAP_QTY-a.Expected_Arrival)) AS Purchase_Plan ,
+          a.Division,
+
+          @FumigatedDaysCount:=(TIMESTAMPDIFF(DAY,CURRENT_DATE,date(h.nextfumigationdate))) as FumigatedDaysCount,
+          
+          @Fumi_Cleared_Qty:= IFNULL(IF((@FumigatedDaysCount>0 and @FumigatedDaysCount<=ifnull(mb.FumigationValidity,30)) OR (h.fumigationstatus = 9), h.wheatqty,
+                              IF(h.FumigationSkipFlag=1 and h.FumigationSkipDate>=current_date, h.wheatqty, 0)),0) AS Fumi_Cleared_Qty, 
+          h.FumigationSkipFlag,
+          @QC_Cleared_Qty:= IFNULL(IF(h.nextrnddate>=current_date,h.wheatqty,
+                            IF(h.RndSkipFlag=1 and h.RndSkipDate>=current_date, h.wheatqty, 0)),0) AS QC_Cleared_Qty, 
+
+          
+          @Keyloan_Cleared_Qty:= IFNULL(IF(IFNULL(h.Keyloan_Pledge_Status,'NO')='YES',h.Keyloan_Release_Qty,h.wheatqty ),0)  AS Keyloan_Cleared_Qty,
+          
+          IF((a.planqty - if(@Actual_Movement_Qty is null,0,@Actual_Movement_Qty)) <= @Fumi_Cleared_Qty, '#00A000', '#A00000') FumigationClearedColor,
+          IF((a.planqty - if(@Actual_Movement_Qty is null,0,@Actual_Movement_Qty)) <= @QC_Cleared_Qty, '#00A000', '#A00000') QCClearedColor,
+          IF((a.planqty - if(@Actual_Movement_Qty is null,0,@Actual_Movement_Qty)) <= @Keyloan_Cleared_Qty, '#00A000', '#A00000') KeyloanClearedColor,
+          
+          '#00D084' as ApprovalColor,'#FA6C3F' as PendingColor,
+          
+          IF((a.Priority='1' or a.Priority='2') and (
+              (a.planqty - if(@Actual_Movement_Qty is null,0,@Actual_Movement_Qty)) > @Fumi_Cleared_Qty or 
+              (a.planqty - if(@Actual_Movement_Qty is null,0,@Actual_Movement_Qty)) > @QC_Cleared_Qty or 
+              (a.planqty - if(@Actual_Movement_Qty is null,0,@Actual_Movement_Qty)) > IF(IFNULL(h.Keyloan_Pledge_Status,'NO')='YES',h.Keyloan_Release_Qty,h.wheatqty)
+            ), 0, 1) AS ApprovalEnableFlag,
+
+          (CASE 
+            WHEN a.status = 0 THEN 'Priority Pending'
+            WHEN a.status = 1 THEN 'R&D Pending'
+            WHEN a.status = 2 THEN 'Commercial Pending'
+            WHEN a.status =-2 THEN 'R&D Reject'
+            WHEN a.status = 3 THEN 'Commercial Approved'
+            WHEN a.status =-3 THEN 'Commercial Reject'
+          END) as  Status_String,
+
+          a.status,
+          a.RejectReason,
+          a.Commercial_RejectReason,
+          @countRow := @countRow + 1 AS rowId
+
+        FROM `ngw_weeklyplan` a
+        $join_L JOIN pp_bulksilono k ON a.ReceivingBin = k.Id
+        
+        JOIN (SELECT @countRow := -1) tmp
+
+        $join_R JOIN ngw_sublot h ON a.fromlotid = h.lotid 
+          AND a.fromplantid = h.plantid 
+          AND a.fromlocationid = h.StorageLocationId
+          AND a.wheatvarityid = h.wheatvarietyid 
+          AND a.fromwarehouseid = h.warehouseid 
+          AND h.RecStatus = 1
+
+        $join_L JOIN warehouse_master b ON h.warehouseid = b.wh_refid
+        $join_L JOIN master_plant c ON    h.plantid = c.ID 
+        $join_L JOIN master_storage j ON    a.fromlocationid = j.STORAGE_REFID AND a.fromplantid = j.plantid
+        $join_L JOIN master_mrc_wheat_variety f ON a.wheatvarityid = f.Id
+        $join_L JOIN ngw_lot g ON h.lotid = g.lotid AND g.plantid = h.plantid AND g.locationid = h.StorageLocationId
+        $join_L JOIN master_bag mb ON h.bagtypeid = mb.BAG_REFID
+        
+        WHERE a.RecStatus = 1 AND a.MovementType = 'MILL'" . $cnd . " ORDER BY rowId, planid";
+        /********** 
+        //Mohan 08-09-2022 NOTE: IF any value in the above query Excel Export will not work in Plan screen
+        //So Added IFNULL in Keyloancleared qty , etc..
+        **********/
+
+    //-- IF(IFNULL(h.Keyloan_Pledge_Status,'NO')='YES', IF(a.planqty>=h.Keyloan_Release_Qty, '#A00000', '#00A000'),'#00A000') AS KeyloanClearedColor,
+    //  echo $fetchsql; exit();
+
+    $builder =  $this->db->query($fetchsql);
+    return $builder->getResultArray();
+  }
+
+  public function getLotnoLocPlanList($warehouseid, $plantid, $locationid, $lotid, $wheatvarietyid)
+  {
+
+    $cnd = "";
+    //echo "SELECT id as value,WheatVariety as label FROM `master_mrc_wheat_variety` ORDER by id";exit();
+    $Sql = "SELECT 
+    concat('{\"warehouseid\":\"',b.warehouseid,'\",\"plantid\":\"', a.id,'\",\"locationid\":\"', b.storagelocationid,'\",\"lotid\":\"', b.lotid, '\",\"lotno\":\"',b.lotno,'\",\"wheatvarityid\":\"', b.wheatvarietyid,'\"}') as value,
+    concat(a.werks,'-',a.PLANT_NAME) as label 
+    FROM `master_plant` a, ngw_sublot b 
+    where b.plantid=a.id and b.Recstatus = 1 and a.Recstatus = 1 
+    and (b.warehouseid, b.wheatvarietyid)=('$warehouseid','$wheatvarietyid')
+    and b.lotno in (select lotno from ngw_sublot where lotid = '$lotid')
+    and b.storagelocationid in (select STORAGE_REFID from master_storage where LGORT in (select LGORT from master_storage where STORAGE_REFID = '$locationid' and plantid = '$plantid'))
+    ORDER by a.werks";
+    //echo $Sql;exit();
+    $builder = $this->db->query($Sql);
+    return  $builder->getResultArray();
+  }
+}

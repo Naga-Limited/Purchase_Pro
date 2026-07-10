@@ -1,0 +1,35 @@
+/* MarketRateEntryRowForm.css */
+
+/* Basic table styles */
+.custom-table {
+    width: 100%;
+  }
+  .custom-table thead th {
+    background-color: #7374f0 !important;
+    color: white !important; /* Optional: to ensure the text is readable */
+  }
+  
+  
+  
+  .custom-table td, .custom-table th {
+    padding: 8px;
+    text-align: left;
+  }
+  
+  .custom-table th {
+    background-color: #7374f0;
+  }
+  
+  /* Responsive styles for mobile */
+  @media (max-width: 768px) {
+    .custom-table {
+      display: block;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+  
+    .custom-table th, .custom-table td {
+      min-width: 200px; /* Adjust as needed */
+    }
+  }
+  

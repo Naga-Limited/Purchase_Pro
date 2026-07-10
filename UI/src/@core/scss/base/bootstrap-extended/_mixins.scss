@@ -1,0 +1,13 @@
+//  ===============================================================================================
+//  File Name: mixins.scss
+//  Description: Extended mixins file with new mixins features.
+//  ----------------------------------------------------------------------------------------------
+//  Item Name: Purchase Pro
+//  Author: PECZAWEB
+//  Author URL: http://www.peczaweb.com/
+//  ================================================================================================
+
+@import 'mixins/_type'; //(NEW)
+
+// Components
+@import 'mixins/_navs';

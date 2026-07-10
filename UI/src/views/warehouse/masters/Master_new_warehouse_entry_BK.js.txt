@@ -1,0 +1,1203 @@
+import React, { Fragment, useEffect,useState } from "react";
+import { useFormik } from "formik";
+import { CustomDropdownInput, CustomTextInput, CustomUploader,validation, Yup } from "../../forms/custom-form";
+import { useHistory, useParams } from "react-router";
+import { apiBaseUrl } from "../../../urlConstants";
+import { useLoader } from "../../../utility/hooks/useLoader";
+import { addOption } from "../../common/Utils";
+import { apiPostMethod } from "@helpers/axiosHelper";
+import { errorToast,ShowToast  } from "@helpers/appHelper";
+import { CancelSubmitButtons } from "../../forms/custom-button";
+import { CardComponent } from "../../common/CardComponent";
+import moment from "moment"; 
+////import Master_new_warehouse_entryForm from "./Master_new_warehouse_entryForm";
+import { Row, Col,Button } from "reactstrap";
+import Master_new_warehouse_list from "./list/Master_new_warehouse_list";
+import { WHMaster_ListUrl } from "../../../urlConstants";
+import CaptureImage from "../../CaptureImage";
+
+const Master_new_warehouse_entryForm = ({ form,onSubmit, attachedFiles, ImgData, setAttachment, setImgData }) => {
+
+const generalinfoOptions = [
+  {
+    options: [
+      { value: "Available", label: "A" },
+      { value: "Not Available", label: "N" },
+    ],
+  },
+];
+  const history = useHistory();
+  let { wh_refid } = useParams();
+  let refid='';
+  if(wh_refid){
+  refid = wh_refid.replace(":", "");
+  }
+  let { showLoader, hideLoader } = useLoader();
+  useEffect(() => {
+    if (wh_refid) {
+      onFetchwarehousecreationdetailsByid();
+    }
+  }, [wh_refid]);
+  const handleFileChange = (file, id) => {
+    setAttachment((p) => ({
+      ...p,
+      [id]: file,
+    }));
+  };
+  const onFetchwarehousecreationdetailsByid = () => {
+    let fdata = {
+      id: refid,
+    };
+    showLoader();
+    apiPostMethod(apiBaseUrl + "Warehouse/Master/getMaster_new_warehouseDetailsById", fdata)
+      .then((response) => {
+        const { data } = response;
+        console.log(JSON.stringify(response));
+        if (data.success) {
+          form.setValues({
+            wh_refid:data.results[0].wh_refid,
+            wh_code:data.results[0].wh_code,
+            wh_name:data.results[0].wh_name,
+            whaddress:data.results[0].whaddress,
+            street:data.results[0].street,
+            district:data.results[0].district.value,
+            state:data.results[0].state.value,
+            whlat:data.results[0].whlat,
+            whlong:data.results[0].whlong,
+            ownertype:data.results[0].ownertype,
+            owneraddress:data.results[0].owneraddress,
+            ownerstreet:data.results[0].ownerstreet,
+            ownerdistrict:data.results[0].ownerdistrict,
+            ownerstate:data.results[0].ownerstate,
+            ownerlandlineno:data.results[0].ownerlandlineno,
+            ownermobileno:data.results[0].ownermobileno,
+            ownermailid:data.results[0].ownermailid,
+            totalcapacityinmts:data.results[0].totalcapacityinmts,
+            totalcapacityinsqft:data.results[0].totalcapacityinsqft,
+            outsideareacapacitymts:data.results[0].outsideareacapacitymts,
+            outsideareacapacityinsqft:data.results[0].outsideareacapacityinsqft,
+            contractstartdate:data.results[0].contractstartdate,
+            contractenddate:data.results[0].contractenddate,
+            whcity:data.results[0].whcity,
+            whpincode:data.results[0].whpincode,
+            ownername:data.results[0].ownername,
+            ownerpincode:data.results[0].ownerpincode,
+            ownercity:data.results[0].ownercity,
+            ownerfaxnumber:data.results[0].ownerfaxnumber,
+            pillarinfo:data.results[0].pillarinfo,
+            advancevalueaftertds:data.results[0].advancevalueaftertds,
+            rentduedate:data.results[0].rentduedate,
+            name_of_collateral:data.results[0].name_of_collateral,
+            name_of_bank:data.results[0].name_of_bank,
+            /*naga_pwh_insurance_no:data.results[0].naga_pwh_insurance_no,
+            /naga_pwh_insurance_attachment:data.results[0].naga_pwh_insurance_attachment,
+            insurance_covered_amt:data.results[0].insurance_covered_amt,
+            insurance_premium_amt:data.results[0].insurance_premium_amt,
+            insurance_period:data.results[0].insurance_period,
+            insurance_company:data.results[0].insurance_company,
+            gst_registration:data.results[0].gst_registration,*/
+            company_name:data.results[0].company_name,
+            godown_type:data.results[0].godown_type,
+            contract_agreement_attachment:data.results[0].contract_agreement_attachment,
+            gst_type:data.results[0].gst_type,
+            effective_from:data.results[0].effective_from,
+            effective_to:data.results[0].effective_to,
+            cost_centre:data.results[0].cost_centre,
+            gl_account:data.results[0].gl_account,
+            rentpersqft:data.results[0].rentpersqft,
+            rentpermonth:data.results[0].rentpermonth,
+            lockingperiodinmonths:data.results[0].lockingperiodinmonths,
+            noticeperiodinmonths:data.results[0].noticeperiodinmonths,
+            contracttype:data.results[0].contracttype,
+            servicechargespwh:data.results[0].servicechargespwh,
+            bankname:data.results[0].bankname,
+            bankbranch:data.results[0].bankbranch,
+            bankcity:data.results[0].bankcity,
+            bankdistrict:data.results[0].bankdistrict,
+            bankstate:data.results[0].bankstate,
+            bankpincode:data.results[0].bankpincode,
+            bankaccountno:data.results[0].bankaccountno,
+            bankifsc:data.results[0].bankifsc,
+            wb_count:data.results[0].wb_count,
+            wb_1_name:data.results[0].wb_1_name,
+            wb_2_name:data.results[0].wb_2_name,
+            wb1_capacity_in_mts:data.results[0].wb1_capacity_in_mts,
+            wb2_capacity_in_mts:data.results[0].wb2_capacity_in_mts,
+            wb1_stamping_certificate_attachment:data.results[0].wb1_stamping_certificate_attachment,
+            wb2_stamping_certificate_attachment:data.results[0].wb2_stamping_certificate_attachment,
+            wb1_stamping_startdate:data.results[0].wb1_stamping_start_date,
+            wb1_stamping_enddate:data.results[0].wb1_stamping_end_date,
+            wb2_stamping_enddate:data.results[0].wb2_stamping_start_date,
+            wb2_stamping_enddate:data.results[0].wb2_stamping_end_date,
+            insurancestartdate:data.results[0].insurancestartdate,
+            insuranceexpirydate:data.results[0].insuranceexpirydate,
+            separate_electric_meters:data.results[0].separate_electric_meters,
+            electric_plug_points_inside:data.results[0].electric_plug_points_inside,
+            electric_light_points_inside:data.results[0].electric_light_points_inside,
+            electric_light_points_inside:data.results[0].electric_light_points_outside,
+            electric_plug_points_outside:data.results[0].electric_plug_points_outside,
+            drinking_water_facility:data.results[0].drinking_water_facility,
+            no_of_fire_extinguisher:data.results[0].no_of_fire_extinguisher,
+            borewell_facility:data.results[0].borewell_facility,
+            toilet_facility:data.results[0].toilet_facility,
+            water_connection:data.results[0].water_connection,
+            year_of_construction:data.results[0].year_of_construction,
+            warehouse_security:data.results[0].warehouse_security,
+            naga_security:data.results[0].naga_security,
+            boundary_wall:data.results[0].boundary_wall,
+            distance_railway_goods_shed:data.results[0].distance_railway_goods_shed,
+            Distance_Mandi:data.results[0].Distance_Mandi,
+            Distance_National_Highways:data.results[0].Distance_National_Highways,
+            Distance_FCI_Procurement_Point:data.results[0].Distance_FCI_Procurement_Point,
+            Distance_State_Highways:data.results[0].Distance_State_Highways,
+            Distance_Pucca:data.results[0].Distance_Pucca,
+            Statutory_Survey_Type:data.results[0].Statutory_Survey_Type,
+            Statutory_Type_Attachment:data.results[0].Statutory_Type_Attachment,
+            License_No_1:data.results[0].License_No_1,
+            License_Copy_Attachment1:data.results[0].License_Copy_Attachment1,
+            License_No_2:data.results[0].License_No_2,
+            License_Copy_Attachment2:data.results[0].License_Copy_Attachment2,
+            License_No_3:data.results[0].License_No_3,
+            License_Copy_Attachment3:data.results[0].License_Copy_Attachment3,
+            Independent_Gate:data.results[0].Independent_Gate,
+            Wall_Type:data.results[0].Wall_Type,
+            Shutter_Count:data.results[0].Shutter_Count,
+            Plinth:data.results[0].Plinth,
+            No_of_Exits:data.results[0].No_of_Exits,
+            Roof_Type:data.results[0].Roof_Type,
+            Door_Count:data.results[0].Door_Count,
+            Floor_Height:data.results[0].Floor_Height,
+            WH_Photograph_Attachment:data.results[0].WH_Photograph_Attachment,
+            Floor_Type:data.results[0].Floor_Type,
+            Window_Count:data.results[0].Window_Count,
+            Height_From_Adj_Land:data.results[0].Height_From_Adj_Land,
+            Inside_Road_Type:data.results[0].Inside_Road_Type,
+            Inside_Heavy_Vehicle_Mvmt:data.results[0].Inside_Heavy_Vehicle_Mvmt,
+            Inside_No_Of_Truck_In_Capacity:data.results[0].Inside_No_Of_Truck_In_Capacity,
+            Repair_Work_Remarks:data.results[0].Repair_Work_Remarks,
+            Latest_Audit_Date:data.results[0].Latest_Audit_Date,
+            Next_Audit_Due_Date:data.results[0].Next_Audit_Due_Date,
+          })
+ 
+ 
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      })
+      .finally((a) => {
+        hideLoader();
+      });
+  };
+  const RefreshPage = () => {
+    history.push(`/warehouse/warehousecreation`);
+  };
+  return (
+    <Fragment>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"WAREHOUSE NAME"} form={form} id="wh_name" type="text" />
+          <CustomTextInput form={form} id="id" type="hidden"  />
+        </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"WAREHOUSE ADDRESS"} form={form} id="whaddress" type="text" />
+      
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"STREET"} form={form} id="street" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"CITY"} form={form} id="whcity" type="text" />
+          </Col>
+
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomDropdownInput url={`${apiBaseUrl}warehouse/master/getDistrict`} label={"DISTRICT"} form={form} id="district" />
+      
+        </Col>
+      <Col md="4" sm="12">
+      <CustomDropdownInput url={`${apiBaseUrl}warehouse/master/getState`} label={"STATE"} form={form} id="state" />
+          </Col>
+          <Col md="4" sm="12">
+      <CustomTextInput label={"PINCODE"} form={form} id="whpincode" type="text" />
+          </Col>
+
+          </Row>
+      <Row>
+          <Col md="4" sm="12">
+      <CustomTextInput label={"WAREHOUSE LATITUTE"} form={form} id="whlat" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"WAREHOUSE LONGTITUDE"} form={form} id="whlong" type="text" />
+          </Col>
+          <Col md="4" sm="12">
+      <CustomTextInput label={"GODOWN TYPE"} form={form} id="godown_type" type="text" />
+          </Col>
+      </Row>
+
+      {/*<Tabs className="tab-wrap" selectedIndex={this.state.tabIndex} onSelect={tabIndex => this.tabChange(tabIndex)}>
+            <TabList className="tab-change">
+                <Tab className={this.state.tabIndex == "0" ? 'tab-select' : 'tab-unselect'}>User</Tab>
+                <Tab className={this.state.tabIndex == "1" ? 'tab-select' : 'tab-unselect'}>Guest User</Tab>
+            </TabList>
+            <TabPanel className="r-pan">
+                {tableConstruction}
+                {this.state.listData && this.state.listData.length == 0 && <div className="table-responsive">
+                    <h6 className="text-center">No record found</h6>
+                </div>}
+            </TabPanel>
+            <TabPanel className="w-pan">
+                {tableConstruction}
+                {this.state.listData && this.state.listData.length == 0 && <div className="table-responsive">
+                    <h6 className="text-center">No record found</h6>
+                </div>}
+            </TabPanel>
+  </Tabs>*/}
+      <Row>
+        <Col md="12" color="#7367f0" sm="12"><h5>Owner Info</h5></Col>
+      </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"OWNER TYPE"} form={form} id="ownertype" type="text" />
+      
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"OWNER NAME"} form={form} id="ownername" type="text" />
+          </Col>
+          </Row>
+       <Row>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"OWNER ADDRESS"} form={form} id="owneraddress" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"OWNER STREET"} form={form} id="ownerstreet" type="text" />
+          </Col>
+          <Col md="4" sm="12">
+            <CustomTextInput label={"OWNER CITY"} form={form} id="ownercity" type="text" />
+            
+        </Col>
+      </Row>
+        
+      <Row>
+      <Col md="4" sm="12">
+      <CustomDropdownInput url={`${apiBaseUrl}warehouse/master/getDistrict`} label={"OWNER DISTRICT"} form={form} id="ownerdistrict" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomDropdownInput url={`${apiBaseUrl}warehouse/master/getState`} label={"OWNER STATE"} form={form} id="ownerstate" />
+          </Col>
+          </Row>
+      <Row>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"OWNER PINCODE"} form={form} id="ownerpincode" type="text" />
+          </Col>
+          <Col md="4" sm="12">
+      <CustomTextInput label={"OWNER LANDLINENO"} form={form} id="ownerlandlineno" type="text" />
+          </Col>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"OWNER MOBILENO"} form={form} id="ownermobileno" type="text" />
+      
+        </Col>
+
+      <Col md="4" sm="12">
+      <CustomTextInput label={"OWNER FAXNO"} form={form} id="ownerfaxnumber" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"OWNER MAILID"} form={form} id="ownermailid" type="text" />
+          </Col>
+          </Row>
+
+      <Row>
+        <Col md="12" color="#7367f0" sm="12"><h5>Capacity Info</h5></Col>
+      </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"TOTAL CAPACITY IN MTS"} form={form} id="totalcapacityinmts" type="text" />
+      
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"TOTAL CAPACITY IN SQFT"} form={form} id="totalcapacityinsqft" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"PILLAR INFO"} form={form} id="pillarinfo" type="text" />
+          </Col>
+          </Row>
+      <Row>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"OUTSIDE AREA CAPACITY MTS"} form={form} id="outsideareacapacitymts" type="text" />
+          </Col>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"OUTSIDE AREA CAPACITY IN SQFT"} form={form} id="outsideareacapacityinsqft" type="text" />
+    
+        </Col>
+          </Row>
+      <Row>
+        <Col md="12" color="#7367f0" sm="12"><h5>Rent &amp; Contract Info</h5></Col>
+      </Row>    
+      <Row>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"CONTRACT START DATE"} form={form} id="contractstartdate" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"CONTRACT END DATE"} form={form} id="contractenddate" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"ADVANCE VALUE AFTER TDS"} form={form} id="advancevalueaftertds" type="text" />
+          </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"RENT PER SQFT"} form={form} id="rentpersqft" type="text" />
+    
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"RENT PER MONTH"} form={form} id="rentpermonth" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"RENT DUE DATE"} form={form} id="rentduedate" type="text" />
+          </Col>
+
+          </Row>
+      <Row>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"LOCKING PERIOD IN MONTHS"} form={form} id="lockingperiodinmonths" type="text" />
+          </Col>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"NOTICE PERIOD IN MONTHS"} form={form} id="noticeperiodinmonths" type="text" />
+      
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"CONTRACT TYPE"} form={form} id="contracttype" type="text" />
+          </Col>
+          </Row>
+          <Row>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"SERVICE CHARGES (if PWH)"} form={form} id="servicechargespwh" type="text" />
+          </Col>
+          </Row>
+      <Row>
+        <Col md="12" color="#7367f0" sm="12"><h5>Bank Info</h5></Col>
+      </Row>    
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"BANK NAME"} form={form} id="bankname" type="text" />
+    
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"BANK BRANCH"} form={form} id="bankbranch" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"BANK CITY"} form={form} id="bankcity" type="text" />
+          </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomDropdownInput url={`${apiBaseUrl}warehouse/master/getDistrict`} label={"BANK DISTRICT"} form={form} id="bankdistrict" />
+      
+        </Col>
+      <Col md="4" sm="12">
+      <CustomDropdownInput url={`${apiBaseUrl}warehouse/master/getState`} label={"BANK STATE"} form={form} id="bankstate" />
+          </Col>
+          <Col md="4" sm="12">
+      <CustomTextInput label={"BANK PINCODE"} form={form} id="bankpincode" type="text" />
+          </Col>
+          </Row>
+          <Row>
+          <Col md="4" sm="12">
+      <CustomTextInput label={"BANK ACCOUNTNO"} form={form} id="bankaccountno" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"BANK IFSC"} form={form} id="bankifsc" type="text" />
+          </Col>
+          </Row>
+      <Row>
+        <Col md="12" color="#7367f0" sm="12"><h5>Weigh Bridge Info</h5></Col>
+      </Row>    
+
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"WEIGH BRIDGE COUNT"} form={form} id="wb_count" type="text" />
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"WEIGH BRIDGE 1 NAME"} form={form} id="wb_1_name" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"WEIGH BRIDGE 1 CAPACITY IN MTS"} form={form} id="wb1_capacity_in_mts" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+          </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"WEIGH BRIDGE 1 STAMPING STARTDATE"} form={form} id="wb1_stamping_start_date" type="text" />
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"WEIGH BRIDGE 1 STAMPING ENDDATE"} form={form} id="wb1_stamping_expiry_date" type="text" />
+          </Col>
+          <Col md="4" sm="12">
+      
+     <CustomUploader isReadOnly={false} form={form} label={"WEIGH BRIDGE 1 STAMPING CERTIFICATE ATTACHMENT"} id={"wb1_stamping_certificate_attachment"} />
+     <CaptureImage ImgData={ImgData} setImgData={setImgData} ItemName={"wb1_stamping_certificate_attachment1"} />
+          </Col>
+
+          </Row>
+      <Row>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"WEIGH BRIDGE  2 NAME"} form={form} id="wb_2_name" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"WEIGH BRIDGE 2 CAPACITY IN MTS"} form={form} id="wb2_capacity_in_mts" type="text" />
+          </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"WEIGH BRIDGE 2 STAMPING ENDDATE"} form={form} id="wb2_stamping_start_date" type="text" />
+    
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"WEIGH BRIDGE 2 STAMPING ENDDATE"} form={form} id="wb2_stamping_expiry_date" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      {/*<CustomTextInput label={"WEIGH BRIDGE 2 STAMPING CERTIFICATE ATTACHMENT"} form={form} id="wb2_stamping_certificate_attachment" type="text" />*/}
+     <CustomUploader isReadOnly={false} form={form} label={"WEIGH BRIDGE 2 STAMPING CERTIFICATE ATTACHMENT"} id={"wb2_stamping_certificate_attachment"} />
+     <CaptureImage ImgData={ImgData} setImgData={setImgData} ItemName={"wb2_stamping_certificate_attachment1"} />
+          </Col>
+          </Row>
+
+      <Row>
+        <Col md="12" color="#7367f0" sm="12"><h5>Electricity Info</h5></Col>
+      </Row> 
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"SEPARATE ELECTRIC METERS"} form={form} id="separate_electric_meters" type="text" />
+      
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"ELECTRIC LIGHT POINTS INSIDE"} form={form} id="electric_light_points_inside" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"ELECTRIC LIGHT POINTS OUTSIDE"} form={form} id="electric_light_points_outside" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"ELECTRIC PLUG POINTS INSIDE"} form={form} id="electric_plug_points_inside" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"ELECTRIC PLUG POINTS OUTSIDE"} form={form} id="electric_plug_points_outside" type="text" />
+          </Col>
+          </Row>
+          
+      <Row>
+        <Col md="12" color="#7367f0" sm="12"><h5>General Info</h5></Col>
+      </Row> 
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"DRINKING WATER FACILITY"} form={form} id="drinking_water_facility" type="text" />
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"BOREWELL FACILITY"} form={form} id="borewell_facility" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"WATER CONNECTION"} form={form} id="water_connection" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"NO OF FIRE EXTINGUISHER"} form={form} id="no_of_fire_extinguisher" type="text" />
+          </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"TOILET FACILITY"} form={form} id="toilet_facility" type="text" />
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"YEAR OF CONSTRUCTION"} form={form} id="year_of_construction" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+          </Col>
+      <Col md="4" sm="12">
+          </Col>
+          </Row>
+      <Row>
+        <Col md="12" color="#7367f0" sm="12"><h5>Security Info</h5></Col>
+      </Row>           
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"WAREHOUSE SECURITY"} form={form} id="warehouse_security" type="text" />
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"NAGA SECURITY"} form={form} id="naga_security" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"BOUNDARY WALL"} form={form} id="boundary_wall" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+          </Col>
+          </Row>
+      <Row>
+        <Col md="12" color="#7367f0" sm="12"><h5>Distance Info</h5></Col>
+      </Row>          
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"DISTANCE RAILWAY GOODS SHED"} form={form} id="distance_railway_goods_shed" type="text" />
+
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"DISTANCE NATIONAL HIGHWAYS"} form={form} id="Distance_National_Highways" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"DISTANCE STATE HIGHWAYS"} form={form} id="Distance_State_Highways" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"DISTANCE MANDI"} form={form} id="Distance_Mandi" type="text" />
+          </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"DISTANCE FCI PROCUREMENT POINT"} form={form} id="Distance_FCI_Procurement_Point" type="text" />
+
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"DISTANCE PUCCA"} form={form} id="Distance_Pucca" type="text" />
+          </Col>
+          </Row>
+
+      <Row>
+        <Col md="12" color="#7367f0" sm="12"><h5>Statutory Info</h5></Col>
+      </Row>          
+      <Row>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"Municipal Survey / Property Title No"} form={form} id="Statutory_Type" type="text" />
+      </Col>
+      <Col md="4" sm="12">
+      {/*<CustomTextInput label={"STATUTORY TYPE ATTACHMENT"} form={form} id="Statutory_Type_Attachment" type="text" />*/}
+     <CustomUploader 
+     title={"STATUTORY"} 
+     isReadOnly={false} 
+     form={form} 
+     label={"STATUTORY TYPE ATTACHMENT"} 
+     id={"Statutory_Type_Attachment"} 
+     setAttachment={handleFileChange}
+     selectedFileName={attachedFiles.Statutory_Type_Attachment.name}
+     />
+     {/*<span id="Statutory_Type_Attachment_Error" style={{color: "red"}} ></span>
+                     
+                     <Button.Ripple
+                       outline
+                       color="primary"
+                       onClick={(e) => {
+                         fileUploadAction();
+                       }}
+                     >
+                       <Paperclip size={14} />
+                       <span className="align-middle ml-25">Attach</span>
+                     </Button.Ripple>
+                      <div className="align-middle ml-25">{Statutory_Type_Attachment.name}</div>*/}
+        <CaptureImage ImgData={ImgData} setImgData={setImgData} ItemName={"Statutory_Type_Attachment_Img"} />
+          </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"LICENSE NO 1"} form={form} id="License_No_1" type="text" />
+      
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"LICENSE NO 2"} form={form} id="License_No_2" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"LICENSE NO 3"} form={form} id="License_No_3" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+          </Col>
+          </Row>
+      <Row>
+        <Col md="3" sm="12">
+
+     <CustomUploader isReadOnly={false} form={form} label={"LICENSE COPY ATTACHMENT1"} id={"License_Copy_Attachment1"} />
+     <CaptureImage ImgData={ImgData} setImgData={setImgData} ItemName={"License_Copy_Attachment1_Img"} />
+        </Col>
+      <Col md="3" sm="12">
+
+     <CustomUploader isReadOnly={false} form={form} label={"LICENSE COPY ATTACHMENT2"} id={"License_Copy_Attachment2"} />
+     <CaptureImage ImgData={ImgData} setImgData={setImgData} ItemName={"License_Copy_Attachment2_Img"} />
+          </Col>
+      <Col md="3" sm="12">
+
+     <CustomUploader isReadOnly={false} form={form} label={"LICENSE COPY ATTACHMENT3"} id={"License_Copy_Attachment3"} />
+     <CaptureImage ImgData={ImgData} setImgData={setImgData} ItemName={"License_Copy_Attachment3_Img"} />
+          </Col>
+      <Col md="3" sm="12">
+        TEST
+          </Col>
+          </Row>
+      {/*<Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"INDEPENDENT GATE"} form={form} id="Independent_Gate" type="text" />
+
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"NO OF EXITS"} form={form} id="No_of_Exits" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"WALL TYPE"} form={form} id="Wall_Type" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"ROOF TYPE"} form={form} id="Roof_Type" type="text" />
+          </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"FLOOR TYPE"} form={form} id="Floor_Type" type="text" />
+
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"SHUTTER COUNT"} form={form} id="Shutter_Count" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"DOOR COUNT"} form={form} id="Door_Count" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"WINDOW COUNT"} form={form} id="Window_Count" type="text" />
+          </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"PLINTH"} form={form} id="Plinth" type="text" />
+
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"FLOOR HEIGHT"} form={form} id="Floor_Height" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"HEIGHT FROM ADJ LAND"} form={form} id="Height_From_Adj_Land" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+//      <CustomTextInput label={"WH PHOTOGRAPH ATTACHMENT"} form={form} id="WH_Photograph_Attachment" type="text" />
+     <CustomUploader isReadOnly={true} form={form} label={"WH PHOTOGRAPH ATTACHMENT"} id={"WH_Photograph_Attachment"} />
+     <CaptureImage ImgData={ImgData} setImgData={setImgData} ItemName={"WH_Photograph_Attachment1"} />
+          </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"INSIDE ROAD TYPE"} form={form} id="Inside_Road_Type" type="text" />
+
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"INSIDE HEAVY VEHICLE MVMT"} form={form} id="Inside_Heavy_Vehicle_Mvmt" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"INSIDE NO OF TRUCK IN CAPACITY"} form={form} id="Inside_No_Of_Truck_In_Capacity" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+          </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"REPAIR WORK REMARKS"} form={form} id="Repair_Work_Remarks" type="text" />
+
+        </Col>
+      <Col md="4" sm="12">
+          </Col>
+      <Col md="4" sm="12">
+          </Col>
+      <Col md="4" sm="12">
+          </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"LATEST AUDIT DATE"} form={form} id="Latest_Audit_Date" type="text" />
+
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"NEXT AUDIT DUE DATE"} form={form} id="Next_Audit_Due_Date" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+          </Col>
+      <Col md="4" sm="12">
+          </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"NAME OF COLLATERAL"} form={form} id="name_of_collateral" type="text" />
+
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"NAME OF BANK"} form={form} id="name_of_bank" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"INSURANCE NUMBER"} form={form} id="naga_pwh_insurance_no" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+//      <CustomTextInput label={"INSURANCE ATTACHMENT"} form={form} id="naga_pwh_insurance_attachment" type="text" />
+     <CustomUploader isReadOnly={true} form={form} label={"INSURANCE ATTACHMENT"} id={"naga_pwh_insurance_attachment"} />
+     <CaptureImage ImgData={ImgData} setImgData={setImgData} ItemName={"naga_pwh_insurance_attachment1"} />
+          </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"INSURANCE COVERED AMOUNT"} form={form} id="insurance_covered_amt" type="text" />
+
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"INSURANCE PREMIUM AMOUNT"} form={form} id="insurance_premium_amt" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"INSURANCE PERIOD"} form={form} id="insurance_period" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"INSURANCE COMPANY"} form={form} id="insurance_company" type="text" />
+          </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"INSURANCE START DATE"} form={form} id="insurance_start_date" type="text" />
+
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"INSURANCE EXPIRY DATE"} form={form} id="insurance_end_date" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"GST REGISTRATION"} form={form} id="gst_registration" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+          </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"COMPANY NAME"} form={form} id="company_name" type="text" />
+
+        </Col>
+      <Col md="4" sm="12">
+//      <CustomTextInput label={"CONTRACT AGREEMENT ATTACHMENT"} form={form} id="contract_agreement_attachment" type="text" />
+     <CustomUploader isReadOnly={true} form={form} label={"CONTRACT AGREEMENT ATTACHMENT"} id={"contract_agreement_attachment"} />
+     <CaptureImage ImgData={ImgData} setImgData={setImgData} ItemName={"contract_agreement_attachment1"} />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"EFFECTIVE FROM"} form={form} id="effective_from" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"EFFECTIVE TO"} form={form} id="effective_to" type="text" />
+          </Col>
+          </Row>
+      <Row>
+        <Col md="4" sm="12">
+      <CustomTextInput label={"COST CENTRE"} form={form} id="cost_centre" type="text" />
+
+        </Col>
+      <Col md="4" sm="12">
+      <CustomTextInput label={"GL CODE"} form={form} id="gl_account" type="text" />
+          </Col>
+      <Col md="4" sm="12">
+          </Col>
+      <Col md="4" sm="12">
+          </Col>
+          </Row>*/}
+ 
+      <Row>
+      <Col md="2" sm="12">
+      <Button.Ripple color="primary" type="button" onClick={(e) => onSubmit()}>
+                Submit
+              </Button.Ripple>
+    
+  </Col>
+  <Col md="2" sm="12">
+  <Button.Ripple color="primary" block type="button" onClick={(e) => RefreshPage()}>
+                Refresh
+  </Button.Ripple>
+              </Col>
+     </Row>
+     
+     <Master_new_warehouse_list
+        url={WHMaster_ListUrl}
+        title={"WAREHOUSE CREATION"}
+        actionRendorer={(row) => {
+          let tx = row.isApproved ? `View` : "Edit";
+          return (
+            <Button.Ripple
+              color="primary"
+              onClick={() => {
+                history.push(`/warehouse/warehouse_master:` + row.id );
+              }}
+            >
+              {tx}
+            </Button.Ripple>
+          );
+        }}
+      />
+    </Fragment>
+    
+    
+  );
+};
+const Master_new_warehouse_entry = () => {
+  const { showLoader, hideLoader } = useLoader();
+  const dateFormat = "YYYY-MM-DD";
+  const today = moment().format(dateFormat);
+  const isToday = (date) => {
+    return moment(date).format(dateFormat) == today;
+  };
+  const [ImgData, setImgData] = useState({});
+const [attachedFiles, setAttachment] = useState({ 
+  Statutory_Type_Attachment: {},
+  wb1_stamping_certificate_attachment: {},
+  wb2_stamping_certificate_attachment: {},
+  License_Copy_Attachment3: {},
+  License_Copy_Attachment2: {},
+  License_Copy_Attachment1: {},
+});
+
+  const form = useFormik({
+    isInitialValid: false,
+    initialValues: {},
+    validationSchema: Yup.object().shape({
+ 
+      //wh_code: validation.required({ message:"WH CODE should not be empty", isObject: false }),
+      wh_name: validation.required({ message:"WAREHOUSE NAME should not be empty", isObject: false }),
+      godown_type: validation.required({ message:"GODOWN TYPE should not be empty", isObject: false }),
+      whaddress: validation.required({ message:"WAREHOUSE ADDRESS should not be empty", isObject: false }),
+      street: validation.required({ message:"STREET should not be empty", isObject: false }),
+      whcity: validation.required({ message:"CITY should not be empty", isObject: false }),
+      whpincode: validation.required({ message:"PINCODE should not be empty", isObject: false }),
+      district: validation.required({ message:"DISTRICT NAME should not be empty", isObject: true }),
+      state: validation.required({ message:"STATE NAME should not be empty", isObject: true }),
+      whlat: validation.required({ message:"WAREHOUSE LATITUTE should not be empty", isObject: false }),
+      whlong: validation.required({ message:"WAREHOUSE LONGTITUDE should not be empty", isObject: false }),
+      ownertype: validation.required({ message:"OWNER TYPE should not be empty", isObject: false }),
+      ownername: validation.required({ message:"OWNER NAME should not be empty", isObject: false }),
+      owneraddress: validation.required({ message:"OWNER ADDRESS should not be empty", isObject: false }),
+      ownerstreet: validation.required({ message:"OWNER STREET should not be empty", isObject: false }),
+      ownercity: validation.required({ message:"OWNER CITY should not be empty", isObject: false }),
+      ownerpincode: validation.required({ message:"OWNER PINCODE should not be empty", isObject: false }),
+      ownerdistrict: validation.required({ message:"OWNER DISTRICT NAME should not be empty", isObject: true }),
+      ownerstate: validation.required({ message:"OWNER STATE NAME should not be empty", isObject: true }),
+      ownermobileno: validation.required({ message:"OWNER MOBILENO should not be empty", isObject: false }),
+      ownerlandlineno: validation.required({ message:"OWNER LANDLINENO should not be empty", isObject: false }),
+      ownerfaxnumber: validation.required({ message:"OWNER FAXNO should not be empty", isObject: false }),
+      ownermailid: validation.required({ message:"OWNER MAILID should not be empty", isObject: false }),
+      totalcapacityinmts: validation.required({ message:"TOTAL CAPACITY IN MTS should not be empty", isObject: false }),
+      totalcapacityinsqft: validation.required({ message:"TOTAL CAPACITY IN SQFT should not be empty", isObject: false }),
+      pillarinfo: validation.required({ message:"PILLAR INFO should not be empty", isObject: false }),
+      outsideareacapacitymts: validation.required({ message:"OUTSIDE AREA CAPACITY MTS should not be empty", isObject: false }),
+      outsideareacapacityinsqft: validation.required({ message:"OUTSIDE AREA CAPACITY IN SQFT should not be empty", isObject: false }),
+      contractstartdate: validation.required({ message:"CONTRACT START DATE should not be empty", isObject: false }),
+      contractenddate: validation.required({ message:"CONTRACT END DATE should not be empty", isObject: false }),
+      advancevalueaftertds: validation.required({ message:"ADVANCE VALUE AFTER TDS should not be empty", isObject: false }),
+      rentpersqft: validation.required({ message:"RENT PER SQFT should not be empty", isObject: false }),
+      rentpermonth: validation.required({ message:"RENT PER MONTH should not be empty", isObject: false }),
+      rentduedate: validation.required({ message:"RENT DUE DATE should not be empty", isObject: false }),
+      lockingperiodinmonths: validation.required({ message:"LOCKING PERIOD IN MONTHS should not be empty", isObject: false }),
+      noticeperiodinmonths: validation.required({ message:"NOTICE PERIOD IN MONTHS should not be empty", isObject: false }),
+      contracttype: validation.required({ message:"CONTRACT TYPE should not be empty", isObject: false }),
+      servicechargespwh: validation.required({ message:"SERVICE CHARGES PWH should not be empty", isObject: false }),
+      bankname: validation.required({ message:"BANK NAME should not be empty", isObject: false }),
+      bankbranch: validation.required({ message:"BANK BRANCH should not be empty", isObject: false }),
+      bankcity: validation.required({ message:"BANK CITY should not be empty", isObject: false }),
+      bankpincode: validation.required({ message:"BANK PINCODE should not be empty", isObject: false }),
+      bankdistrict: validation.required({ message:"BANK DISTRICT should not be empty", isObject: true }),
+      bankstate: validation.required({ message:"BANK STATE should not be empty", isObject: true }),
+      bankaccountno: validation.required({ message:"BANK ACCOUNTNO should not be empty", isObject: false }),
+      bankifsc: validation.required({ message:"BANK IFSC should not be empty", isObject: false }),
+      wb_count: validation.required({ message:"WEIGH BRIDGE COUNT should not be empty", isObject: false }),
+      wb_1_name: validation.required({ message:"WEIGH BRIDGE  1 NAME should not be empty", isObject: false }),
+      wb1_capacity_in_mts: validation.required({ message:"WEIGH BRIDGE 1 CAPACITY IN MTS should not be empty", isObject: false }),
+      wb1_stamping_start_date: validation.required({ message:"WEIGH BRIDGE 1 STAMPING STARTDATE should not be empty", isObject: false }),
+      wb1_stamping_expiry_date: validation.required({ message:"WEIGH BRIDGE 1 STAMPING ENDDATE should not be empty", isObject: false }),
+      wb_2_name: validation.required({ message:"WEIGH BRIDGE  2 NAME should not be empty", isObject: false }),
+      wb2_capacity_in_mts: validation.required({ message:"WEIGH BRIDGE 2 CAPACITY IN MTS should not be empty", isObject: false }),
+      wb2_stamping_start_date: validation.required({ message:"WEIGH BRIDGE 2 STAMPING ENDDATE should not be empty", isObject: false }),
+      wb2_stamping_expiry_date: validation.required({ message:"WEIGH BRIDGE 2 STAMPING ENDDATE should not be empty", isObject: false }),
+     // wb1_stamping_certificate_attachment: validation.required({ message:"WEIGH BRIDGE 1 STAMPING CERTIFICATE ATTACHMENT should not be empty", isObject: false }),
+     // wb2_stamping_certificate_attachment: validation.required({ message:"WEIGH BRIDGE 2 STAMPING CERTIFICATE ATTACHMENT should not be empty", isObject: false }),
+      separate_electric_meters: validation.required({ message:"SEPARATE ELECTRIC METERS should not be empty", isObject: false }),
+      electric_light_points_inside: validation.required({ message:"ELECTRIC LIGHT POINTS INSIDE should not be empty", isObject: false }),
+      electric_light_points_outside: validation.required({ message:"ELECTRIC LIGHT POINTS OUTSIDE should not be empty", isObject: false }),
+      electric_plug_points_inside: validation.required({ message:"ELECTRIC PLUG POINTS INSIDE should not be empty", isObject: false }),
+      electric_light_points_outside: validation.required({ message:"ELECTRIC LIGHT POINTS OUTSIDE should not be empty", isObject: false }),
+      drinking_water_facility: validation.required({ message:"DRINKING WATER FACILITY should not be empty", isObject: false }),
+      borewell_facility: validation.required({ message:"BOREWELL FACILITY should not be empty", isObject: false }),
+      water_connection: validation.required({ message:"WATER CONNECTION should not be empty", isObject: false }),
+      no_of_fire_extinguisher: validation.required({ message:"NO OF FIRE EXTINGUISHER should not be empty", isObject: false }),
+      toilet_facility: validation.required({ message:"TOILET FACILITY should not be empty", isObject: false }),
+      year_of_construction: validation.required({ message:"YEAR OF CONSTRUCTION should not be empty", isObject: false }),
+      warehouse_security: validation.required({ message:"WAREHOUSE SECURITY should not be empty", isObject: false }),
+      naga_security: validation.required({ message:"NAGA SECURITY should not be empty", isObject: false }),
+      boundary_wall: validation.required({ message:"BOUNDARY WALL should not be empty", isObject: false }),
+      distance_railway_goods_shed: validation.required({ message:"DISTANCE RAILWAY GOODS SHED should not be empty", isObject: false }),
+      distance_national_highways: validation.required({ message:"DISTANCE NATIONAL HIGHWAYS should not be empty", isObject: false }),
+      distance_state_highways: validation.required({ message:"DISTANCE STATE HIGHWAYS should not be empty", isObject: false }),
+      distance_mandi: validation.required({ message:"DISTANCE MANDI should not be empty", isObject: false }),
+      distance_fci_procurement_point: validation.required({ message:"DISTANCE FCI PROCUREMENT POINT should not be empty", isObject: false }),
+      distance_pucca: validation.required({ message:"DISTANCE PUCCA should not be empty", isObject: false }),
+      statutory_survey_type: validation.required({ message:"STATUTORY SURVEY TYPE should not be empty", isObject: false }),
+      //statutory_type_attachment: validation.required({ message:"STATUTORY TYPE ATTACHMENT should not be empty", isObject: false }),
+      license_no_1: validation.required({ message:"LICENSE NO 1 should not be empty", isObject: false }),
+      license_no_2: validation.required({ message:"LICENSE NO 2 should not be empty", isObject: false }),
+      license_no_3: validation.required({ message:"LICENSE NO 3 should not be empty", isObject: false }),
+      // license_copy_attachment1: validation.required({ message:"LICENSE COPY ATTACHMENT1 should not be empty", isObject: false }),
+      // license_copy_attachment2: validation.required({ message:"LICENSE COPY ATTACHMENT2 should not be empty", isObject: false }),
+      // license_copy_attachment3: validation.required({ message:"LICENSE COPY ATTACHMENT3 should not be empty", isObject: false }),
+      independent_gate: validation.required({ message:"INDEPENDENT GATE should not be empty", isObject: false }),
+      no_of_exits: validation.required({ message:"NO OF EXITS should not be empty", isObject: false }),
+      wall_type: validation.required({ message:"WALL TYPE should not be empty", isObject: false }),
+      roof_type: validation.required({ message:"ROOF TYPE should not be empty", isObject: false }),
+      floor_type: validation.required({ message:"FLOOR TYPE should not be empty", isObject: false }),
+      shutter_count: validation.required({ message:"SHUTTER COUNT should not be empty", isObject: false }),
+      door_count: validation.required({ message:"DOOR COUNT should not be empty", isObject: false }),
+      window_count: validation.required({ message:"WINDOW COUNT should not be empty", isObject: false }),
+      plinth: validation.required({ message:"PLINTH should not be empty", isObject: false }),
+      floor_height: validation.required({ message:"FLOOR HEIGHT should not be empty", isObject: false }),
+      height_from_adj_land: validation.required({ message:"HEIGHT FROM ADJ LAND should not be empty", isObject: false }),
+      // wh_photograph_attachment: validation.required({ message:"WH PHOTOGRAPH ATTACHMENT should not be empty", isObject: false }),
+      inside_road_type: validation.required({ message:"INSIDE ROAD TYPE should not be empty", isObject: false }),
+      inside_heavy_vehicle_mvmt: validation.required({ message:"INSIDE HEAVY VEHICLE MVMT should not be empty", isObject: false }),
+      inside_no_of_truck_in_capacity: validation.required({ message:"INSIDE NO OF TRUCK IN CAPACITY should not be empty", isObject: false }),
+      repair_work_remarks: validation.required({ message:"REPAIR WORK REMARKS should not be empty", isObject: false }),
+      latest_audit_date: validation.required({ message:"LATEST AUDIT DATE should not be empty", isObject: false }),
+      next_audit_due_date: validation.required({ message:"NEXT AUDIT DUE DATE should not be empty", isObject: false }),
+      name_of_collateral: validation.required({ message:"NAME OF COLLATERAL should not be empty", isObject: false }),
+      name_of_bank: validation.required({ message:"NAME OF BANK should not be empty", isObject: false }),
+      naga_pwh_insurance_no: validation.required({ message:"INSURANCE NUMBER should not be empty", isObject: false }),
+      // naga_pwh_insurance_attachment: validation.required({ message:"INSURANCE ATTACHMENT should not be empty", isObject: false }),
+      insurance_covered_amt: validation.required({ message:"INSURANCE COVERED AMOUNT should not be empty", isObject: false }),
+      insurance_premium_amt: validation.required({ message:"INSURANCE PREMIUM AMOUNT should not be empty", isObject: false }),
+      insurance_period: validation.required({ message:"INSURANCE PERIOD should not be empty", isObject: false }),
+      insurance_company: validation.required({ message:"INSURANCE COMPANY should not be empty", isObject: false }),
+      insurance_start_date: validation.required({ message:"INSURANCE START DATE should not be empty", isObject: false }),
+      insurance_end_date: validation.required({ message:"INSURANCE EXPIRY DATE should not be empty", isObject: false }),
+      gst_registration: validation.required({ message:"GST REGISTRATION should not be empty", isObject: false }),
+      company_name: validation.required({ message:"COMPANY NAME should not be empty", isObject: false }),
+      // contract_agreement_attachment: validation.required({ message:"CONTRACT AGREEMENT ATTACHMENT should not be empty", isObject: false }),
+      gst_type: validation.required({ message:"GST TYPE should not be empty", isObject: false }),
+      effective_from: validation.required({ message:"EFFECTIVE FROM should not be empty", isObject: false }),
+      effective_to: validation.required({ message:"EFFECTIVE TO should not be empty", isObject: false }),
+      cost_centre: validation.required({ message:"COST CENTRE should not be empty", isObject: false }),
+      gl_account: validation.required({ message:"GL CODE should not be empty", isObject: false }),
+    }),
+    onSubmit(values) {},
+  });
+  const values = form.values;
+  const EmptyValidateById = (obj,Msg,show) => {
+    console.log(1);
+    if(obj) {       
+    }
+    if(obj && obj===" ") {       
+      console.log(2);
+    if(show==1){
+      console.log(3);
+      //console.log(Id);
+      errorToast(Msg);
+    }
+  }
+  }
+  const showError = (Id,Msg,show) => {
+    if(document.getElementById(Id)) { 
+      document.getElementById(Id).innerHTML="";
+    if(show==1){
+      console.log(Id);
+    document.getElementById(Id).innerHTML=Msg;
+    }
+  }
+  }
+  const isFilledAll = (formData) => {
+    
+    //wb1_stamping_certificate_attachment: alidation.required({ message:"WEIGH BRIDGE 1 STAMPING CERTIFICATE ATTACHMENT should not be empty", isObject: false }),
+    /*if(formData.wb1_stamping_start_date && !formData.wb1_stamping_certificate_attachment && !attachedFiles.wb1_stamping_certificate_attachment.name && ImgData.wb1_stamping_certificate_attachment1==null){  
+      
+      showError("INV_COPY_Error","Upload WB-1 Stamping Certificate Copy",1);
+      
+    }*/
+    if(!formData.statutory_type_attachment && !attachedFiles.statutory_type_attachment.name && ImgData.Statutory_Type_Attachment_Img==null){  
+      
+      showError("INV_COPY_Error","Upload Statutory Type Attachment",1);
+      
+    }
+    
+    errorToast("END");
+    return false;
+   // wb1_stamping_certificate_attachment: validation.required({ message:"WEIGH BRIDGE 1 STAMPING CERTIFICATE ATTACHMENT should not be empty", isObject: false }),
+   // wb2_stamping_certificate_attachment: validation.required({ message:"WEIGH BRIDGE 2 STAMPING CERTIFICATE ATTACHMENT should not be empty", isObject: false }),
+    //statutory_type_attachment: validation.required({ message:"STATUTORY TYPE ATTACHMENT should not be empty", isObject: false }),
+   /* statutory_type_attachment: 
+    Yup.array().nullable()                                             
+      .required('VALIDATION_FIELD_REQUIRED')
+      .test(),   
+                  }),     
+    statutory_type_attachment1: 
+                  Yup.object.when('statutory_type_attachment', {                                                    
+                    is: (statutory_type_attachment) => statutory_type_attachment===null || !statutory_type_attachment || statutory_type_attachment.length === 0,
+                    then: Yup.object                                                  
+                    .required('At least one Statutory Attachment/Image Capture required'),
+                    }), * /
+    // license_copy_attachment1: validation.required({ message:"LICENSE COPY ATTACHMENT1 should not be empty", isObject: false }),
+    // license_copy_attachment2: validation.required({ message:"LICENSE COPY ATTACHMENT2 should not be empty", isObject: false }),
+    // license_copy_attachment3: validation.required({ message:"LICENSE COPY ATTACHMENT3 should not be empty", isObject: false }),
+    // wh_photograph_attachment: validation.required({ message:"WH PHOTOGRAPH ATTACHMENT should not be empty", isObject: false }),
+    naga_pwh_insurance_no: validation.required({ message:"INSURANCE NUMBER should not be empty", isObject: false }),
+    // naga_pwh_insurance_attachment: validation.required({ message:"INSURANCE ATTACHMENT should not be empty", isObject: false }),
+    // contract_agreement_attachment: validation.required({ message:"CONTRACT AGREEMENT ATTACHMENT should not be empty", isObject: false }),
+*/
+  }
+  
+  const onSubmit = () => {
+    if (!form.isValid) {
+      form.setSubmitting(true);
+      form.validateForm();
+      return;
+    }
+
+    let formData = form.values;
+    if(!isFilledAll(formData))
+    {
+      return;
+    }
+    return;
+    
+    const FrmData = {
+      id:formData.id,
+      wh_code:formData.wh_code,
+      wh_name:formData.wh_name,
+      whaddress:formData.whaddress,
+      street:formData.street,
+      district:formData.district.value,
+      state:formData.state.value,
+      whpincode:formData.whpincode,
+      whcity:formData.whcity,
+      whlat:formData.whlat,
+      whlong:formData.whlong,
+      ownertype:formData.ownertype,
+      ownername:formData.ownername,
+      owneraddress:formData.owneraddress,
+      ownercity:formData.ownercity,
+      ownerstreet:formData.ownerstreet,
+      ownerdistrict:formData.ownerdistrict.value,
+      ownerstate:formData.ownerstate.value,
+      ownerpincode:formData.ownerpincode,
+      ownerlandlineno:formData.ownerlandlineno,
+      ownerfaxnumber:formData.ownerfaxnumber,
+      ownermobileno:formData.ownermobileno,
+      ownermailid:formData.ownermailid,
+      totalcapacityinmts:formData.totalcapacityinmts,
+      totalcapacityinsqft:formData.totalcapacityinsqft,
+      outsideareacapacitymts:formData.outsideareacapacitymts,
+      outsideareacapacityinsqft:formData.outsideareacapacityinsqft,
+      contractstartdate:formData.contractstartdate,
+      contractenddate:formData.contractenddate,
+      rentpersqft:formData.rentpersqft,
+      rentpermonth:formData.rentpermonth,
+      lockingperiodinmonths:formData.lockingperiodinmonths,
+      noticeperiodinmonths:formData.noticeperiodinmonths,
+      contracttype:formData.contracttype,
+      servicechargespwh:formData.servicechargespwh,
+      bankname:formData.bankname,
+      bankbranch:formData.bankbranch,
+      bankcity:formData.bankcity,
+      bankdistrict:formData.bankdistrict.value,
+      bankstate:formData.bankstatevalue,
+      bankpincode:formData.bankpincode,
+      bankaccountno:formData.bankaccountno,
+      bankifsc:formData.bankifsc,
+      wb_count:formData.wb_count,
+      wb_1_name:formData.wb_1_name,
+      wb_2_name:formData.wb_2_name,
+      wb1_capacity_in_mts:formData.wb1_capacity_in_mts,
+      wb2_capacity_in_mts:formData.wb2_capacity_in_mts,
+      wb1_stamping_certificate_attachment:formData.wb1_stamping_certificate_attachment,
+      wb2_stamping_certificate_attachment:formData.wb2_stamping_certificate_attachment,
+      wb1_stamping_start_date:formData.wb1_stamping_startdate,
+      wb1_stamping_end_date:formData.wb1_stamping_enddate,
+      wb2_stamping_start_date:formData.wb2_stamping_enddate,
+      wb2_stamping_end_date:formData.wb2_stamping_enddate,
+      insurancestartdate:formData.insurancestartdate,
+      insuranceexpirydate:formData.insuranceexpirydate,
+      separate_electric_meters:formData.separate_electric_meters,
+      electric_plug_points_inside:formData.electric_plug_points_inside,
+      electric_light_points_inside:formData.electric_light_points_inside,
+      electric_plug_points_outside:formData.electric_plug_points_outside,
+      electric_light_points_outside:formData.electric_light_points_outside,
+      drinking_water_facility:formData.drinking_water_facility,
+      no_of_fire_extinguisher:formData.no_of_fire_extinguisher,
+      borewell_facility:formData.borewell_facility,
+      toilet_facility:formData.toilet_facility,
+      water_connection:formData.water_connection,
+      year_of_construction:formData.year_of_construction,
+      warehouse_security:formData.warehouse_security,
+      naga_security:formData.naga_security,
+      boundary_wall:formData.boundary_wall,
+      distance_railway_goods_shed:formData.distance_railway_goods_shed,
+      Distance_Mandi:formData.Distance_Mandi,
+      Distance_National_Highways:formData.Distance_National_Highways,
+      Distance_FCI_Procurement_Point:formData.Distance_FCI_Procurement_Point,
+      Distance_State_Highways:formData.Distance_State_Highways,
+      Distance_Pucca:formData.Distance_Pucca,
+      Statutory_Type:formData.Statutory_Survey_Type,
+      Statutory_Type_Attachment:formData.Statutory_Type_Attachment,
+      License_No_1:formData.License_No_1,
+      License_Copy_Attachment1:formData.License_Copy_Attachment1,
+      License_No_2:formData.License_No_2,
+      License_Copy_Attachment2:formData.License_Copy_Attachment2,
+      License_No_3:formData.License_No_3,
+      License_Copy_Attachment3:formData.License_Copy_Attachment3,
+      Independent_Gate:formData.Independent_Gate,
+      Wall_Type:formData.Wall_Type,
+      Shutter_Count:formData.Shutter_Count,
+      Plinth:formData.Plinth,
+      No_of_Exits:formData.No_of_Exits,
+      Roof_Type:formData.Roof_Type,
+      Door_Count:formData.Door_Count,
+      Floor_Height:formData.Floor_Height,
+      WH_Photograph_Attachment:formData.WH_Photograph_Attachment,
+      Floor_Type:formData.Floor_Type,
+      Window_Count:formData.Window_Count,
+      Height_From_Adj_Land:formData.Height_From_Adj_Land,
+      Inside_Road_Type:formData.Inside_Road_Type,
+      Inside_Heavy_Vehicle_Mvmt:formData.Inside_Heavy_Vehicle_Mvmt,
+      Inside_No_Of_Truck_In_Capacity:formData.Inside_No_Of_Truck_In_Capacity,
+      Repair_Work_Remarks:formData.Repair_Work_Remarks,
+      Latest_Audit_Date:formData.Latest_Audit_Date,
+      Next_Audit_Due_Date:formData.Next_Audit_Due_Date,
+ 
+    };
+    const postdata = {
+      wh_refid:formData.id,
+      Data:FrmData
+    }
+   console.log(JSON.stringify(postdata))
+   
+    showLoader();
+    apiPostMethod(apiBaseUrl + "warehouse/warehouseEntry/update_new_warehouse_entry", postdata)
+      .then((response) => {
+        const { data } = response;
+        console.log(JSON.stringify(response))
+        let UsrId=data.success;
+        if(UsrId==-5){
+          errorToast("Duplicate Entry");
+        }else{
+       // window.location(`warehouse/warehousecreation`);
+       if(!formData.id || formData.id==""){
+        window.location.reload();
+       }else{
+        history.push(`/warehouse/warehousecreation`);
+       }
+         
+        }
+      })
+      .catch((error) => {
+        console.log(JSON.stringify(error))
+        errorToast("Something went wrong, please try again after sometime");
+      })
+      .finally((a) => {
+        hideLoader();
+      });
+  }
+  const history = useHistory();
+  const resetForm = () => {
+    history.push(`/master/Master_new_warehouse_entry`);
+  };
+  return (
+    <Fragment>
+      <CardComponent header="WAREHOUSE CREATION">
+        <Master_new_warehouse_entryForm form={form} ImgData={ImgData} setImgData={setImgData} setAttachment={setAttachment} attachedFiles={attachedFiles} onSubmit={onSubmit} />
+      </CardComponent>
+    </Fragment>
+  );
+};
+export default Master_new_warehouse_entryForm;

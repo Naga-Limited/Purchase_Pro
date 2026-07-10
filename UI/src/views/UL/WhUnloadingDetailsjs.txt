@@ -1,0 +1,700 @@
+import { Card, CardBody, FormGroup, Row, Col, Input, Button, Label } from "reactstrap";
+import { apiPostMethod, apiGetMethod } from "@helpers/axiosHelper";
+import React, { useEffect, useState } from "react";
+import Select from "react-select";
+import { useParams } from "react-router";
+import { Link, useHistory } from "react-router-dom";
+import { mbagUrl, mpolineUrl, ulUrl, msuppUrl, uploadUrl, apiBaseUrl } from "../../urlConstants";
+import { errorToast } from "@helpers/appHelper";
+import { roundOf } from "../../helper/appHelper";
+import Uploader from "../Uploader";
+import NumberOnlyInput from "../../@core/components/number-input/number-input";
+import PPModal from "../../@core/components/ppModel";
+import { getTextElement } from "../../@core/components/custom/input-control";
+import { useLoader } from "../../utility/hooks/useLoader";
+
+const WhUnloadingDetails = () => {
+  const history = useHistory();
+  let { id } = useParams();
+  let refid = id.replace(":", "");
+  let { showLoader, hideLoader } = useLoader();
+
+  const [poData, setPoData] = useState({});
+  const [formData, setFormaData] = useState({ no_bags: "", gunny_wt: "", bag_type: "" });
+
+  const [bagTypeOptions, setBagTypedata] = useState([]);
+  const [poLineOptions, setPOLinedata] = useState([]);
+  const [bagweight, setBagweight] = useState(0);
+  const [supplierOptions, setSupplierdata] = useState([]);
+  const [attachedFiles, setAttachment] = useState({ supp_inv_copy: {}, supp_wb_copy: {} });
+
+  const [isOpen, setOpenModel] = useState(false);
+  const [modelData, setModelData] = useState({});
+  const [poModelOptions, setPoModelData] = useState([]);
+
+  const updateData = (data) => {
+    setFormaData(data);
+  };
+
+  const onTextChange = (e, key) => {
+    const newData = {
+      ...formData,
+      [key]: e.target ? e.target.value : e.value,
+    };
+    updateData(newData);
+  };
+
+  const OnUnloadingDetails = () => {
+    let fdata = { ...formData, id: refid, formType: "A" };
+    if (!attachedFiles.supp_inv_copy.name && !attachedFiles.supp_wb_copy.name) {
+      const { INV_COPY, WB_COPY } = poData;
+      if (INV_COPY) {
+        fdata.supp_inv_copy = INV_COPY;
+      }
+      if (WB_COPY) {
+        fdata.supp_wb_copy = WB_COPY;
+      }
+      onSubmitUnloadForm(fdata);
+      return "";
+    }
+    let postdata = new FormData();
+    Object.keys(attachedFiles).forEach((key) => {
+      postdata.append("file[]", attachedFiles[key]);
+    });
+    postdata.append("form_name", "UL");
+    postdata.append("ponumber", refid);
+    showLoader();
+    apiPostMethod(uploadUrl, postdata, "File")
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          data.files.forEach((item) => {
+            Object.keys(attachedFiles).forEach((k) => {
+              if (item.orgname === attachedFiles[k].name) {
+                fdata[k] = item.updname;
+              }
+            });
+          });
+          onSubmitUnloadForm(fdata);
+        }
+      })
+      .catch((error) => {})
+      .finally((a) => {
+        hideLoader();
+      });
+  };
+  const onSubmitUnloadForm = (fdata) => {
+    showLoader();
+    apiPostMethod(ulUrl, fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          history.push(`/UL`);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      })
+      .finally((a) => {
+        hideLoader();
+      });
+  };
+
+  useEffect(() => {
+    if (!poData || Object.keys(poData).length === 0) {
+      onFetchPodetailsById();
+      onFetchBagTypes();
+    }
+  }, [poData]);
+
+  const onFetchPodetailsById = () => {
+    let fdata = { id: refid, formType: "PO" };
+    showLoader();
+    apiPostMethod(ulUrl, fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          const poResult = data.results[0];
+          setPoData({ ...poData, ...poResult });
+          setFormaData({
+            ...formData,
+            ZSUPPLIER_CODE: poResult.ZSUPPLIER_CODE,
+            ZSUPPLIER_NAME: poResult.ZSUPPLIER_NAME,
+            TRUCK_NO: poResult.TRUCK_NO,
+            PO_LINE_ITEM: poResult.PO_LINE_ITEM,
+            supplier_wb_qty: poResult.supplier_wb_qty,
+            invoice_rate: poResult.invoice_rate,
+            invoice_date: poResult.invoice_date,
+            invoice_no: poResult.invoice_no,
+            invoice_qty: poResult.invoice_qty,
+            supplier_wb_dt: poResult.supplier_wb_dt,
+          });
+          setModelData({
+            PO_NUMBER: poResult.ZPO_NUMBER,
+            SUPPLIER_CODE: poResult.ZSUPPLIER_CODE,
+            SUPPLIER_NAME: poResult.ZSUPPLIER_NAME,
+            LINE_ITEM: poResult.PO_LINE_ITEM,
+            PLANT_NAME: poResult.PLANT_NAME,
+            VEHICAL_NO: poResult.CONTAINER_NO || poResult.TRUCK_NO,
+          });
+          onFetchPOLine(poResult.ZPO_NUMBER, poResult.SCREEN_TYPE);
+          onFetchSupplier(poResult.ZPO_NUMBER, poResult.PO_LINE_ITEM, poResult.SCREEN_TYPE);
+          onFetchSDIPOLine(poResult.ZPO_NUMBER, poResult.ZSUPPLIER_CODE);
+        }
+      })
+      .catch((error) => {
+        errorToast(error);
+      })
+      .finally((a) => {
+        hideLoader();
+      });
+  };
+
+  const onFetchBagTypes = () => {
+    apiGetMethod(mbagUrl)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          setBagTypedata([{ options: data.results }]);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });
+  };
+
+  const onFetchPOLine = (PO_number, screentype) => {
+    let fdata = { PO_NUMBER: PO_number, screenType: screentype };
+    apiPostMethod(mpolineUrl, fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          setPOLinedata([{ options: data.results }]);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });
+  };
+
+  const onFetchSupplier = (PO_NUMBER, lineItem, screenType) => {
+    let fdata = { PO_NUMBER: PO_NUMBER, lineItem: lineItem, screenType: screenType };
+    apiPostMethod(msuppUrl, fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          setSupplierdata([{ options: data.results }]);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });
+  };
+
+  const onSupplierChange = (e) => {
+    setFormaData({
+      ...formData,
+      ZSUPPLIER_CODE: e.value,
+      ZSUPPLIER_NAME: e.label,
+    });
+  };
+
+  const onBagTypeChange = (e) => {
+   // alert(JSON.stringify(e))
+    if(e.length>3){
+      errorToast("Maximum 3 Bags Allowed");
+      return false;
+    }
+    
+    // const { weight } = e;
+    let WeightArr=[];
+    let no_bagsArr=[];
+    for( let i=0;i<e.length;i++){
+      WeightArr.push(e[i].weight);
+    }
+    const { no_bags,no_bags2,no_bags3 } = formData;
+    no_bagsArr.push(no_bags);
+    no_bagsArr.push(no_bags2);
+    no_bagsArr.push(no_bags3);
+    //alert(JSON.stringify(WeightArr))
+   // alert(JSON.stringify(no_bagsArr))
+    //setBagweight(e.weight);  
+    const gw = calgunnyweight(WeightArr, no_bagsArr);
+    const dp = { bag_type: e.value, BAG_NAME: e.label };
+    if (gw) {
+      dp.gunny_wt = roundOf(gw);
+    }
+    updateData({
+      ...formData,
+      ...dp,
+    });
+  };
+
+  const onBagNoChange = (e) => {
+    const { value } = e.target;
+    const dp = { no_bags: value };
+    const { no_bags,no_bags2,no_bags3 } = formData;
+    let no_bagsArr=[];
+    no_bagsArr.push(no_bags);
+    no_bagsArr.push(no_bags2);
+    no_bagsArr.push(no_bags3);
+    //const gw = calgunnyweight(bagweight, value);
+
+    if(e.length>3){
+      errorToast("Maximum 3 Bags Allowed");
+      return false;
+    }
+    
+    // const { weight } = e;
+    let WeightArr=[];
+    alert(BagsType.length);
+    for( let i=0;i<BagsType.length;i++){
+      WeightArr.push(BagsType[i].weight);
+    }
+    const gw = calgunnyweight(WeightArr, no_bagsArr);
+
+    if (gw) {
+      dp.gunny_wt = roundOf(gw);
+    }
+    updateData({
+      ...formData,
+      ...dp,
+    });
+  };
+
+  const calgunnyweight_OLD = (bagwt, nobag) => {
+    if (bagwt && nobag) {
+      return (Number(bagwt) * Number(nobag)).toFixed(3);
+    }
+    return "";
+  };
+  const calgunnyweight = (bagwtArr, nobagArr) => {
+    let TotWeight=0
+    for(let i=0;i<bagwtArr.length;i++){
+      TotWeight=parseFloat(TotWeight)+(parseFloat(bagwtArr[i])*parseFloat(nobagArr[i]))
+    }
+    return TotWeight;
+   /* if (bagwt && nobag) {
+      return (Number(bagwt) * Number(nobag)).toFixed(3);
+    }
+    return "";*/
+  };
+
+  const isFilledAll = () => {
+    if (formData.supplier_wb_qty && formData.supplier_wb_qty.length < 3) {
+      return true;
+    }
+    let isNotFilled = [
+      "TRUCK_NO",
+      "supplier_wb_qty",
+      "invoice_rate",
+      "invoice_date",
+      "invoice_no",
+      "invoice_qty",
+      "invoice_bag_count",
+    ].some((a) => !formData[a]);
+    if (
+      poData.VEHICLE_TYPE !== "Rake" &&
+      (isNotFilled || (!poData.INV_COPY && !attachedFiles.supp_inv_copy.name) || (!poData.WB_COPY && !attachedFiles.supp_wb_copy.name))
+    ) {
+      return true;
+    }
+
+    const fmValues = Object.values(formData);
+    return !fmValues.every((x) => x !== null && x !== "");
+  };
+  const handleFileChange = (file, id) => {
+    setAttachment((p) => ({
+      ...p,
+      [id]: file,
+    }));
+  };
+
+  const onFetchSDIPOLine = (PO_number, ZSUPPLIER_CODE) => {
+    let fdata = { PO_NUMBER: PO_number, ZSUPPLIER_CODE: ZSUPPLIER_CODE };
+    showLoader();
+    apiPostMethod(apiBaseUrl + "sdi/getsdiPOLines", fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          setPoModelData([{ options: data.results }]);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      })
+      .finally((a) => {
+        hideLoader();
+      });
+  };
+
+  const OnRedirect = () => {
+    setOpenModel(true);
+  };
+  const onCloseModel = () => {
+    setModelData({
+      ...modelData,
+      LINE_ITEM: poData.PO_LINE_ITEM,
+      PLANT_NAME: poData.PLANT_NAME,
+      WERKS: poData.WERKS,
+    });
+    setOpenModel(false);
+  };
+  const onPoLineChange = (e) => {
+    const { PO_NUMBER, SUPPLIER_CODE } = modelData;
+    let fdata = { poNumber: PO_NUMBER, lineItem: e.value, supplierCode: SUPPLIER_CODE };
+    showLoader();
+    apiPostMethod(apiBaseUrl + "sdi/getPlantbysdi", fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success && data.results.length) {
+          const plantResult = data.results[0];
+          setModelData({
+            ...modelData,
+            PLANT_NAME: plantResult.PLANT_NAME,
+            WERKS: plantResult.WERKS,
+            LINE_ITEM: e.value,
+            Storage_Id: plantResult.LGORT,
+          });
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      })
+      .finally((a) => {
+        hideLoader();
+      });
+  };
+  const OnRedirectSubmit = (isGateOut) => {
+    setOpenModel(false);
+    const { PO_NUMBER, SUPPLIER_CODE, LINE_ITEM, WERKS, VEHICAL_NO, Storage_Id } = modelData;
+    const postData = {
+      id: refid,
+      lineItem: LINE_ITEM,
+      plant_Id: WERKS,
+      poNumber: PO_NUMBER,
+      supplierCode: SUPPLIER_CODE,
+      oldLineItem: poData.PO_LINE_ITEM,
+      isGateOut: isGateOut,
+      vehicleNo: VEHICAL_NO,
+      screenType: poData.SCREEN_TYPE,
+      storageId: Storage_Id,
+    };
+    showLoader();
+    apiPostMethod(apiBaseUrl + "sdi/gateoutRedirect", postData)
+      .then((response) => {
+        const { data } = response;
+        if (data.success && data.results) {
+          history.push(`/UL`);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      })
+      .finally((a) => {
+        hideLoader();
+      });
+  };
+
+  const renderModelContent = () => {
+    const { PO_NUMBER, SUPPLIER_NAME, LINE_ITEM, PLANT_NAME } = modelData;
+    return (
+      <>
+        <div>
+          <Row>
+            {getTextElement("PO Number", PO_NUMBER, "12")}
+            {getTextElement("Supplier Name", SUPPLIER_NAME, "12")}
+
+            <Col md="12" sm="12">
+              <FormGroup>
+                <Label>PO Line Item</Label>
+                <Select
+                  className="react-select"
+                  classNamePrefix="select"
+                  options={poModelOptions}
+                  value={{ label: LINE_ITEM, value: LINE_ITEM }}
+                  onChange={(e) => onPoLineChange(e)}
+                />
+              </FormGroup>
+            </Col>
+            {getTextElement("Receiving Plant", PLANT_NAME, "12")}
+          </Row>
+        </div>
+        <Button
+          className="mr-1 mb-1"
+          color="primary"
+          disabled={LINE_ITEM === poData.PO_LINE_ITEM ? true : false}
+          onClick={(e) => {
+            OnRedirectSubmit("");
+          }}
+        >
+          Redirect
+        </Button>
+        <Button
+          className="mr-1 mb-1"
+          color="primary"
+          disabled={LINE_ITEM === poData.PO_LINE_ITEM ? true : false}
+          onClick={(e) => {
+            OnRedirectSubmit(true);
+          }}
+        >
+          {"Gateout & Redirect"}
+        </Button>
+      </>
+    );
+  };
+
+  const {
+    ZPO_NUMBER,
+    ZVENDOR_NAME,
+    IDNLF,
+    NETPR,
+    STORAGE_LOCATION,
+    PLANT_NAME,
+    ZVA_NUMBER,
+    MATNR,
+    INCO_DESC,
+    BAG_NAME,
+    RECOMMENDED_LOT,
+    INV_COPY,
+    WB_COPY,
+  } = poData;
+  const { no_bags,no_bags2,no_bags3, gunny_wt, ZSUPPLIER_CODE, ZSUPPLIER_NAME, TRUCK_NO, PO_LINE_ITEM, unload_lot } = formData;
+
+  return (
+    <div>
+      <Card>
+        <CardBody>
+          <div>
+            <Row>
+              <Col md="12" sm="12">
+                <h5>
+                  Warehouse Incharge <span>(VA No: {ZVA_NUMBER})</span>
+                </h5>
+              </Col>
+              {getTextElement("PO Number", ZPO_NUMBER)}
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="lastNameMulti">Truck Number</Label>
+                  <Input type="text" value={TRUCK_NO} onChange={(e) => onTextChange(e, "TRUCK_NO")} placeholder="Truck Number" />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12"></Col>
+              {getTextElement("Inco Terms", INCO_DESC)}
+              {getTextElement("Broker Name", ZVENDOR_NAME)}
+              {getTextElement("Wheat Variety", IDNLF)}
+              {getTextElement("PO Rate", roundOf(NETPR))}
+              {getTextElement("Receiving Storage Location", STORAGE_LOCATION)}
+              {getTextElement("Receiving Plant", PLANT_NAME)}
+              {getTextElement("PO Bag Type", BAG_NAME)}
+              {getTextElement("Material Number", MATNR)}
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label>PO Line Item</Label>
+                  <Select
+                    className="react-select"
+                    classNamePrefix="select"
+                    options={poLineOptions}
+                    value={{ label: PO_LINE_ITEM, value: PO_LINE_ITEM }}
+                    onChange={(e) => onTextChange(e, "PO_LINE_ITEM")}
+                  />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label>Supplier Name</Label>
+                  <Select
+                    className="react-select"
+                    classNamePrefix="select"
+                    options={supplierOptions}
+                    value={{ label: ZSUPPLIER_NAME, value: ZSUPPLIER_CODE }}
+                    onChange={(e) => onSupplierChange(e)}
+                  />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label>Received Bag Type(Max:3)</Label>
+                  <Select className="react-select" isMulti classNamePrefix="select" options={bagTypeOptions} id="BagsType" onChange={(e) => onBagTypeChange(e)} />
+                </FormGroup>
+              </Col>
+              <Col md="1" sm="12">
+                <FormGroup>
+                  <Label for="cityMulti">Bags(1)</Label>
+                  <Input
+                    type="text"
+                    value={no_bags}
+                    onChange={(e) => onTextChange(e, "no_bags")}
+                    onBlur={(e) => onBagNoChange(e)}
+                    placeholder="Nos"
+                  />
+                </FormGroup>
+              </Col>
+              <Col md="1" sm="12">
+                <FormGroup>
+                  <Label for="cityMulti">Bags(2)</Label>
+                  <Input
+                    type="text"
+                    value={no_bags2}
+                    onChange={(e) => onTextChange(e, "no_bags2")}
+                    onBlur={(e) => onBagNoChange(e)}
+                    placeholder="Nos"
+                  />
+                </FormGroup>
+              </Col>
+              <Col md="1" sm="12">
+                <FormGroup>
+                  <Label for="cityMulti">Bags(3)</Label>
+                  <Input
+                    type="text"
+                    value={no_bags3}
+                    onChange={(e) => onTextChange(e, "no_bags3")}
+                    onBlur={(e) => onBagNoChange(e)}
+                    placeholder="Nos"
+                  />
+                </FormGroup>
+              </Col>
+              {getTextElement("Gunny Wt (In Kgs)", gunny_wt)}
+              {poData.VEHICLE_TYPE !== "Rake" ? getTextElement("Recommended Lot", RECOMMENDED_LOT) : ""}
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="cityMulti">Unloading Lot</Label>
+                  <Input type="text" value={unload_lot} onChange={(e) => onTextChange(e, "unload_lot")} placeholder="Unload Lot" />
+                </FormGroup>
+              </Col>
+              {poData.VEHICLE_TYPE !== "Rake" ? (
+                <>
+                  <Col md="4" sm="12">
+                    <Label>Supplier WB Date</Label>
+                    <Input
+                      type="date"
+                      name="date"
+                      value={formData.supplier_wb_dt}
+                      onChange={(date) => onTextChange(date, "supplier_wb_dt")}
+                      placeholder="Supplier WB Date"
+                    />
+                  </Col>
+                  <Col md="4" sm="12">
+                    <FormGroup>
+                      <Label for="cityMulti">Supplier WB Qty (In Kgs)</Label>
+                      <NumberOnlyInput
+                        type="text"
+                        maxLength={5}
+                        value={roundOf(formData.supplier_wb_qty)}
+                        onChange={(e) => onTextChange(e, "supplier_wb_qty")}
+                        placeholder="Supplier WB Qty (In Kgs)"
+                      />
+                    </FormGroup>
+                  </Col>
+                  <Col md="4" sm="12">
+                    <FormGroup>
+                      <Label for="cityMulti">Invoice Rate (In Kgs)</Label>
+                      <NumberOnlyInput
+                        decimalFormat={"2,2"}
+                        placeholder="Decimal (2,2)"
+                        value={formData.invoice_rate}
+                        onChange={(e) => onTextChange(e, "invoice_rate")}
+                      />
+                    </FormGroup>
+                  </Col>
+                  <Col md="4" sm="12">
+                    <Label>Invoice Date</Label>
+                    <Input
+                      type="date"
+                      name="date"
+                      value={formData.invoice_date}
+                      onChange={(date) => onTextChange(date, "invoice_date")}
+                      placeholder="Invoice Date"
+                    />
+                  </Col>
+                  <Col md="4" sm="12">
+                    <FormGroup>
+                      <Label for="cityMulti">Invoice No</Label>
+                      <Input
+                        type="text"
+                        value={formData.invoice_no}
+                        onChange={(e) => onTextChange(e, "invoice_no")}
+                        placeholder="Invoice Number"
+                      />
+                    </FormGroup>
+                  </Col>
+                  <Col md="4" sm="12">
+                    <FormGroup>
+                      <Label for="cityMulti">Invoice Qty (In Kgs)</Label>
+                      <NumberOnlyInput
+                        type="text"
+                        maxValue={70000}
+                        value={formData.invoice_qty}
+                        onChange={(e) => onTextChange(e, "invoice_qty")}
+                        placeholder="Max 70000"
+                      />
+                    </FormGroup>
+                  </Col>
+                  <Col md="4" sm="12">
+                    <FormGroup>
+                      <Label>Invoice Bag Count</Label>
+                      <NumberOnlyInput
+                        type="text"
+                        value={formData.invoice_bag_count}
+                        onChange={(e) => onTextChange(e, "invoice_bag_count")}
+                        placeholder="Invoice Bag Count"
+                      />
+                    </FormGroup>
+                  </Col>
+
+                  <Col md="4" sm="12">
+                    {INV_COPY ? (
+                      <Uploader isReadOnly={true} label={"Supplier Invoice Copy"} selectedFileName={INV_COPY} />
+                    ) : (
+                      <Uploader
+                        setAttachment={handleFileChange}
+                        label={"Supplier Invoice Copy"}
+                        title="Attach Supplier Invoice copy"
+                        id={"supp_inv_copy"}
+                        selectedFileName={attachedFiles.supp_inv_copy.name}
+                      />
+                    )}
+                  </Col>
+                  <Col md="4" sm="12">
+                    {WB_COPY ? (
+                      <Uploader isReadOnly={true} label={"Supplier WB Copy"} selectedFileName={WB_COPY} />
+                    ) : (
+                      <Uploader
+                        setAttachment={handleFileChange}
+                        label={"Supplier WB Copy"}
+                        title="Attach Supplier WB Copy"
+                        id={"supp_wb_copy"}
+                        selectedFileName={attachedFiles.supp_wb_copy.name}
+                      />
+                    )}
+                  </Col>
+                </>
+              ) : (
+                ""
+              )}
+              <Col sm="12" className="mt-2">
+                <FormGroup className="d-flex mb-0 justify-content-end">
+                  <div className="mr-1">
+                    <Button.Ripple color="primary" type="button" onClick={(e) => OnRedirect()}>
+                      Redirect
+                    </Button.Ripple>
+                  </div>
+                  <Button.Ripple outline color="secondary" tag={Link} to={`/UL`} type="reset" className="mr-2">
+                    Cancel
+                  </Button.Ripple>
+                  <div className="mr-1">
+                    <Button.Ripple color="primary" type="button" disabled={isFilledAll()} onClick={(e) => OnUnloadingDetails()}>
+                      Submit
+                    </Button.Ripple>
+                  </div>
+                </FormGroup>
+              </Col>
+            </Row>
+          </div>
+        </CardBody>
+      </Card>
+      <PPModal open={isOpen} closeModal={onCloseModel} title={"Redirect"} children={renderModelContent()} />
+    </div>
+  );
+};
+export default WhUnloadingDetails;

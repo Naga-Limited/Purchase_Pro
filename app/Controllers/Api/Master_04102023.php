@@ -1,0 +1,1320 @@
+<?php namespace App\Controllers\Api;
+use App\Models\Master\VendorModel;
+use App\Models\MasterModel;
+use App\Models\VehicleArrivalModel;
+use App\Models\EmptyVehicleArrivalModel;
+
+
+date_default_timezone_set("Asia/Calcutta");
+class Master extends BaseApiController
+{
+    public function getVendors(){
+      $cat = $this->request->getJSON();
+      $model = new VendorModel();
+      $res = $model->getByCategory($cat->category);
+      return  $this->sendSuccessResult($res);
+    }
+    public function getLastMileTransporter(){
+      $model = new MasterModel();
+      $res = $model->getLastMileTransporter();
+      return  $this->sendSuccessResult($res);
+    }
+
+    public function getReceivingBin(){
+      $model = new MasterModel();
+      $res = $model->getReceivingBin();
+      return  $this->sendSuccessResult($res);
+    }
+
+    public function getReceivingBin_1(){
+      $model = new MasterModel();
+      $res = $model->getReceivingBin_1();
+      return  $this->sendSuccessResult($res);
+    }
+
+    public function getBulkSiloNo(){
+      $model = new MasterModel();
+      $res = $model->getBulkSiloNo();
+      return  $this->sendSuccessResult($res);
+    }
+    
+    public function getIntraLoadingVendor(){
+      $model = new MasterModel();
+      $res = $model->getIntraLoadingVendor();
+      return  $this->sendSuccessResult($res);
+    }
+    public function getLoadingLotNo(){
+      $model = new MasterModel();
+      $res = $model->getLoadingLotNo();
+      return  $this->sendSuccessResult($res);
+    }
+    public function getIntraUnLoadingVendor(){   
+      $model = new MasterModel();
+      $res = $model->getIntraUnLoadingVendor();
+      return  $this->sendSuccessResult($res);
+    }
+
+    public function getTicketNo() {
+      $model = new MasterModel();
+      $res = $model->getTicketNo();
+      return  $this->sendSuccessResult($res); 
+    }
+    public function getWarehouse() {
+    
+      $model = new MasterModel();
+      $res = $model->getWarehouse();
+      return  $this->sendSuccessResult($res);
+    }
+   
+    public function getBagType() {
+      $model = new MasterModel();
+      $res = $model->getBagType();
+      return  $this->sendSuccessResult($res);
+    }
+
+    //
+
+    public function updateEad(){
+      $postData = $this->request->getJSON();
+      $session = session();
+      $SessionUser=$_SESSION["USERID"];
+      $SessionUserName=$_SESSION["FIRSTNAME"];
+      $model = new MasterModel();
+      if($postData->id!=""){ 
+        $postData->Data->ModBy=$SessionUser;
+      $res = $model->updateEad($postData->id,$postData->Data);
+      }else{
+        $postData->Data->InsBy=$SessionUser;
+        $res = $model->insertEad($postData->Data);
+      }
+     return  $this->respond(["success" => $res]);
+    }
+    public function getEadDetailsById(){
+      $postData = $this->request->getJSON();
+      $model = new MasterModel();
+      $res = $model->getEad($postData->id);
+      return  $this->sendSuccessResult($res);
+    }
+
+    public function updatemaster_bag(){
+     
+      $postData = $this->request->getJSON();
+      $session = session();
+     
+      $SessionUser=$_SESSION["USERID"];
+      $SessionUserName=$_SESSION["FIRSTNAME"];
+      $model = new MasterModel(); 
+      
+      if($postData->id!=""){
+        $postData->Data->ModBy=$SessionUser;
+      $res = $model->updateMasterBag($postData->id,$postData->Data);
+      }else{
+        $postData->Data->InsBy=$SessionUser;
+        $res = $model->insertMasterBag($postData->Data);
+      }
+      if($res=="-5")
+      {
+       return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+      }
+
+    // var_dump($postData->Data);
+     
+      return  $this->respond(["success" => $res]);
+    }
+    public function updatemaster_bag1(){
+     
+      $postData = $this->request->getJSON();
+      $session = session();
+     
+      $SessionUser=$_SESSION["USERID"];
+      $SessionUserName=$_SESSION["FIRSTNAME"];
+      $model = new MasterModel(); 
+      
+      if($postData->id!=""){
+        $postData->Data->ModBy=$SessionUser;
+      $res = $model->updateMasterBag1($postData->id,$postData->Data);
+      }else{
+        $postData->Data->InsBy=$SessionUser;
+        // print_r($postData);
+        $res = $model->insertMasterBag1($postData->Data);
+      }
+       if($res=="-5")
+       {
+        return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+       }
+       else{
+        return $this->respond(["success" => $res]);
+       }
+         
+      
+    }
+    public function getMasterBagDetailsByRefId(){
+      $postData = $this->request->getJSON();
+     /* $model = new SDIModel();
+      $res = $model->getSDIDetailById($postData->id);
+      return  $this->respond(["success" => 1, "results" => $res]);
+*/
+      $model = new MasterModel();
+      $res = $model->getMasterBag($postData->BAG_REFID);
+      return  $this->sendSuccessResult($res);
+    }
+   
+    public function getMasterBagDuplicateChk() {
+      $postData = $this->request->getJSON();
+      $code=$id='';
+      if($postData->$code)
+      {
+      $code=$postData->$code;
+      }
+      if($postData->$id)
+      {
+      $id=$postData->$id;
+      }
+      $model = new MasterModel();
+      $res = $model->getMasterBagDuplicateChk($code, $id);
+      return  $this->sendSuccessResult($res);
+     }
+    //From Location
+    public function updateMaster_from_location(){
+     
+      $postData = $this->request->getJSON();
+     
+      $model = new MasterModel();
+      $session = session();
+     
+      $SessionUser=$_SESSION["USERID"];
+      $SessionUserName=$_SESSION["FIRSTNAME"];
+      if($postData->id!=""){
+        $postData->Data->ModBy=$SessionUser; 
+      $res = $model->updateMasterFromLocation($postData->id,$postData->Data);
+      }else{
+        $postData->Data->InsBy=$SessionUser;
+        $res = $model->insertMasterFromLocation($postData->Data);
+      }
+      if($res=="-5")
+      {
+       return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+      }
+    // var_dump($postData->Data);
+     
+      return  $this->respond(["success" => $res]);
+    }
+    public function getMaster_from_locationdetailsbyId(){
+      $postData = $this->request->getJSON();
+     /* $model = new SDIModel();
+      $res = $model->getSDIDetailById($postData->id);
+      return  $this->respond(["success" => 1, "results" => $res]);
+*/
+      $model = new MasterModel();
+      $res = $model->getMasterFromLocation($postData->id);
+      return  $this->sendSuccessResult($res);
+    }
+
+    //Plant Master
+    public function updateMaster_plant(){
+      $postData = $this->request->getJSON();
+      $model = new MasterModel();
+      $session = session();
+     
+      $SessionUser=$_SESSION["USERID"];
+      $SessionUserName=$_SESSION["FIRSTNAME"];
+     // var_dump($SessionUser);
+      if($postData->ID!=""){
+       $postData->Data->ModBy=$SessionUser;
+      $res = $model->updatePlant($postData->ID,$postData->Data);
+      }else{
+        $postData->Data->InsBy=$SessionUser;    
+        $res = $model->insertPlant($postData->Data);
+      }
+      if($res=="-5")
+      {
+       return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+      }
+
+     return  $this->respond(["success" => $res]);
+    }
+    public function getMaster_plantDetailsById(){
+      $postData = $this->request->getJSON();
+      $model = new MasterModel();
+      $res = $model->getPlant($postData->ID);
+      return  $this->sendSuccessResult($res);
+    }
+        //Master_incoentry
+        public function updatemaster_inco(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->INCO_REFID!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updatemaster_inco($postData->INCO_REFID,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertmaster_inco($postData->Data);
+          }
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+      
+          return  $this->respond(["success" => $res]);
+        }
+        public function getINCO_DetailsByRefId(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getINCO_DetailsByRefId($postData->INCO_REFID);
+          return  $this->sendSuccessResult($res);
+        }
+        //        Master_port_of_dischargeentry
+        public function updateMaster_port_of_discharge(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->Id!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updateMaster_port_of_discharge($postData->Id,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertMaster_port_of_discharge($postData->Data);
+          }
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+        
+          return  $this->respond(["success" => $res]);
+        }
+        public function getMaster_port_of_dischargeDetailsById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getMaster_port_of_dischargeDetailsById($postData->Id);
+          return  $this->sendSuccessResult($res);
+        }
+        
+        
+        //        Master_port_of_loadingentry
+        public function updatemaster_port_of_loading(){
+     
+     //return  $this->respond(["success" => "1"]);
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+          // echo "S2";
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->Id!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updatemaster_port_of_loading($postData->Id,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            // echo "S3".$postData->Id."X";
+            // var_dump($postData->Data);
+            $res = $model->insertmaster_port_of_loading($postData->Data);
+            // var_dump($res);
+          }
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+                     
+          return  $this->respond(["success" => $res]);
+        }
+        public function getmaster_port_of_loadingDetailsById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getmaster_port_of_loadingDetailsById($postData->Id);
+          return  $this->sendSuccessResult($res);
+        }
+      
+        //        Master_privilegeentry
+        public function updatemaster_privilege(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->ID!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updatemaster_privilege($postData->ID,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertmaster_privilege($postData->Data);
+          }
+                 
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+              return  $this->respond(["success" => $res]);
+        }
+        public function getmaster_privilegeDetailsById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getmaster_privilegeDetailsById($postData->ID);
+          return  $this->sendSuccessResult($res);
+        }
+        
+        //        Master_quality_checkentry
+        public function updatemaster_quality_check_OLD(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->QCM_REFID!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updatemaster_quality_check($postData->QCM_REFID,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertmaster_quality_check($postData->Data);
+          }
+                 
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+              return  $this->respond(["success" => $res]);
+        }
+        public function updatemaster_quality_check(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          for($i=0;$i<sizeof($postData->Data);$i++){
+           
+           if($postData->Data[$i]->QCM_REFID){
+            $res = $model->updatemaster_quality_check($postData->Data[$i]->QCM_REFID,$postData->Data[$i]);
+           }
+          
+          }
+         
+                 
+        
+              return  $this->respond(["success" => $res]);
+        }
+        
+        public function getMaster_quality_checkById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getMaster_quality_checkById($postData->QCM_REFID);
+          return  $this->sendSuccessResult($res);
+        }
+
+        public function getMaster_quality_check_Wheat_ById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getMaster_quality_check_Wheat_ById($postData->Id);
+          //return  $this->sendSuccessResult($res);
+         //var_dump($res);
+         //echo $res[0]['WheatVariety'];
+         $WheatVariety=$res[0]['WheatVariety'];
+         $CheckList = $model->getMaster_quality_checkList_ByName($WheatVariety);
+        //  exit();
+      
+
+          return  $this->respond(["success" =>1,"results"=>$res,"CheckList"=>$CheckList]);
+        }
+        
+        
+         //        Master_quality_perferredentry
+         public function updatemaster_quality_perferred(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->Id!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updatemaster_quality_perferred($postData->Id,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertmaster_quality_perferred($postData->Data);
+          }
+                 
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+              return  $this->respond(["success" => $res]);
+        }
+        public function getmaster_quality_perferredDetailsById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getmaster_quality_perferredDetailsById($postData->Id);
+          return  $this->sendSuccessResult($res);
+        }
+        
+         //        Master_roleentry
+         public function updatemaster_role(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->RM_REFID!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updatemaster_role($postData->RM_REFID,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertmaster_role($postData->Data);
+          }
+                 
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+              return  $this->respond(["success" => $res]);
+        }
+        public function getMaster_roleDetailsById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getMaster_roleDetailsById($postData->RM_REFID);
+          return  $this->sendSuccessResult($res);
+        }
+        
+         //        Master_screenentry
+         public function updatemaster_screen(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->ID!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updatemaster_screen($postData->ID,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertmaster_screen($postData->Data);
+          }
+                 
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+              return  $this->respond(["success" => $res]);
+        }
+        public function getMaster_screenDetailsById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getMaster_screenDetailsById($postData->ID);
+          return  $this->sendSuccessResult($res);
+        }
+         //    Master_storageentry
+         public function updatemaster_storage(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->STORAGE_REFID!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updatemaster_storage($postData->STORAGE_REFID,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertmaster_storage($postData->Data);
+          }
+                 
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+              return  $this->respond(["success" => $res]);
+        }
+        public function getMaster_storageDetailsById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getMaster_storageDetailsById($postData->STORAGE_REFID);
+          return  $this->sendSuccessResult($res);
+        }
+        
+         //Master_to_locationentry
+         public function updatemaster_to_location(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->id!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updatemaster_to_location($postData->id,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertmaster_to_location($postData->Data);
+          }
+                 
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+              return  $this->respond(["success" => $res]);
+        }
+        public function getMaster_to_locationDetailsById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getMaster_to_locationDetailsById($postData->id);
+          return  $this->sendSuccessResult($res);
+        }
+        
+         //Master_user_plantentry
+         public function updatemaster_user_plant(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         //exit();
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->ID!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updatemaster_user_plant($postData->ID,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertmaster_user_plant($postData->Data);
+          }
+                 
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+              return  $this->respond(["success" => $res]);
+        }
+        public function getMaster_userplantDetailsById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getMaster_userplantDetailsById($postData->ID);
+          return  $this->sendSuccessResult($res);
+        }
+
+        //Master_user_privilegeentry
+        public function updatemaster_user_privilege(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->ID!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updatemaster_user_privilege($postData->ID,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertmaster_user_privilege($postData->Data);
+          }
+                 
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+              return  $this->respond(["success" => $res]);
+        }
+        public function getMaster_user_privilegeDetailsById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getMaster_user_privilegeDetailsById($postData->ID);
+          return  $this->sendSuccessResult($res);
+        }
+        
+        //Master_user_screenentry
+        public function updatemaster_user_screen(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->ID!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updatemaster_user_screen($postData->ID,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertmaster_user_screen($postData->Data);
+          }
+                 
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+              return  $this->respond(["success" => $res]);
+        }
+        public function getMaster_user_screenDetailsById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getMaster_user_screenDetailsById($postData->ID);
+          return  $this->sendSuccessResult($res);
+        }
+        
+        //Master_vendorentry
+        public function updatemaster_vendor(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->Id!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updatemaster_vendor($postData->Id,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertmaster_vendor($postData->Data);
+          }
+                 
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+              return  $this->respond(["success" => $res]);
+        }
+        public function getMaster_vendorDetailsById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getMaster_vendorDetailsById($postData->Id);
+          return  $this->sendSuccessResult($res);
+        }
+        
+        //Master_vesselentry
+        public function updatemaster_vessel(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->VESSEL_REFID!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updatemaster_vessel($postData->VESSEL_REFID,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertmaster_vessel($postData->Data);
+          }
+                 
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+              return  $this->respond(["success" => $res]);
+        }
+        public function getMaster_vesselDetailsById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getMaster_vesselDetailsById($postData->VESSEL_REFID);
+          return  $this->sendSuccessResult($res);
+        }
+        
+        //Master_wheat_varietyentry
+        public function updatemaster_wheat_variety(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->id!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updatemaster_wheat_variety($postData->id,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertmaster_wheat_variety($postData->Data);
+          }
+                 
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+              return  $this->respond(["success" => $res]);
+        }
+        public function getMaster_wheat_varietyDetailsById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getMaster_wheat_varietyDetailsById($postData->id);
+          return  $this->sendSuccessResult($res);
+        }
+
+        //Module_masterentry.js
+        public function updatemodule_master(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->MODULE_REFID!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updatemodule_master($postData->MODULE_REFID,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertmodule_master($postData->Data);
+          }
+                 
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+              return  $this->respond(["success" => $res]);
+        }
+        public function getModule_masterDetailsById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getModule_masterDetailsById($postData->MODULE_REFID);
+          return  $this->sendSuccessResult($res);
+        }
+        
+        //User_infoentry.js
+        public function updateuser_info(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         if($postData->Data->PASSWORD!="")
+         {
+          $postData->Data->PASSWORD = md5($postData->Data->PASSWORD);
+         }
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->UI_ID!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updateuser_info($postData->UI_ID,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertuser_info($postData->Data);
+          }
+                 
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+              return  $this->respond(["success" => $res]);
+        }
+        public function getUser_infoDetailsById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getUser_infoDetailsById($postData->UI_ID);
+          return  $this->sendSuccessResult($res);
+        }
+        
+        //Warehouse_masterentry.js
+        public function updatewarehouse_master(){
+     
+          $postData = $this->request->getJSON();
+         
+          $model = new MasterModel();
+          $session = session();
+         
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+          if($postData->WH_REFID!=""){
+            $postData->Data->ModBy=$SessionUser;
+          $res = $model->updatewarehouse_master($postData->WH_REFID,$postData->Data);
+          }else{
+            $postData->Data->InsBy=$SessionUser;
+            $res = $model->insertwarehouse_master($postData->Data);
+          }
+                 
+          if($res=="-5")
+          {
+           return $this->respond(["success" => $res,"ErrorMsg"=>"Duplicate record.."]);
+          }
+              return  $this->respond(["success" => $res]);
+        }
+        public function getWarehouse_masterDetailsById(){
+          $postData = $this->request->getJSON();
+          $model = new MasterModel();
+          $res = $model->getWarehouse_masterDetailsById($postData->WH_REFID);
+          return  $this->sendSuccessResult($res);
+        }
+
+        //Change VH status
+
+        public function ChangevehicleStatus(){
+          $postData = $this->request->getJSON();
+          //var_dump($postData);exit();
+          $session = session();
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+        if($postData->Mode=='SDO_SDI'){
+         
+         $UpdateNext=0;
+          if($postData->Status==1 || $UpdateNext==1){
+            $postData->Data->WaitOutsideDt=NULL;
+            $postData->Data->WaitOutsideBy=0;
+            $UpdateNext=1;
+          }
+         
+          if($postData->Status==23 || $UpdateNext==1){
+            $postData->Data->FirstWeightEntryDt=NULL;
+            $postData->Data->FirstWeightEntryBy=0;
+          }
+
+          if($postData->Status==2 || $UpdateNext==1){
+            $postData->Data->GateInDt=NULL;
+            $postData->Data->GateInBy=0;
+
+            $postData->Data->QualityCheckSubmitDt=NULL;
+            $postData->Data->QualityCheckSubmitBy=0;
+          }
+          if($postData->Status==21 || $UpdateNext==1){
+            $postData->Data->AfterUnloadQCDt=NULL;
+            $postData->Data->AfterUnloadQCBy=0;
+          }
+          if($postData->Status==3 || $UpdateNext==1){
+            $postData->Data->QualityDeductionSubmitDt=NULL;
+            $postData->Data->QualityDeductionSubmitBy=0;
+            $UpdateNext=1;
+          }
+          if($postData->Status==22 || $UpdateNext==1){
+            $postData->Data->QualityDeductionApproveDt=NULL;
+            $postData->Data->QualityDeductionApproveBy=0;
+            $UpdateNext=1;
+          }
+
+          if($postData->Status==22 || $UpdateNext==1){
+            $postData->Data->QualityDeductionApproveDt=NULL;
+            $postData->Data->QualityDeductionApproveBy=0;
+            $UpdateNext=1;
+          }
+         
+          if($postData->Status==4 || $UpdateNext==1){
+            
+            $postData->Data->UnloadWHSubmitDt=NULL;
+            $postData->Data->UnloadWHSubmitBy=0;
+           
+            $UpdateNext=1;
+          }
+
+          if($postData->Status==24 || $UpdateNext==1){
+            
+            $postData->Data->SecondWeightEntryDt=NULL;
+            $postData->Data->SecondWeightEntryBy=0;
+           
+            $UpdateNext=1;
+          }
+          
+          if($postData->Status==5 || $UpdateNext==1){
+            $postData->Data->GateOutDt=NULL;
+            $postData->Data->GateOutBy=0;
+            $UpdateNext=1;
+          }
+        
+          if($postData->Status==6 || $UpdateNext==1){
+            $postData->Data->MIGOApprovalDt=NULL;
+            $postData->Data->MIGOApprovalBy=0;
+            $UpdateNext=1;
+          }
+          $model = new MasterModel();
+          $postData->Data->LastStatusChangedBy=$SessionUser;
+          $CurrentDateTime=date("Y-m-d H:i:s");
+          $postData->Data->LastStatusChangedOn=$CurrentDateTime;
+          $res = $model->ChangeVHStatus($postData->id,$postData->Data);
+          
+        }
+        if($postData->Mode=="IAS"){
+          $UpdateNext=0;
+          if($postData->Status==1 || $UpdateNext==1){
+            $postData->Data->WaitOutsideDt=NULL;
+            $postData->Data->WaitOutsideBy=0;
+            $UpdateNext=1;
+          }
+          if($postData->Status==2 || $UpdateNext==1){
+            $postData->Data->GateInDt=NULL;
+            $postData->Data->GateInBy=0;
+            $UpdateNext=1;
+          }
+          if($postData->Status==13 || $UpdateNext==1){
+            $postData->Data->UpdateLotDt=NULL;
+            $postData->Data->UpdateLotDt=0;
+            $UpdateNext=1;
+            
+            
+
+          }
+          if($postData->Status==5 || $UpdateNext==1){
+            $postData->Data->GateOutDt=NULL;
+            $postData->Data->GateOutBy=0;
+            $UpdateNext=1;
+          }
+          if($postData->Status==14 || $UpdateNext==1){
+            $postData->Data->PickSlipDt=NULL;
+            $postData->Data->PickSlipBy=0;
+            $UpdateNext=1;
+          }
+          if($postData->Status==15 || $UpdateNext==1){
+            $postData->Data->RedirectDt=NULL;
+            $postData->Data->RedirectBy=0;
+            $UpdateNext=1;
+          }
+          $model = new MasterModel();
+          $postData->Data->LastStatusChangedBy=$SessionUser;
+          $CurrentDateTime=date("Y-m-d H:i:s");
+          $postData->Data->LastStatusChangedOn=$CurrentDateTime;
+
+          if($postData->Status!=16 && $postData->Status!=20){
+            include_once APIPATH. "/db_connection.php"; 
+
+            $usql = "DELETE FROM `purchase_info` WHERE EMPTY_VEHICLE_ARRIVAL_ID= " . $postData->id;
+            //echo $usql;exit();
+            mysqli_query($connect, $usql);
+         }
+        // exit();
+          $res = $model->ChangeVHStatusIAS_IRS($postData->id,$postData->Data);
+          
+        }
+        if($postData->Mode=="STM"){
+          $UpdateNext=0;
+          if($postData->Status==1 || $UpdateNext==1){
+            $postData->Data->WaitOutsideDt=NULL;
+            $postData->Data->WaitOutsideBy=0;
+            $UpdateNext=1;
+          }
+          if($postData->Status==2 || $UpdateNext==1){
+            $postData->Data->GateInDt=NULL;
+            $postData->Data->GateInBy=0;
+            $UpdateNext=1;
+          }
+          if($postData->Status==13 || $UpdateNext==1){
+            $postData->Data->UpdateLotDt=NULL;
+            $postData->Data->UpdateLotDt=0;
+            $UpdateNext=1;
+            
+            
+
+          }
+          if($postData->Status==5 || $UpdateNext==1){
+            $postData->Data->GateOutDt=NULL;
+            $postData->Data->GateOutBy=0;
+            $UpdateNext=1;
+          }
+          if($postData->Status==14 || $UpdateNext==1){
+            $postData->Data->PickSlipDt=NULL;
+            $postData->Data->PickSlipBy=0;
+            $UpdateNext=1;
+          }
+          if($postData->Status==15 || $UpdateNext==1){
+            $postData->Data->RedirectDt=NULL;
+            $postData->Data->RedirectBy=0;
+            $UpdateNext=1;
+          }
+          $model = new MasterModel();
+          $postData->Data->LastStatusChangedBy=$SessionUser;
+          $CurrentDateTime=date("Y-m-d H:i:s");
+          $postData->Data->LastStatusChangedOn=$CurrentDateTime;
+
+          if($postData->Status!=16 && $postData->Status!=4 && $postData->Status!=12){
+            include_once APIPATH. "/db_connection.php"; 
+
+            $usql = "DELETE FROM `purchase_info` WHERE EMPTY_VEHICLE_ARRIVAL_ID= " . $postData->id;
+            //echo $usql;exit();
+            mysqli_query($connect, $usql);
+         }
+        // exit();
+        //var_dump($postData->Data);
+          $res = $model->ChangeVHStatusIAS_IRS($postData->id,$postData->Data);
+          
+        }
+        if($postData->Mode=="IRS"){
+          $UpdateNext=0;
+          if($postData->Status==1 || $UpdateNext==1){
+            $postData->Data->WaitOutsideDt=NULL;
+            $postData->Data->WaitOutsideBy=0;
+            $UpdateNext=1;
+          }
+          if($postData->Status==8 || $UpdateNext==1){
+            $postData->Data->YardDispatchDt=NULL;
+            $postData->Data->YardDispatchBy=0;
+            $UpdateNext=1;
+          }
+          if($postData->Status==9 || $UpdateNext==1){
+            $postData->Data->PortDispatchDt=NULL;
+            $postData->Data->PortDispatchBy=0;
+            $UpdateNext=1;
+          }
+          if($postData->Status==10 || $UpdateNext==1){
+            $postData->Data->PortReceiptDt=NULL;
+            $postData->Data->PortReceiptBy=0;
+            $UpdateNext=1;
+          }
+          
+         
+          $model = new MasterModel();
+          $postData->Data->LastStatusChangedBy=$SessionUser;
+          $CurrentDateTime=date("Y-m-d H:i:s");
+          $postData->Data->LastStatusChangedOn=$CurrentDateTime;
+          $res = $model->ChangeVHStatusIAS_IRS($postData->id,$postData->Data);
+          
+        }
+        return  $this->respond(["success" => $res]);
+        }
+
+        public function QualityCheckBulkUpload(){
+        
+          $postData = $this->request->getJSON();
+           //var_dump($postData);exit();
+           $FilePath=$postData->QCFilePath;
+           $target_file = $FilePath;
+         //  $target_file = $_SERVER['HTTP_HOST']."/".$target_file;
+      //   echo $target_file="http://localhost/pp/api/upload/2021/October/04/_MasterQualityCheck.csv_9-20211004132824.csv";
+        // echo $target_file;
+           $fileexists = 0;
+           if (file_exists($target_file)) {
+             $fileexists = 1;
+           }
+        //  echo $fileexists;exit();
+           $model = new MasterModel();
+          $session = session();
+          $SessionUser=$_SESSION["USERID"];
+          $SessionUserName=$_SESSION["FIRSTNAME"];
+
+           if ($fileexists == 1) {
+            $file = fopen($target_file, "r");
+            $importData_arr =array();
+            include_once APIPATH. "/db_connection.php"; 
+            $i=0;
+            while (($data = fgetcsv($file, 1000, ",")) !== false) {
+          
+              $num = count($data);
+              
+             
+              
+               if($i>0 && $data[1]!=""){
+              
+               $MIC=$data[1];
+               $MIC_DESC=$data[2];
+               $UOM=$data[3];
+               $MinValue=$data[4];
+               $MaxValue=$data[5];
+               $nir_yes=$data[6];
+               $nir_no=$data[7];
+               $nir_foss=$data[8];
+               $surveyor=$data[9];
+               $IDNLF=$data[10];
+               $FIELD_MAP=$data[11];
+               $input_type=$data[12];
+               
+               $postData=array(
+                "MIC"=>$MIC,
+                "MIC_DESC"=>$MIC_DESC,
+                "UOM"=>$UOM,
+                "MIN_VALUE"=>$MinValue,
+                "MAX_VALUE"=>$MaxValue,
+                "nir_yes"=>$nir_yes,
+                "nir_no"=>$nir_no,
+                "nir_foss"=>$nir_foss,
+                "surveyor"=>$surveyor,
+                "IDNLF"=>$IDNLF,
+                "FIELD_MAP"=>$FIELD_MAP,
+                "input_type"=>$input_type
+              );
+
+
+
+               $Qry="SELECT QCM_REFID FROM `master_quality_check`  where upper(MIC)=upper('$MIC') and upper(MIC_DESC)=upper('$MIC_DESC') and upper(IDNLF)=upper('$IDNLF') and RecStatus='1'";
+              $Select=mysqli_query($connect, $Qry);
+              $Fetch=mysqli_fetch_assoc($Select);
+              $Count=mysqli_num_rows($Select);
+             //echo $Count;
+            // exit();
+              if($Count>0){
+               // echo "hhi";exit();
+              $postData['ModBy']=$SessionUser;
+             $res = $model->UpdateQualityCheck($Fetch['QCM_REFID'],$postData);
+
+             /* $Qry="UPDATE `master_quality_check` SET  `MIC`='$MIC', `MIC_DESC`='$MIC_DESC', `UOM`='$UOM',
+               `MIN_VALUE`='$MinValue', `MAX_VALUE`='$MaxValue', `nir_yes`='$nir_yes', `nir_no`='$nir_no', `nir_foss`='$nir_foss',
+                `surveyor`='$surveyor', `IDNLF`='$IDNLF', `FIELD_MAP`='$FIELD_MAP', `input_type`='$input_type' where upper(MIC)=upper('$MIC') and upper(MIC_DESC)=upper('$MIC_DESC') and upper(IDNLF)=upper('$IDNLF') and RecStatus='1'";
+          
+              $res=mysqli_query($connect, $Qry);
+*/
+
+              }else{
+              
+              $postData['InsBy']=$SessionUser;
+               
+                $res = $model->InsertQualityCheck($postData);
+            /*  $Qry="INSERT INTO `master_quality_check`(InsBy, `MIC`, `MIC_DESC`, `UOM`, `MIN_VALUE`, `MAX_VALUE`, `nir_yes`, `nir_no`, `nir_foss`, `surveyor`, `IDNLF`, `FIELD_MAP`, `input_type`) 
+              VALUES ('0','$MIC','$MIC_DESC','$UOM','$MinValue','$MaxValue','$nir_yes','$nir_no','$nir_foss','$surveyor','$IDNLF','$FIELD_MAP','$input_type')";
+            echo $Qry;
+            exit();
+              $Select=mysqli_query($connect, $Qry);*/
+            
+              }
+
+               }
+             
+              $i++;
+              
+            }
+            fclose($file);
+           }
+          // exit();
+           return  $this->respond(["success" => $res]);
+        
+        }
+  //
+
+
+  public function STMWeightEntry(){
+
+    $postData = $this->request->getJSON();
+    // var_dump($postData);exit();
+
+    $model = new MasterModel();
+    $session = session();
+
+    $SessionUser = $_SESSION["USERID"];
+    $SessionUserName = $_SESSION["FIRSTNAME"];
+    $Table = "";
+
+    $purchaseid = $postData->purchaseid;
+    $id = $postData->id;
+
+    if ($postData->Mode == "STM") {
+      //echo "pp_silotomillweights";
+      $Table = "pp_silotomillweights";
+    }
+    if ($postData->Mode == "UNLOAD") {
+      //echo "pp_silotomillweights_unload";
+      $Table = "pp_silotomillweights_unload";
+    }
+    $WeightEntry = "";
+    if ($postData->VEHICLE_STATUS == "23") {
+      $WeightEntry = 1;
+    }
+    if ($postData->VEHICLE_STATUS == "24") {
+      $WeightEntry = 2;
+    }
+
+    if($postData->Data->FirstWeight1)
+    {
+      $postData->Data->ManualFirstWeight=$postData->Data->FirstWeight1;
+      
+    }
+
+    if($postData->Data->SecondWeight1)
+    {
+      $postData->Data->ManualSecondWeight=$postData->Data->SecondWeight1;
+      
+    }
+    if(isset($postData->Data->FirstWeight1))
+    unset($postData->Data->FirstWeight1);
+    if(isset($postData->Data->SecondWeight1))
+    unset($postData->Data->SecondWeight1);   
+
+//var_dump($postData);
+//exit();
+    if ($postData->WeightId != "") {
+      $postData->Data->ModBy = $SessionUser;
+      $res = $model->UpdateWeight($postData->WeightId, $postData->Data, $Table);
+    } else {
+      $postData->Data->InsBy = $SessionUser;
+      $res = $model->InsertWeight($postData->Data, $Table);
+    }
+    
+    if ($purchaseid > 0) {
+      $model = new VehicleArrivalModel();
+      $UpdateStatus = 2;
+      if ($postData->SCREEN_TYPE == "IAS" && $WeightEntry == 1) {
+        $ExpWerks = explode("-", $postData->WERKS);
+        if ($ExpWerks[0] == "1111" || $ExpWerks[0] == "8101" || $ExpWerks[0] == "8001" || $ExpWerks[0] == "FR01") {
+          $UpdateStatus = 2;
+        } else {
+          if ($postData->Mode == "UNLOAD") {
+          $UpdateStatus = 4;
+          }
+          else{
+            $UpdateStatus = 24;
+          }
+        }
+      }
+      if ($postData->SCREEN_TYPE == "SILOTOMILL" && $WeightEntry == 1) {
+        $UpdateStatus = 4;
+      }
+      include_once APIPATH . "/db_connection.php";
+      $usql = "SELECT VEHICLE_TYPE FROM `purchase_info` WHERE PI_REFID='" . $purchaseid . "'";
+      $selectQ = mysqli_query($connect, $usql);
+      $FetchQ = mysqli_fetch_assoc($selectQ);
+      $tType = $FetchQ['VEHICLE_TYPE'];
+      //echo $tType; exit();
+      if ($postData->SCREEN_TYPE == "SDI" && $WeightEntry == 1 && strtoupper($tType) == 'RAKE') {
+        $UpdateStatus = 4;
+      }
+      $Purchase_res = $model->UpdateWeight($purchaseid, $WeightEntry, $UpdateStatus);
+    } else {
+      
+      $model = new EmptyVehicleArrivalModel();
+      $Purchase_res = $model->UpdateWeight($id, $WeightEntry, $postData->SCREEN_TYPE);
+    }
+    if ($res == "-5") {
+      return $this->respond(["success" => $res, "ErrorMsg" => "Duplicate record.."]);
+    }
+    return  $this->respond(["success" => $res]);
+  }
+
+  public function user_plant_inactive(){
+     
+    $postData = $this->request->getJSON();
+    $formats = date('Y-m-d H:i:s');
+
+    $model = new MasterModel();
+    $session = session();
+    $SessionUser=$_SESSION["USERID"];
+    $Data= array(
+      "ModBy"=>$SessionUser,
+      "RecStatus"=>$postData->RecStatus,
+      "ModDt"=>$formats,
+    );
+    
+    $res = $model->Inactive_user_plant($postData->id,$Data);
+    
+        return  $this->respond(["success" => $res]);
+  }
+ 
+       
+}

@@ -1,0 +1,13 @@
+<IfModule authz_core_module>
+    Require all denied
+</IfModule>
+<IfModule !authz_core_module>
+    Deny from all
+</IfModule>
+
+<IfModule mod_headers.c>
+    # Accept cross-domain requests
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept"
+    Header always set Access-Control-Allow-Methods 'GET, POST, PATCH, PUT, DELETE, OPTIONS'
+</IfModule>

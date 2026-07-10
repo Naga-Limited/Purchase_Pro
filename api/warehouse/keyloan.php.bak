@@ -1,0 +1,121 @@
+<?php
+include_once APIPATH. "/helper/sessionHelper.php";
+//include DB File
+include_once APIPATH. "/db_connection.php";
+include_once APIPATH."/helper/appHelper.php";
+$entityVAContent = json_decode(file_get_contents("php://input"));
+//var_dump($entityQCContent);exit();
+
+if ($entityVAContent->formType == "keyloanUpdate") {
+  echo keyLoanLedgerEntryUpdate($connect, $entityVAContent);
+}else if ($entityVAContent->formType == "keyloanDORelease") {
+  echo keyLoanLedgerDORelease($connect, $entityVAContent);
+}else if ($entityVAContent->formType == "getKeyLoanReportDet") {
+  echo keyLoanLedgerDORelease($connect, $entityVAContent);
+}else{
+echo keyLoanLedgerEntry($connect, $entityVAContent);
+}
+$connect->close();
+/*================Connection END====================*/
+
+
+function keyLoanLedgerDORelease($connect, $record){
+  
+  $CurrentTime=date("d-m-Y H:i:s")."\n";
+  $keytoexclude = ["formType"];
+  
+  $fields = [];
+  $values = [];
+  $UpdateArray=[];
+  foreach ($record as $key => $value) {
+    if (!in_array($key, $keytoexclude)) {
+      array_push($fields, $key);
+      array_push($values, mysqli_real_escape_string($connect, trim($value)));
+      array_push($UpdateArray,$key."='".mysqli_real_escape_string($connect, trim($value))."'");
+    }
+  }
+
+  $sql = "INSERT INTO ngw_keyloan_do_release (" . join(", ", $fields) . ") VALUES ( '" . join("','", $values) . "')";
+  //echo $sql;exit();
+  mysqli_query($connect, $sql);
+  $last_id = $connect->insert_id;
+
+  $sql = "UPDATE `ngw_keyloan_pledge` 
+          SET `release_qty` = `release_qty` + '".$record->release_qty."',
+              `balance_qty` = `balance_qty` - '".$record->release_qty."',
+              `LastKeyloan_Pledge_Release_Id`='$last_id' 
+          WHERE `warehouseid`='".$record->warehouseid."' and `plantid`='".$record->plantid."' 
+              and `Wheat_Variety_Id`='".$record->wheat_variety_id."' and `lotid`='".$record->lotid."'";
+  //echo $sql;exit();
+  mysqli_query($connect, $sql);
+  
+  $sql = "UPDATE `ngw_sublot` 
+          SET Keyloan_Release_Qty = Keyloan_Release_Qty +'".$record->release_qty."'
+          WHERE lotid ='".$record->lotid."' and warehouseid =(SELECT wh_refid FROM warehouse_master WHERE wh_code='".$record->warehouseid."')  
+          and plantid ='".$record->plantid."' and wheatvarietyid ='".$record->wheat_variety_id."' ";
+  //echo $sql;exit();
+  $Select=mysqli_query($connect, $sql);
+
+  return json_encode(["success" => 1]);
+}
+
+
+function keyLoanLedgerEntryUpdate($connect, $record){
+  for($i=0;$i<sizeof($record->KeyloanDatas);$i++){
+  $sql = "UPDATE ngw_keyloan_pledge 
+          SET Loan_No='".$record->KeyloanDatas[$i]->LoanNo."',
+              Loan_Amount='".$record->KeyloanDatas[$i]->LoanAmount."',
+              Loan_Rate_MT='".$record->KeyloanDatas[$i]->LoanRate."'
+          WHERE SR_No ='".$record->KeyloanDatas[$i]->SRNo->value."'";
+
+          /* Data Truncate Issue in 49 & 11
+          Pledge_Value='".$record->KeyloanDatas[$i]->SR_90_Percent_Value."'
+          */
+  //echo $sql;exit();
+  mysqli_query($connect, $sql);
+  }
+  return json_encode(["success" => 1]);
+}
+
+function keyLoanLedgerEntry($connect, $record){
+  //Check Duplicate
+  $sql = "SELECT * FROM `ngw_keyloan_pledge` where lotid='".$record->lotid."' 
+  and warehouseid='".$record->warehouseid."' and plantid='".$record->plantid."' 
+  and Wheat_Variety_Id='".$record->Wheat_Variety_Id."' and balance_qty > 0";
+  $Select=mysqli_query($connect, $sql);
+  $Count=mysqli_num_rows($Select);
+  if($Count>0){
+    return json_encode(["success" => 0]);
+    exit();
+  }
+
+  $CurrentTime=date("Y-m-d");
+  $fields = [];
+  $values = [];
+  $UpdateArray=[];
+  foreach ($record as $key => $value) {
+    array_push($fields, $key);
+    array_push($values, mysqli_real_escape_string($connect, trim($value)));
+    array_push($UpdateArray,$key."='".mysqli_real_escape_string($connect, trim($value))."'"); 
+  }
+
+  $sql = "INSERT INTO ngw_keyloan_pledge (" . join(", ", $fields) . ") VALUES ( '" . join("','", $values) . "')";
+  mysqli_query($connect, $sql);
+  $last_id = $connect->insert_id;
+
+  $sql = "UPDATE `ngw_sublot` 
+          SET Keyloan_Release_Qty = 0, 
+              Keyloan_Pledge_Date ='".$CurrentTime."',
+              Last_Keyloan_Pledge_Id ='".$last_id."', 
+              Keyloan_Pledge_Status = 'YES' 
+          WHERE  lotid ='".$record->lotid."' 
+              AND warehouseid =(SELECT wh_refid FROM warehouse_master WHERE wh_code='".$record->warehouseid."') 
+              And plantid ='".$record->plantid."' 
+              AND wheatvarietyid ='".$record->Wheat_Variety_Id."' ";
+  //echo $sql;exit();
+  $Select=mysqli_query($connect, $sql);
+
+  return json_encode(["success" => 1]);
+}
+
+?>

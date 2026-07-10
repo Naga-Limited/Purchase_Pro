@@ -1,0 +1,1116 @@
+import { Card, CardBody, FormGroup, Row, Col, Input, Button, Label } from "reactstrap";
+import Select from "react-select";
+import { Paperclip, X, Plus, ArrowDown } from "react-feather";
+import { msuppUrl, mpolineUrl, sdisdUrl,uploadUrl, sdisdAUrl,SaveCaptureImage, mvessUrl, ddlSDPOUrl, masterUrl, getEdaUrl,duplicate_sdisdAUrl } from "../../urlConstants";
+import { errorToast, ShowToast } from "@helpers/appHelper";
+import React, { useState, useEffect } from "react";
+import { useSelector } from "react-redux";
+import { apiPostMethod, apiGetMethod } from "@helpers/axiosHelper";
+import { _supplierFormData, _poData } from "./SupplierHelper";
+import { roundOf } from "../../helper/appHelper";
+import { DropdownControl } from "../../@core/components/dropdown";
+import moment from "moment";
+import NumberOnlyInput from "../../@core/components/number-input/number-input";
+import { useLoader } from "../../utility/hooks/useLoader";
+import confirmDialog from "../../@core/components/confirm/confirmDialog";
+import { RefreshBlock } from "../common/RefreshBlock";
+import CaptureImageSDI from "../CaptureImageSDI";
+const TruckMdl = "14";
+const RackMdl = "13";
+const ContrMdl = "12";
+const fumigOptions = [
+  {
+    options: [
+      { value: "yes", label: "Yes" },
+      { value: "no", label: "No" },
+    ],
+  },
+];
+
+const SupplierDispatchInfo = () => {
+  const dateFormat = "YYYY-MM-DD";
+  const today = moment().format(dateFormat);
+  let { showLoader, hideLoader } = useLoader();
+  const [poOptions, setPOdata] = useState([]);
+  const [poData, setPOData] = useState({});
+  const [ImgData, setImgData] = useState({});
+  const [formData, setFormData] = useState({ ..._supplierFormData });
+  const [vehicalDatas, setvehicalDatas] = useState([]);
+  const [supplierOptions, setSupplierdata] = useState([]);
+  const [poLineOptions, setPOLinedata] = useState([]);
+  const [vesselOptions, setVesseldata] = useState([]);
+  const [selectedLiner, setSelectedLiner] = useState();
+  const [selectedLocation, setSelectedLocation] = useState();
+  const UserDetails = useSelector((state) => (state && state.auth ? state.auth.userData : {}));
+  const deleteForm = (index) => {
+    let vdata = [...vehicalDatas];
+    vdata.splice(index, 1);
+    setvehicalDatas(vdata);
+  };
+
+  const onFetchVessel = () => {
+    apiGetMethod(mvessUrl)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          setVesseldata([{ options: data.results }]);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });
+  };
+  useEffect(() => {
+    if (!poOptions || poOptions.length === 0) {
+      onFetchAllPOByUserPlant();
+    }
+  }, [poOptions]);
+
+  const onFetchAllPOByUserPlant = () => {
+    let fdata = {
+      plantIds: UserDetails.plantids,
+    };
+    apiPostMethod(ddlSDPOUrl, fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          setPOdata([{ options: data.poresults }]);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });
+  };
+
+  const onPOChange = (e) => {
+    const { value } = e;
+    const sfd = { ..._supplierFormData };
+    delete sfd.ZPO_NUMBER;
+    setFormData({ ...formData, ZPO_NUMBER: value, ...sfd });
+    setPOData({ ..._poData });
+    onFetchPOLine(value);
+  };
+
+  const onFetchPOLine = (PO_number) => {
+    setSelectedLocation("");
+    let fdata = { PO_NUMBER: PO_number, screenType: "SDO" };
+    apiPostMethod(mpolineUrl, fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          setPOLinedata([{ options: data.results }]);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });
+  };
+  const onLinerChange = (e) => {
+    setSelectedLiner(e);
+  };
+  const onLineItemchange = (e) => {
+    const { value } = e;
+    const sfd = { ..._supplierFormData };
+    delete sfd.ZPO_NUMBER;
+    delete sfd.ZPO_LINE_ITEM;
+    setFormData({ ...formData, ZPO_LINE_ITEM: value, ...sfd });
+    setPOData({ ..._poData });
+    onFetchSupplier(value);
+  };
+
+  const onFetchSupplier = (lineItem) => {
+    let fdata = { PO_NUMBER: formData.ZPO_NUMBER, lineItem: lineItem, screenType: "SDO" };
+    apiPostMethod(msuppUrl, fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          setSupplierdata([{ options: data.results }]);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });
+  };
+
+  const onSupplierChange = (e) => {
+    const { label, value } = e;
+    setFormData({ ...formData, ZSUPPLIER_CODE: value, ZSUPPLIER_NAME: label });
+    onFetchPOdetails(value);
+  };
+
+  const onFetchPOdetails = (ZSUPPLIER_CODE) => {
+    let fdata = { PO_NUMBER: formData.ZPO_NUMBER, ZPO_LINE_ITEM: formData.ZPO_LINE_ITEM, ZSUPPLIER_CODE: ZSUPPLIER_CODE };
+
+    apiPostMethod(sdisdUrl, fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success && data.results.length) {
+          const { results } = data;
+          setPOData(results[0]);
+
+          addTblRecord(results[0].PURCHASE_ORG, "I");
+          if (results[0].PURCHASE_ORG === ContrMdl) {
+            onFetchVessel();
+          }
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });
+  };
+
+  const onTextChange = (e, key) => {
+    const { value } = e.target ? e.target : e;
+    setFormData({
+      ...formData,
+      [key]: value,
+    });
+  };
+  const onSupplierLoadingDate = (e) => {
+    setFormData((p) => {
+      let newData = { ...p, ZSUPPLIER_LOAD_DT: e.target.value, EDA: "" };
+      if (newData.EDA_DAYS) {
+        newData.EDA = moment(e.target.value).add(Number(newData.EDA_DAYS), "days").format("DD-MM-YYYY");
+      }
+      return newData;
+    });
+  };
+  const onValidLoadingDate = (e) => {
+    if (poData.PURCHASE_ORG === RackMdl && !moment(poData.POLOADINGDATE, "DD-MM-YYYY").isSameOrAfter(e.target.value)) {
+      confirmDialog({
+        title: "Are you sure?",
+        cancelButton: false,
+        confirmText: "OK",
+        description: "Supplier Loading Date Exceeds PO Loading Date",
+      }).then((res) => {
+        if (res) {
+        }
+      });
+    }
+  };
+  const onValidWBDate = (e) => {
+    if (!moment(poData.POLOADINGDATE, "DD-MM-YYYY").isSameOrAfter(e.target.value)) {
+      confirmDialog({
+        title: "Are you sure?",
+        cancelButton: false,
+        confirmText: "OK",
+        description: "Supplier WB date Exceeds PO Loading Date",
+      }).then((res) => {
+        if (res) {
+        }
+      });
+    }
+  };
+  const onValidInvoiceQty = (e) => {
+    if (poData.PURCHASE_ORG === RackMdl && e.target.value > 300000) {
+      const inve = e.target;
+      confirmDialog({
+        title: "Invoice Qty(kgs)",
+        cancelButton: false,
+        confirmText: "OK",
+        description: "Invoice Qty Exceeds 3 Lakh Kgs, Please correct the kgs",
+      }).then((res) => {
+        if (res) {
+          inve.focus();
+        }
+      });
+    }
+  };
+
+  const onEDAChange = (e) => {
+    setFormData((p) => {
+      let newData = { ...p, EDA: e.target.value };
+      return newData;
+    });
+  };
+
+  const SplChar = (e)=>{
+   // console.log("test")
+   // console.log(e);
+   return false
+  }
+  const handleKeyDown =(e)=>{
+     if(e.key.length>2 ||e.key=="Backspace"||e.key=="ArrowDown"||e.key=="ArrowLeft"||e.key=="ArrowRight"||e.key=="ArrowUp")
+     {
+       return;
+     }
+     const pattern = /^[A-Za-z]/g;
+     if(e.target.value.length < 4 && !pattern.test(e.key))
+     {
+       e.preventDefault();
+     }
+     const pattern1 = /[0-9]$/g;
+     if(e.target.value.length >= 4 && !pattern1.test(e.key))
+     {
+       e.preventDefault();
+     }
+
+  }
+  const onValueChange = (e, key, index) => {
+    let vds = [...vehicalDatas];
+    vds.forEach((fitem, v) => {
+      if (index === v) {
+        //fitem[key] = e.target ? e.target.value : e.value;
+       if(key=="ZSUPPLIER_INV_NO" || key=="vehical_no" || key=="no_of_wagon" || key=="supplier_wb_qty" || key=="seal_no"){
+        let regEx = /[^a-zA-Z0-9]/gi; 
+        if(key=="no_of_wagon" || key=="supplier_wb_qty"){
+           regEx = /[^0-9.]/gi;
+         }
+         if(key=="ZSUPPLIER_INV_NO"){
+          regEx = /[^a-zA-Z0-9-/]/gi; 
+         }
+       
+          let Val=e.target ? e.target.value.toUpperCase() : e.value.toUpperCase();
+          // console.log(Val);
+           Val = Val.replace(regEx, "");
+
+          document.getElementById(key+"_"+index).value=Val;
+          fitem[key] = Val;
+        }else{
+          fitem[key] = e.target ? e.target.value : e.value;
+        }
+        
+      }
+    });
+    console.log(vds);
+    setvehicalDatas(vds);
+  };
+  const fileUploadAction = (id) => {
+    document.getElementById(id).click();
+  };
+  const handleFileChange = (e, key, index) => {
+    if (e.target.files && e.target.files[0].size > 5242880) {
+      errorToast("File Size is too Large. Please try again with less than 5Mb");
+    } else {
+      let { files } = e.target;
+      let vds = [...vehicalDatas];
+      vds.forEach((fitem, i) => {
+        if (index === i) {
+          fitem[key] = files[0].name;
+          fitem[key + "_attach"] = files[0];
+        }
+      });
+      setvehicalDatas(vds);
+    }
+  };
+
+  
+
+  const onSubmitSD=()=>{
+   
+    let allKeys = Object.keys(formData);
+    let postdata = new FormData();
+    //postdata.append("file_from", "sdi_sdi");
+    postdata.append("file_from", "SDI");
+    postdata.append("SubFolder", "Supplier_Dispatch_Info");
+    postdata.append("VEHICLE_TYPE", poData.VEHICLETYPE);
+    postdata.append("WERKS", poData.plant_id);
+    postdata.append("IDNLF", poData.IDNLF);
+    postdata.append("INCO1", poData.INCO1);
+    postdata.append("LINER_NAME", selectedLiner ? selectedLiner.label : "");
+    if (allKeys && allKeys.length) {
+      allKeys.forEach((key) => {
+        postdata.append([key], formData[key]);
+      });
+    }
+    let pvd = vehicalDatas.map((item) => {
+      const nitem = { ...item, LINE_ITEM: formData.ZPO_LINE_ITEM };
+      postdata.append("files[]", nitem["sup_inv_copy_attach"]);
+      if (nitem["sup_wb_copy_attach"]) {
+        postdata.append("files[]", nitem["sup_wb_copy_attach"]);
+      }
+      delete nitem.sup_inv_copy_attach;
+      delete nitem.sup_wb_copy_attach;
+      return nitem;
+    });
+    postdata.append("sdinfo", JSON.stringify(pvd));
+
+    console.log(JSON.stringify(postdata));
+    apiPostMethod(duplicate_sdisdAUrl, postdata, "Y")
+    .then((response) => {
+      
+      const { data } = response;
+      if (data.success==1) {
+        onSubmitSD_SAVE()
+      }else{
+        errorToast("Duplicate Vehicle Number.."+data.VehicleNo);
+      }
+    })
+    .catch((error) => {
+      errorToast("Something went wrong, please try again after sometime");
+    })
+    .finally((a) => {
+      hideLoader();
+    });
+
+  }
+  const onSubmitSD_SAVE = () => {
+    //console.log("INsave");
+   // return false;
+    let allKeys = Object.keys(formData);
+    let postdata = new FormData();
+
+    if(formData.EDA == "" || formData.EDA == undefined){
+      errorToast('Please Enter EDA ...')
+      return false
+    }else if(formData.ZSUPPLIER_LOAD_POINT == "" || formData.ZSUPPLIER_LOAD_POINT == undefined){
+      errorToast('Please Enter Supplier load point ...')
+      return false
+    }else if(formData.ZSUPPLIER_LOAD_DT == "" || formData.ZSUPPLIER_LOAD_DT == undefined){
+      errorToast('Please Enter Supplier load Date ...')
+      return false
+    }else if(poData.PO_Bag_Type == "" || poData.PO_Bag_Type == undefined){
+      errorToast('Please select Correct PO  ...')
+      return false
+    }else if(poData.PLANT_NAME == "" || poData.PLANT_NAME == undefined){
+      errorToast('Please select Correct PO  ...')
+      return false
+    }else if(poData.BROCKER_NAME == "" || poData.BROCKER_NAME == undefined){
+      errorToast('Please select Correct PO  ...')
+      return false
+    }else if(poData.IDNLF == "" || poData.IDNLF == undefined){
+      errorToast('Please select Correct PO  ...')
+      return false
+    }else if(poData.MATNR == "" || poData.MATNR == undefined){
+      errorToast('Please select Correct PO  ...')
+      return false
+    }else if(poData.NETPR == "" || poData.NETPR == undefined){
+      errorToast('Please select Correct PO  ...')
+      return false
+    }else if(poData.STORAGE_LOCATION == "" || poData.STORAGE_LOCATION == undefined){
+      errorToast('Please select Correct PO  ...')
+      return false
+    }else if(poData.POLOADINGDATE == "" || poData.POLOADINGDATE == undefined){
+      errorToast('Please select Correct PO  ...')
+      return false
+    }else if(poData.VEHICLETYPE == "" || poData.VEHICLETYPE == undefined){
+      errorToast('Please select Correct PO  ...')
+      return false
+    }else if(poData.PURCHASE_ORG == "" || poData.PURCHASE_ORG == undefined){
+      errorToast('Please select Correct PO  ...')
+      return false
+    }
+   
+    //postdata.append("file_from", "sdi_sdi");
+    postdata.append("form_name", "SDI");
+    postdata.append("form_name", "SDI");
+    postdata.append("SubFolder", "Supplier_Dispatch_Info");
+    postdata.append("VEHICLE_TYPE", poData.VEHICLETYPE);
+    postdata.append("WERKS", poData.plant_id);
+    postdata.append("IDNLF", poData.IDNLF);
+    postdata.append("INCO1", poData.INCO1);
+    postdata.append("LINER_NAME", selectedLiner ? selectedLiner.label : "");
+    if (allKeys && allKeys.length) {
+      allKeys.forEach((key) => {
+        postdata.append([key], formData[key]);
+      });
+    }
+    let FileSaveUrl=uploadUrl;
+    let Capture=0;
+    if(vehicalDatas[0].sup_inv_Imgcopy!=null && vehicalDatas[0].sup_inv_Imgcopy!=""){
+      FileSaveUrl=SaveCaptureImage;
+      Capture=1;
+    }
+    let i=0;
+    let pvd = vehicalDatas.map((item) => {
+      const nitem = { ...item, LINE_ITEM: formData.ZPO_LINE_ITEM };
+      postdata.append("files[]", nitem["sup_inv_copy_attach"]);
+      if (nitem["sup_wb_copy_attach"]) {
+        postdata.append("files[]", nitem["sup_wb_copy_attach"]);
+      }
+    /*  if(Capture==1){
+        postdata.append("image[]",nitem["sup_inv_Imgcopy"]);
+      }else{
+        postdata.append("file[]", nitem["sup_inv_copy_attach"]);
+      }
+      if(Capture==1){
+        if(nitem["sup_wb_Imgcopy"]!=""){
+          postdata.append("image[]", nitem["sup_wb_Imgcopy"]);
+        }
+        
+      }else{
+      if (nitem["sup_wb_copy_attach"]) {
+        postdata.append("file[]", nitem["sup_wb_copy_attach"]);
+      }
+    }*/
+    i++;
+
+      
+
+      delete nitem.sup_inv_copy_attach;
+      delete nitem.sup_wb_copy_attach;
+
+     
+      
+      return nitem;
+    });
+    postdata.append("sdinfo[]", JSON.stringify(pvd));
+
+    //postdata.append("sdinfo[]", vehicalDatas);
+    //postdata.append("sdinfo[]", pvd);
+    showLoader();
+    //console.log("POSTDATA");
+    //console.log(postdata);
+   // console.log(JSON.stringify(Object.values(postdata)));
+//File Updation Added-START
+apiPostMethod(sdisdAUrl, postdata, "File")
+        .then((response) => {
+          const { data } = response;
+          if (data.success) {
+           
+           ShowToast("Updated Successfully...");  
+           resetForm();
+         
+          } else {
+            errorToast(data.files[0].orgname + " file format is not supported ");
+          }
+        })
+        .catch((error) => {
+          errorToast("Something went wrong, please try again after sometime");
+        })
+        .finally((a) => {
+          hideLoader();
+        });
+//File Updation Added-END
+   /* apiPostMethod(sdisdAUrl, postdata, "Y")
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          resetForm();
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      })
+      .finally((a) => {
+        hideLoader();
+      });*/
+  };
+  const resetForm = () => {
+    setPOData({ ..._poData });
+    setFormData({ ..._supplierFormData });
+    setvehicalDatas([]);
+    setPOLinedata([]);
+    setSupplierdata([]);
+    setSelectedLocation("");
+    // history.push(`/SD`);
+  };
+
+  const addTblRecord = (Purchaseorgdesc, isNew) => {
+    const vhType = {
+      [TruckMdl]: { vehical_no: "", supplier_wb_qty: "", supplier_wb_date: "", sup_inv_copy: "", sup_wb_copy: "", sup_inv_Imgcopy: "", sup_wb_Imgcopy: ""},
+      [ContrMdl]: { vehical_no: "", supplier_wb_qty: "", supplier_wb_date: "", seal_no: "", sup_inv_copy: "", sup_wb_copy: "", sup_inv_Imgcopy: "", sup_wb_Imgcopy: ""},
+      [RackMdl]: { vehical_no: "", no_of_wagon: "", sup_inv_copy: "", sup_inv_Imgcopy: "", sup_wb_Imgcopy: "" },
+    };
+    const vhTA = { ...vhType[Purchaseorgdesc] };
+    let vd = [];
+    if (!isNew) {
+      vd = [...vehicalDatas];
+    }
+    vd.push(vhTA);
+    setvehicalDatas(vd);
+  };
+
+  const renderHeader = (vehicleId) => {
+    const headObj = { [TruckMdl]: "Vehicle Details", [ContrMdl]: "Container Details", [RackMdl]: "Rake Details" };
+    return (
+      <Row className="p-0">
+        <Col md="12" sm="12">
+          <h5>{headObj[vehicleId]}</h5>
+        </Col>
+      </Row>
+    );
+  };
+  const renderSupplierInvoiceDetails = (info, vehicleId, index) => {
+    return (
+      <>
+        <Col md="3" sm="12">
+          <FormGroup>
+            <Label for="cityMulti">Invoice Rate (In Kgs)</Label>
+            <NumberOnlyInput
+              decimalFormat={"2,2"}
+              placeholder="Decimal (2,2)"
+              value={info.ZSUPPLIER_INV_RATE}
+              onChange={(e) => onValueChange(e, "ZSUPPLIER_INV_RATE", index)}
+            />
+          </FormGroup>
+        </Col>
+        <Col md="2" sm="12">
+          <FormGroup>
+            <Label for="cityMulti">Invoice No</Label>
+            <Input
+              type="text"
+              value={info.ZSUPPLIER_INV_NO}
+              placeholder="Invoice No"
+              id={"ZSUPPLIER_INV_NO_"+index}
+              onChange={(e) => onValueChange(e, "ZSUPPLIER_INV_NO", index)}
+            />
+          </FormGroup>
+        </Col>
+        <Col md="2" sm="12">
+          <FormGroup>
+            <Label for="cityMulti">Invoice Date</Label>
+            <Input type="date"   max={today} value={info.ZSUPPLIER_INV_DT} onChange={(e) => onValueChange(e, "ZSUPPLIER_INV_DT", index)} />
+          </FormGroup>
+        </Col>
+        <Col md="2" sm="12">
+          <FormGroup>
+            <Label for="cityMulti">Invoice Qty (In Kgs)</Label>
+            <NumberOnlyInput
+              type="text"
+              decimalFormat={"6,0"}
+              maxValue={vehicleId !== RackMdl ? 70000 : 999999}
+              value={info.ZSUPPLIER_INV_QTY}
+              placeholder={` Max ${vehicleId !== RackMdl ? 70000 : 300000}`}
+              onChange={(e) => onValueChange(e, "ZSUPPLIER_INV_QTY", index)}
+              onBlur={(e) => onValidInvoiceQty(e)}
+            />
+          </FormGroup>
+        </Col>
+      </>
+    );
+  };
+  const renderContExtraFields = () => {
+    return (
+      <Row className="col-12 m-0 p-0">
+        <Col md="3" sm="12">
+          <FormGroup>
+            <Label>Vessel Name</Label>
+            <Select
+              className="react-select"
+              classNamePrefix="select"
+              options={vesselOptions}
+              onChange={(e) => onTextChange(e, "VESSEL_NAME")}
+            />
+          </FormGroup>
+        </Col>
+        <Col md="3" sm="12">
+          <FormGroup>
+            <Label>Vessel Number</Label>
+            <Input type="text" onChange={(e) => onTextChange(e, "VESSEL_NO")} />
+          </FormGroup>
+        </Col>
+        <Col md="3" sm="12">
+          <FormGroup>
+            <Label>Fumigation</Label>
+            <Select
+              className="react-select"
+              classNamePrefix="select"
+              options={fumigOptions}
+              onChange={(e) => onTextChange(e, "FUMIGATION")}
+            />
+          </FormGroup>
+        </Col>
+      </Row>
+    );
+  };
+  const renderBody = (vehicleId) => {
+    return (
+      <Col md="12" sm="12" className="p-0 mt-2">
+        {vehicalDatas &&
+          vehicalDatas.length &&
+          vehicalDatas.map((item, i) => {
+            return (
+              <div key={vehicleId + "_" + i}>
+                <Row className="col-12 p-0 m-0">
+                  <Col md="2" sm="12">
+                    <FormGroup>
+                      {vehicleId === TruckMdl ? (
+                        <>
+                        <Label>Vehicle No</Label>
+                        <Input 
+                        id={"vehical_no_"+i}
+                        maxLength={10} type="text" onChange={(e) => onValueChange(e, "vehical_no", i)} />
+                         </>
+
+                      ) : vehicleId === ContrMdl ? (
+                        <>
+                        <Label>Container No</Label>
+                          <Input 
+                        id={"vehical_no_"+i}
+                         type="text" 
+                        
+                         maxLength={11}
+                         onKeyDown={handleKeyDown}
+                         onPaste={handleKeyDown}
+                         onChange={(e) => onValueChange(e, "vehical_no", i)} />
+                         </>
+                      ) : (
+                        <>
+                        <Label>RR No</Label>
+                        <Input 
+                        id={"vehical_no_"+i}
+                         type="text" onChange={(e) => onValueChange(e, "vehical_no", i)} />
+                         </>
+                      )}
+                    
+                    </FormGroup>
+                  </Col>
+                  {vehicleId === ContrMdl ? (
+                    <>
+                      <Col md="2" sm="12">
+                        <FormGroup>
+                          <Label>Seal No</Label>
+                          <Input placeholder="Seal No"  id={"seal_no_"+i} onChange={(e) => onValueChange(e, "seal_no", i)} />
+                        </FormGroup>
+                      </Col>
+                    </>
+                  ) : (
+                    ""
+                  )}
+                  {vehicleId === RackMdl ? (
+                    <>
+                      <Col md="2" sm="12">
+                        <FormGroup>
+                          <Label>No of Wagon</Label>
+                          <NumberOnlyInput
+                            type="text"
+                            decimalFormat={"2,0"}
+                            maxLength={2}
+                            placeholder="No of Wagon"
+                            id={"no_of_wagon_"+i} 
+                            onChange={(e) => onValueChange(e, "no_of_wagon", i)}
+                          />
+                        </FormGroup>
+                      </Col>
+                    </>
+                  ) : (
+                    ""
+                  )}
+                  {vehicleId === TruckMdl || vehicleId === ContrMdl ? (
+                    <>
+                      <Col md="3" sm="12">
+                        <FormGroup>
+                          <Label>Supplier WB qty (In Kgs)</Label>
+                          <NumberOnlyInput
+                            type="text"
+                            decimalFormat={"5,0"}
+                            maxLength={5}
+                            placeholder="Supplier WB qty (In Kgs)"
+                            id={"supplier_wb_qty_"+i} 
+                            onChange={(e) => onValueChange(e, "supplier_wb_qty", i)}
+                          />
+                        </FormGroup>
+                      </Col>
+                      <Col md="2" sm="12">
+                        <FormGroup>
+                          <Label>Supplier WB date</Label>
+                          <Input
+                            type="date"
+                            max={today}
+                            placeholder="Supplier WB date"
+                            onChange={(e) => onValueChange(e, "supplier_wb_date", i)}
+                            onBlur={onValidWBDate}
+                          />
+                        </FormGroup>
+                      </Col>
+                    </>
+                  ) : (
+                    ""
+                  )}
+
+                  {renderSupplierInvoiceDetails(item, vehicleId, i)}
+                  <Col md="2" sm="12">
+                    <FormGroup>
+                      <Label className="d-block" for="nameMulti" title="Supplier Invoice Copy">
+                        Inv Copy
+                      </Label>
+                      <input
+                        type="file"
+                        className="form-control"
+                        id={`supInvcpy${i}`}
+                        hidden
+                        name="upload_file"
+                        accept=".pdf, image/*"
+                        onChange={(e) => {
+                          handleFileChange(e, "sup_inv_copy", i);
+                        }}
+                      />
+                      <Button.Ripple
+                        outline
+                        color="primary"
+                        onClick={(e) => {
+                          fileUploadAction(`supInvcpy${i}`);
+                        }}
+                      >
+                        <Paperclip size={14} />
+                        <span className="align-middle ml-25">pdf</span>
+                      </Button.Ripple>
+                      <div>
+                        <div className="align-middle ml-25">{item.sup_inv_copy}</div>
+                      </div>
+                    </FormGroup>
+                    {/*<CaptureImageSDI setvehicalDatas={setvehicalDatas}   vehicalDatas={vehicalDatas} ImgKey={`sup_inv_Imgcopy`} index={i} ItemName={`sup_inv_Imgcopy${i}`}  />*/}
+                  </Col>
+                  {item.hasOwnProperty("sup_wb_copy") ? (
+                    <Col md="2" sm="12">
+                      <FormGroup>
+                        <Label className="d-block" for="nameMulti" title="Supplier WB Copy">
+                          WB Copy
+                        </Label>
+                        <input
+                          type="file"
+                          className="form-control"
+                          id={`supWbcpy${i}`}
+                          hidden
+                          name="upload_file"
+                          accept=".pdf, image/*"
+                          onChange={(e) => {
+                            handleFileChange(e, "sup_wb_copy", i);
+                          }}
+                        />
+                        <Button.Ripple
+                          outline
+                          color="primary"
+                          onClick={(e) => {
+                            fileUploadAction(`supWbcpy${i}`);
+                          }}
+                        >
+                          <Paperclip size={14} />
+                          <span className="align-middle ml-25">pdf</span>
+                        </Button.Ripple>
+                        <div>
+                          <div className="align-middle ml-25">{item.sup_wb_copy}</div>
+                        </div>
+                      </FormGroup>
+                      
+                     {/* <CaptureImageSDI ImgData={item.sup_wb_Imgcopy} setImgData={setImgData}  ItemName={`SupplierWbcpy${i}`} />*/}
+                     <CaptureImageSDI setvehicalDatas={setvehicalDatas}   vehicalDatas={vehicalDatas} ImgKey={`sup_wb_Imgcopy`} index={i} ItemName={`sup_wb_Imgcopy${i}`}  />
+                      
+                    </Col>
+                  ) : (
+                    ""
+                  )}
+                  <Col md="2" sm="12" className="mt-50">
+                    <Button.Ripple
+                      color="danger"
+                      className="text-nowrap px-1 mt-75"
+                      onClick={(e) => {
+                        deleteForm(i);
+                      }}
+                      outline
+                    >
+                      <X size={14} className="" />
+                      <span></span>
+                    </Button.Ripple>
+                  </Col>
+                </Row>
+
+                <Col sm={12}>
+                  <hr />
+                </Col>
+              </div>
+            );
+          })}
+        <Col sm="12" className="d-flex justify-content-end">
+          <Button.Ripple
+            className="btn-icon"
+            color="primary"
+            onClick={(e) => {
+              addTblRecord(vehicleId);
+            }}
+          >
+            <Plus size={14} />
+            <span className="align-middle ml-25">Add</span>
+          </Button.Ripple>
+        </Col>
+      </Col>
+    );
+  };
+  const renderVehicals = (vehicleId) => {
+    return (
+      <Card>
+        <CardBody>
+          {renderHeader(vehicleId)}
+          {vehicleId === ContrMdl ? renderContExtraFields() : ""}
+          {renderBody(vehicleId)}
+        </CardBody>
+      </Card>
+    );
+  };
+
+  const isFilledAll = () => {
+    if (vehicalDatas.length) {
+      let attch=0;
+      let imgcap=0;
+      const vd = vehicalDatas.filter((item) => {
+        console.log("VehicalData");
+        const itemValues = Object.values(item);
+        let ret=false;
+        Object.keys(item).forEach((key1) => {
+          console.log("key=>"+key1+", v=>"+item[key1]);
+        
+          if((key1=="sup_inv_copy") && item[key1]=="" && item["sup_inv_Imgcopy"]==""){
+            console.log("true1")
+            ret=true;
+          }
+          else if((key1=="sup_inv_Imgcopy") && item[key1]=="" && item["sup_inv_copy"]==""){
+            console.log("true11")
+            ret=true;
+          }
+          else if((key1=="sup_wb_copy" ) && item[key1]=="" && item["sup_wb_Imgcopy"]==""){
+            console.log("true2")
+            ret=true;
+          }
+          else if((key1=="sup_wb_Imgcopy") && item[key1]=="" && item["sup_wb_copy"]==""){
+            console.log("true22")
+            ret=true;
+          }
+          else if((item[key1]=="" || item[key1]==null)  &&  key1!="sup_wb_Imgcopy" && key1!="sup_wb_copy" && key1!="sup_inv_copy" && key1!="sup_inv_Imgcopy"){
+            console.log("true3")
+            ret=true;
+          }
+        });
+        console.log(!itemValues.every((x) => x !== null && x !== ""));
+        console.log(ret);
+return ret;
+      //  return !itemValues.every((x) => x !== null && x !== "");
+      });
+      if (vd.length) {
+        console.log("true- length")
+        return true;
+      }
+    }
+    if (poData.PURCHASE_ORG === "12" && (!formData.VESSEL_NAME || !formData.FUMIGATION)) {
+      return true;
+    }
+
+    /*
+    const nitem = { ...item, LINE_ITEM: formData.ZPO_LINE_ITEM };
+    postdata.append("files[]", nitem["sup_inv_copy_attach"]);
+    if (nitem["sup_wb_copy_attach"]) {
+      postdata.append("files[]", nitem["sup_wb_copy_attach"]);
+    }*/
+
+ /*   const isAttachedInvCopy = postdata.sup_inv_copy_attach && postdata.sup_inv_copy_attach.name && postdata.sup_inv_copy_attach.name.length ? true : false;
+    if (!isAttachedInvCopy && poData.imageSrc=="") {
+      return true;
+    }
+
+    const isAttachedWbCopy = postdata.sup_wb_copy_attach && postdata.sup_wb_copy_attach.name && postdata.sup_wb_copy_attach.name.length ? true : false;
+    if (!isAttachedWbCopy && poData.imageSrc=="") {
+      return true;
+    }
+*/
+    // const fmValues = Object.values(formData);
+    // console.log(fmValues);
+    // return !fmValues.every((x) => x !== null && x !== "");
+  };
+  const onLocationChange = (e) => {
+    setSelectedLocation(e);
+    setFormData((p) => ({ ...p, ZSUPPLIER_LOAD_POINT: e.label }));
+    let state = e.value.split("-");
+
+    apiPostMethod(`${getEdaUrl}?from=${state[state.length - 1].trim()}&to=${poData.plant_id}&type=${poData.VEHICLETYPE}`, {})
+      .then((response) => {
+        const { data } = response;
+        if (data.success && data.results.length) {
+          const { results } = data;
+          setFormData((p) => ({ ...p, EDA_DAYS: results }));
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });
+  };
+  const {
+    BROCKER_NAME,
+    IDNLF,
+    MATNR,
+    NETPR,
+    PLANT_NAME,
+    STORAGE_LOCATION,
+    INCO_DESC,
+    POLOADINGDATE,
+    VEHICLETYPE,
+    PO_Bag_Type,
+    PURCHASE_ORG,
+  } = poData;
+  const { ZPO_NUMBER, ZSUPPLIER_LOAD_DT, ZSUPPLIER_NAME, ZSUPPLIER_CODE, ZPO_LINE_ITEM, EDA } = formData;
+  return (
+    <div>
+      <RefreshBlock />
+      <Card>
+        <CardBody>
+          <div>
+            <Row>
+              <Col md="12" sm="12">
+                <h5>{"Supplier Dispatch"}</h5>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label>PO Number</Label>
+                  <Select
+                    options={poOptions}
+                    id={"EBELN"}
+                    className="react-select"
+                    classNamePrefix="select"
+                    value={{ label: ZPO_NUMBER, value: ZPO_NUMBER }}
+                    onChange={(e) => onPOChange(e)}
+                  />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label>PO Line Item</Label>
+                  {!ZPO_NUMBER ? (
+                    <Input type="text" disabled={true} placeholder={"Select the PO Number"} />
+                  ) : (
+                    <Select
+                      options={poLineOptions}
+                      className="react-select"
+                      classNamePrefix="select"
+                      value={{ label: ZPO_LINE_ITEM, value: ZPO_LINE_ITEM }}
+                      onChange={(e) => onLineItemchange(e)}
+                    />
+                  )}
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label>Supplier Name</Label>
+                  {!ZPO_NUMBER || !ZPO_LINE_ITEM ? (
+                    <Input type="text" disabled={true} placeholder={"Select the PO Line Item"} />
+                  ) : (
+                    <Select
+                      options={supplierOptions}
+                      className="react-select"
+                      classNamePrefix="select"
+                      value={{ label: ZSUPPLIER_NAME, value: ZSUPPLIER_CODE }}
+                      onChange={(e) => onSupplierChange(e)}
+                    />
+                  )}
+                </FormGroup>
+              </Col>
+              {/* <Col md='8' sm='12' className='d-flex align-items-center'>
+                                <span>Open PO Qty :</span><span className='item-qty ml-50'>10000kg</span>
+                            </Col> */}
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="cityMulti">Inco Terms</Label>
+                  <Input type="text" placeholder="Inco Terms" value={INCO_DESC} disabled />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="nameMulti">Broker Name</Label>
+                  <Input type="text" placeholder="Broker Name" value={BROCKER_NAME} disabled />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="cityMulti">Wheat Variety</Label>
+                  <Input type="text" placeholder="Wheat Variety" value={IDNLF} disabled />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="cityMulti">PO Rate</Label>
+                  <Input type="text" placeholder="PO Rate" value={roundOf(NETPR)} disabled />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="nameMulti">Receiving Storage Location</Label>
+                  <Input type="text" placeholder="Receiving Storage Location" value={STORAGE_LOCATION} disabled />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="cityMulti">Receiving Plant</Label>
+                  <Input type="text" placeholder="Recieving Plant" value={PLANT_NAME} disabled />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="cityMulti">PO Bag Type</Label>
+                  <Input type="text" placeholder="PO Bag Type" value={PO_Bag_Type} disabled />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="cityMulti">Purchase PO org</Label>
+                  <Input type="text" placeholder="Purchase PO org" value={VEHICLETYPE} disabled />
+                </FormGroup>
+              </Col>
+              {PURCHASE_ORG === ContrMdl ? (
+                <Col md="4" sm="12">
+                  <FormGroup>
+                    <Label for="cityMulti">Liner Name</Label>
+                    <DropdownControl
+                      selectedValue={selectedLiner}
+                      url={`${masterUrl}?formType=LinerName`}
+                      onDdlChange={(e) => onLinerChange(e)}
+                    />
+                  </FormGroup>
+                </Col>
+              ) : (
+                ""
+              )}
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="cityMulti">PO Loading Date</Label>
+                  <Input type="text" placeholder="PO Loading Date" value={POLOADINGDATE} disabled />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="cityMulti">Material NO</Label>
+                  <Input type="text" placeholder="Material NO" value={MATNR} disabled />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="cityMulti">Supplier Loading Point</Label>
+                  {/* <Input
+                    type="text"
+                    value={ZSUPPLIER_LOAD_POINT}
+                    placeholder="Supplier Loading Point"
+                    onChange={(e) => onTextChange(e, "ZSUPPLIER_LOAD_POINT")}
+                  /> */}
+
+                  <DropdownControl
+                    isDisabled={!poData.STORAGE_LOCATION}
+                    placeholder={"Supplier Loading Point"}
+                    selectedValue={selectedLocation}
+                    url={`${masterUrl}?formType=GetFromLocation`}
+                    onDdlChange={(e) => onLocationChange(e)}
+                  />
+                </FormGroup>
+              </Col>
+
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="cityMulti">Supplier Loading Date</Label>
+                  <Input type="date" value={ZSUPPLIER_LOAD_DT}  max={today} onChange={onSupplierLoadingDate} onBlur={onValidLoadingDate} />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="cityMulti">EDA</Label>
+                  <Input type="date" name="eda" value={EDA} placeholder="EDA" onChange={onEDAChange} />
+                </FormGroup>
+              </Col>
+            </Row>
+          </div>
+        </CardBody>
+      </Card>
+      {PURCHASE_ORG && renderVehicals(PURCHASE_ORG)}
+      <Card>
+        <Col sm="12" className="my-1">
+          <FormGroup className="d-flex mb-0 justify-content-end align-items-center">
+            <Button.Ripple outline color="secondary" type="button" className="mr-2" onClick={(e) => resetForm()}>
+              Cancel
+            </Button.Ripple>
+            <div className="mr-50">
+              <Button.Ripple color="primary" disabled={isFilledAll()} type="button" onClick={(e) => onSubmitSD()}>
+                Submit
+              </Button.Ripple>
+            </div>
+          </FormGroup>
+        </Col>
+      </Card>
+    </div>
+  );
+};
+export default SupplierDispatchInfo;

@@ -1,0 +1,24 @@
+[dir] .btn {
+  padding: 0.65rem;
+}
+
+.custom-width {
+  width: 10rem;
+}
+
+.invalid-feedback {
+  display: block;
+}
+.swal2-confirm {
+  margin-right: 1rem;
+}
+.parentDisable {
+  position: fixed;
+  top: 0;
+  left: 0;
+  background: #333;
+  opacity: 0.8;
+  z-index: 9999;
+  height: 100%;
+  width: 100%;
+}

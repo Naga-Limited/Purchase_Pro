@@ -1,0 +1,105 @@
+/*================================================================================
+	Item Name: Purchase Pro
+	Version: 2.0
+	Author: PECZAWEB
+	Author URL: http://www.peczaweb.com/
+================================================================================
+
+NOTE:
+------
+PLACE HERE YOUR OWN SCSS CODES AND IF NEEDED, OVERRIDE THE STYLES FROM THE OTHER STYLESHEETS.
+WE WILL RELEASE FUTURE UPDATES SO IN ORDER TO NOT OVERWRITE YOUR STYLES IT'S BETTER LIKE THIS.  */
+
+[dir] .main-menu ul.navigation-main > li:first-child {
+  margin-top: 12px;
+}
+[dir] .header-navbar.floating-nav {
+  margin: 0px;
+}
+.header-navbar.floating-nav {
+  border-radius: 0px;
+}
+[dir] .main-menu .navbar-header .navbar-brand {
+  margin-top: 3px;
+}
+.main-menu .navbar-header .navbar-brand .brand-logo img {
+  max-width: 225px;
+  margin-top: 10px;
+  left: -9px;
+  position: relative;
+}
+[dir] .progress-bar {
+  background-color: #fff;
+}
+
+.naga-login-page {
+  background: url(../images/naga/LoginImage.png);
+  // background-size: cover;
+  background-size: contain !important; 
+}
+
+html[dir] .content.app-content {
+  padding: 5.75rem 2rem 0 !important;
+}
+
+.nav-tabs .nav-link {
+  color: #7367f0 !important;
+  border: 1px solid #7367f0 !important;
+  min-width: auto;
+  margin-left: 10px;
+  border-radius: 6px !important;
+  font-weight: 450;
+  position: relative;
+  overflow: hidden;
+}
+.nav-tabs .nav-link.active {
+  position: relative;
+  color: #fff !important;
+  border-radius: 6px;
+  border-color: transparent !important;
+  background-color: #7367f0 !important;
+}
+.css-1rhbuit-multiValue {
+  background-color: #7367f0 !important;
+}
+
+.select__control .select__placeholder,
+.react-select__control .select__placeholder {
+  color: #bfbfc8 !important;
+}
+
+.daterangepicker td.start-date {
+  border-radius: 14px 0 0 14px;
+}
+
+.daterangepicker td.end-date {
+  border-radius: 0 14px 14px 0;
+}
+
+.rdt_TableHeadRow{
+  background-color: #7367f0 !important;
+}
+
+.egpQLm {
+  color:#ffffff !important;
+}
+.rdt_TableCol{
+  color:#ffffff !important;
+}
+
+.rdt_TableCell {
+  border: 1px solid #7367f0;
+  // border-spacing: 0;
+  border-collapse: collapse;
+  // border-bottom: 0px;
+  margin-top: -1px;
+}
+
+@media print {
+  .header-navbar {
+    display: none;
+  }
+  .main-menu {
+    display: none;
+  }
+}

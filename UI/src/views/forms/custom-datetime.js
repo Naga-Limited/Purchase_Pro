@@ -1,0 +1,93 @@
+import React from "react";
+import { FormGroup, Label, FormFeedback } from "reactstrap";
+import DateRangePicker from "react-bootstrap-daterangepicker";
+import moment from "moment";
+import { getErrorAndValue } from "./utils";
+
+export function DatePicker({ form, id, label, placeholder, showFutureDate, isDateRange, format,NotLoadOnchange=0 }) {
+  format = format || "DD/MM/YYYY";
+  let { selectedValue, touchValue, errorValue } = getErrorAndValue(id, form);
+
+  const getValue = () => {
+    if (isDateRange) {
+      let val = selectedValue || {};
+      if (val.start && !val.end) {
+        return `${moment(val.start).format(format)}`;
+      }
+      if (val.start && val.end) {
+        return `${moment(val.start).format(format)} - ${moment(val.end).format(format)}`;
+      }
+    } else if (selectedValue) {
+      //alert(moment(selectedValue).format(format));
+      return moment(selectedValue).format(format);
+    }
+    return "";
+  };
+
+  const handleEvent = (start, end) => {
+    if (isDateRange) {
+      form.setFieldValue(id, {
+        start: start.toDate(),
+        end: end.toDate(),
+      });
+    } else {
+      form.setFieldValue(id, start.toDate());
+    }
+  };
+
+  return (
+    <FormGroup>
+      <Label>{label}</Label>
+      <DateRangePicker
+        // onCallback={handleEvent}
+        onEvent={(evnt, picker) => {
+          if (evnt.type == "hide") {
+            handleEvent(picker.startDate, picker.endDate);
+          }
+        }}
+        // onCallback={(start, end) => {
+        //   console.log(start, end);
+        // }}
+        // onCancel={() => {
+        //   console.log("Cancel");
+        // }}
+
+        initialSettings={{
+          autoUpdateInput: false,
+          singleDatePicker: !isDateRange,
+          autoApply: true,
+          showDropdowns: true,
+          alwaysShowCalendars: true,
+          // linkedCalendars: false,
+          ranges: {
+            Today: [moment(), moment()],
+            Yesterday: [moment().subtract(1, "days"), moment().subtract(1, "days")],
+            "Last 7 Days": [moment().subtract(6, "days"), moment()],
+            "Last 30 Days": [moment().subtract(29, "days"), moment()],
+            "This Month": [moment().startOf("month"), moment().endOf("month")],
+            "Last Month": [moment().subtract(1, "month").startOf("month"), moment().subtract(1, "month").endOf("month")],
+          },
+          //   startDate: "",
+          //   endDate: "",
+          maxDate: showFutureDate ? undefined : moment(),
+          locale: {
+            format: format,
+          },
+        }}
+      >
+        <input
+          type="text"
+          className={"form-control"}
+          placeholder={placeholder || label}
+          onBlur={() => {
+            if(NotLoadOnchange!=1){
+            form.setFieldTouched(id);
+            }
+          }}
+          value={getValue()}
+        ></input>
+      </DateRangePicker>
+      {(touchValue || form.isSubmitting) && form.errors && errorValue && <FormFeedback>{errorValue}</FormFeedback>}
+    </FormGroup>
+  );
+}

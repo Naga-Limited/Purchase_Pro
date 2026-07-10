@@ -1,0 +1,595 @@
+import { Card, Table, CardBody, FormGroup, Row, Col, Input, Button, Label } from "reactstrap";
+import React, { useEffect, useState } from "react";
+import Select from "react-select";
+import { Paperclip } from "react-feather";
+import { useParams } from "react-router";
+import { Link, useHistory } from "react-router-dom";
+import { apiPostMethod, apiGetMethod } from "@helpers/axiosHelper";
+import { errorToast } from "@helpers/appHelper";
+import { qcTestUrl, uploadUrl, qcUrl, getWheatMasterUrl,SaveCaptureImage } from "../../urlConstants";
+import { QCConstant, QCFConstant } from "./constant";
+import QualityCheckForm, { getQcFormPostData, surveyorDeviceType, validateQualityForm } from "./QualityCheckForm";
+import { InputControl } from "../../@core/components/custom/input-control";
+import { useLoader } from "../../utility/hooks/useLoader";
+import 'react-responsive-modal/styles.css';
+import CaptureImage from "../CaptureImage";
+
+//import htmlComponent from "http://localhost/pp/api/CaptureImage.html";
+
+
+const statusOptions = [
+  {
+    options: [
+      { value: "A", label: "A-Accepted" },
+      { value: "R", label: "R-Rejected" },
+    /*  { value: "AD", label: "AD - Accepted with Deduction" },*/
+    ],
+  },
+];
+const sto_statusOptions = [
+  {
+    options: [
+      { value: "A", label: "A-Accepted" },
+      { value: "R", label: "R-Rejected" },
+      { value: "AD", label: "AD - Accepted with Deduction" },
+    ],
+  },
+];
+const RakestatusOptions = [
+  {
+    options: [
+      { value: "A", label: "A-Accepted" },
+      { value: "AD", label: "AD - Accepted with Deduction" },
+    ],
+  },
+];
+
+const testOptions = [
+  {
+    options: [
+      { value: "nir_yes", label: "NIR - Yes" },
+      { value: "nir_no", label: "NIR - No" },
+      { value: "nir_foss", label: "NIR - FOSS" },
+      { value: surveyorDeviceType, label: "Surveyor" },
+    ],
+  },
+];
+const degradeOptions = [
+  {
+    options: [
+      { value: "1", label: "Yes" },
+      { value: "2", label: "No" },
+    ],
+  },
+];
+
+const QualityCheckDetails = () => {
+  const history = useHistory();
+  let { showLoader, hideLoader } = useLoader();
+  let { id } = useParams();
+  let refid = id.replace(":", "");
+
+  const [poData, setPoData] = useState({ ...QCConstant });
+  const [formData, setFormaData] = useState({ ...QCFConstant });
+  const [qcFormData, setqcFormData] = useState([]);
+  const [attachedFiles, setAttachment] = useState({ qcwrkdoc: {} });
+  const [wheatVarityOptions, setWheatVarityOptions] = useState([]);
+  const [selectedDeviceType, setSelectedDeviceType] = useState();
+
+
+  const onTextChange = (e, key) => {
+    console.log("Test");
+    let Value=e.target ? e.target.value : e.value;
+    console.log(Value);
+    let regEx = /[^a-zA-Z0-9]/gi; 
+       
+    Value = Value.replace(regEx, "");
+console.log(Value);
+    setFormaData({
+      ...formData,
+      [key]:Value,
+    });
+  };
+  const onQCDetails = () => {
+
+    if(isFilledAll()){
+      return false;
+    }
+    let fields = getQcFormPostData(qcFormData);
+    const { qcdeviceType, others_comment, overall_result, recommended_lot, degrade, wheat_variety, surveyor_name, reference_no } = formData;
+    const { SCREEN_TYPE, VEHICLE_TYPE, ZPO_NUMBER,VECHICAL_STATUS,QCDocument,ZVA_NUMBER } = poData;
+    let fdata = {
+      ...fields,
+      others_comment: others_comment,
+      overall_result: overall_result,
+      recommended_lot: recommended_lot,
+      surveyor_name: surveyor_name,
+      reference_no: reference_no,
+      purchase_info_id: refid,
+      deviceType: qcdeviceType,
+      formType: "A",
+      VEHICLE_TYPE: VEHICLE_TYPE,
+      degrade: degrade,
+      wheat_variety: wheat_variety,
+      PO_NUMBER: ZPO_NUMBER,
+      VECHICAL_STATUS,
+      SCREEN_TYPE
+    };
+    
+    let FileSaveUrl="";
+    let postdata = new FormData();
+    console.log("SAVE")
+  console.log(JSON.stringify(poData))
+      if(QCDocument){
+      postdata.append("image", QCDocument);
+      FileSaveUrl=SaveCaptureImage;
+      }else{
+      Object.keys(attachedFiles).forEach((key) => {
+        postdata.append("file[]", attachedFiles[key]);
+      });
+      postdata.append("form_name", SCREEN_TYPE);
+      postdata.append("ponumber", ZPO_NUMBER);
+      postdata.append("VA_Number", ZVA_NUMBER);
+      postdata.append("SubFolder", "Quality_Check");
+      FileSaveUrl=uploadUrl;
+    }
+      showLoader();
+      apiPostMethod(FileSaveUrl, postdata, "File")
+        .then((response) => {
+          const { data } = response;
+          if (data.success) {
+            fdata.qc_work_doc = data.files[0].updname;
+            apiPostMethod(qcUrl, fdata)
+              .then((response) => {
+                if (response.data.success) {
+                  history.push(`/QC`);
+                }
+              })
+              .catch((error) => {
+                errorToast("Something went wrong, please try again after sometime");
+              });
+          } else {
+            errorToast(data.files[0].orgname + " file format is not supported ");
+          }
+        })
+        .catch((error) => {
+          errorToast("Something went wrong, please try again after sometime");
+        })
+        .finally((a) => {
+          hideLoader();
+        });
+    
+    
+  };
+
+  useEffect(() => {
+    if (!poData.ZPO_NUMBER) {
+      onFetchPodetailsById();
+      fetchWheatVariety();
+    }
+   
+  }, [poData]);
+
+  const onFetchPodetailsById = () => {
+    let fdata = {
+      id: refid,
+      formType: "PO",
+    };
+    apiPostMethod(qcUrl, fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          setPoData({ ...poData, ...data.results[0] });
+         
+          setqcFormData(data.qmResults);
+          setSelectedDeviceType({label:"NIR - YES",value:"nir_yes"});
+          setFormaData({
+            ...formData,
+            qcdeviceType:"nir_yes",
+          });
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });
+  };
+  const fetchWheatVariety = () => {
+    apiGetMethod(getWheatMasterUrl)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          setWheatVarityOptions(data.results);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      });
+  };
+
+  const onDeviceChange = (e) => {
+    setSelectedDeviceType(e);
+    onFetchQCTest(e.value);
+    onTextChange(e, "qcdeviceType");
+  };
+
+  const onFetchQCTest = (val) => {
+    let fdata = {
+      wvcode: poData.IDNLF,
+      qctest: val,
+    };
+    showLoader();
+    apiPostMethod(qcTestUrl, fdata)
+      .then((response) => {
+        const { data } = response;
+        if (data.success) {
+          const result = data.results;
+          setqcFormData(result);
+        }
+      })
+      .catch((error) => {
+        errorToast("Something went wrong, please try again after sometime");
+      })
+      .finally((a) => {
+        hideLoader();
+      });
+  };
+
+  const onDegradeChange = (e) => {
+    const { value } = e.target ? e.target : e;
+    setFormaData({
+      ...formData,
+      degrade: value,
+      wheat_variety: "",
+    });
+  };
+
+  const fileUploadAction = () => {
+    document.getElementById("qcwrkdoc").click();
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0].size > 5242880) {
+      errorToast("File Size is too Large. Please try again with less than 5Mb");
+    } else {
+      let _filesarr = {
+        ...attachedFiles,
+        [e.target.id]: e.target.files[0],
+      };
+      setAttachment(_filesarr);
+    }
+  };
+
+  const isFilledAll_OLD = () => {
+    const isAttachedVal = attachedFiles.qcwrkdoc && attachedFiles.qcwrkdoc.name && attachedFiles.qcwrkdoc.name.length ? true : false;
+    if (!isAttachedVal) {
+      return true;
+    }
+    const qctestvalue = validateQualityForm(qcFormData);
+    if (qctestvalue.length) {
+      return true;
+    }
+    let fmdata = { ...formData };
+    delete fmdata.others_comment;
+    if (fmdata.degrade === "2") {
+      delete fmdata.wheat_variety;
+    }
+    if (selectedDeviceType && selectedDeviceType.value === surveyorDeviceType && (!fmdata.surveyor_name || !fmdata.surveyor_name.trim())) {
+      return true;
+    }
+    const fmValues = Object.values(fmdata);
+    return !fmValues.every((x) => x !== null && x !== "");
+  };
+  const showError = (Id,Msg,show) => {
+    if(document.getElementById(Id)) { 
+      document.getElementById(Id).innerHTML="";
+    if(show==1){
+      console.log("SHOW ERROR:"+Id);
+    document.getElementById(Id).innerHTML=Msg;
+    }
+  }
+  }
+  const isFilledAll = () => {
+    showError("qcwrkdoc_Error","Invalid WB Name ",0);
+    showError("qctestvalue_Error","Fill the Quality check Details..! ",0);
+    showError("selectedDeviceType_Error","Invalid WB Name ",0);
+    showError("recommended_lot_Error","Invalid WB Name ",0);
+    showError("degrade_Error","Invalid WB Name ",0);
+    showError("wheat_variety_Error","Invalid WB Name ",0);
+    showError("overall_result_Error","Invalid WB Name ",0);
+    showError("others_comment_Error","Invalid WB Name ",0);
+    
+    const isAttachedVal = attachedFiles.qcwrkdoc && attachedFiles.qcwrkdoc.name && attachedFiles.qcwrkdoc.name.length ? true : false;
+    if (!isAttachedVal && poData.imageSrc=="") {
+      
+      showError("qcwrkdoc_Error","QC Document Not Uploaded..! ",1);
+      return true;
+    }
+    const qctestvalue = validateQualityForm(qcFormData);
+    if (qctestvalue.length) {
+      
+      showError("qctestvalue_Error","Fill the Quality check Details..! ",1);
+      return true;
+    }
+    let fmdata = { ...formData };
+    delete fmdata.others_comment;
+    if (fmdata.degrade === "2") {
+      delete fmdata.wheat_variety;
+    }
+    if(!selectedDeviceType){
+      showError("selectedDeviceType_Error","Select Device type ",1);
+    }
+    if (selectedDeviceType && selectedDeviceType.value === surveyorDeviceType && (!fmdata.surveyor_name || !fmdata.surveyor_name.trim())) {
+      
+      showError("selectedDeviceType_Error","Invalid Device type ",1);
+     
+      return true;
+    }
+    
+    if(!formData.recommended_lot) { showError("recommended_lot_Error","Enter Recommended Lot",1); }
+    if(!formData.degrade) { showError("degrade_Error","Select Degrade",1); }
+    if(!formData.degrade==1){
+    if(!formData.wheat_variety) { showError("wheat_variety_Error","Select Wheat Variety",1); }
+    }
+    if(!formData.overall_result) { showError("overall_result_Error","Select Overall Result",1); }
+    if(!formData.others_comment) { showError("others_comment_Error","Select Overall Result",1); }
+    
+   
+
+    const fmValues = Object.values(fmdata);
+    console.log(JSON.stringify(fmValues));
+    return !fmValues.every((x) => x !== null && x !== "");
+  };
+
+  
+
+  /*const capture = React.userCallback(
+()=>{
+const imageSrc=webcamRef.current.getScreenshot();
+},
+[webcamRef]
+  );*/
+
+  const { qcwrkdoc } = attachedFiles;
+  const { ZPO_NUMBER, TRUCK_NO, DRIVER_NO, IDNLF, ZVA_NUMBER } = poData;
+  const { degrade } = formData;
+  return (
+    <div>
+      <p className="font-medium-5 mt-0 extension-title" data-tour="extension-title">
+        Quality Check : {ZVA_NUMBER}
+      </p>
+      <Card>
+        <CardBody>
+          <div>
+            <Row>
+              <Col md="12" sm="12">
+                <h5>Truck Info</h5>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="nameMulti">PO Number</Label>
+                  <Input type="text" value={ZPO_NUMBER} placeholder="PO Number" disabled />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="lastNameMulti">Truck Number</Label>
+                  <Input type="text" value={TRUCK_NO} placeholder="Truck Number" disabled />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="cityMulti">Driver Number</Label>
+                  <Input type="text" value={DRIVER_NO} placeholder="Driver Number" disabled />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label for="wheatvariety">Wheat Variety</Label>
+                  <Input type="text" value={IDNLF} placeholder="Wheat Variety" disabled />
+                </FormGroup>
+              </Col>
+              <Col md="4" sm="12">
+                <FormGroup>
+                  <Label>Device Type</Label>
+                  <Select
+                    options={testOptions}
+                    value={selectedDeviceType}
+                    id={"deviceType"}
+                    className="react-select"
+                    classNamePrefix="select"
+                    onChange={(e) => onDeviceChange(e)}
+                  />
+                </FormGroup>
+                <span id="selectedDeviceType_Error" style={{color: "red"}} ></span>
+              </Col>
+              
+              {selectedDeviceType && selectedDeviceType.value === surveyorDeviceType && (
+                <>
+                  <Col md="4" sm="12">
+                    <FormGroup>
+                      <Label>Surveyor Name</Label>
+                      <Input
+                        type="text"
+                        maxLength="20"
+                        name="SurveyorName"
+                        onChange={(e) => onTextChange(e, "surveyor_name")}
+                        placeholder="Surveyor Name"
+                      />
+                    </FormGroup>
+                  </Col>
+                  <Col md="4" sm="12">
+                    <FormGroup>
+                      <Label>Reference No (Optional)</Label>
+                      <Input
+                        type="text"
+                        maxLength="20"
+                        name="ReferenceNo"
+                        onChange={(e) => onTextChange(e, "reference_no")}
+                        placeholder="Reference No"
+                      />
+                    </FormGroup>
+                  </Col>
+                </>
+              )}
+            </Row>
+            {qcFormData && qcFormData.length ? (
+              <>
+              <span id="qctestvalue_Error" style={{color: "red"}} ></span>
+                <Row className="mt-2">
+                  <Col md="12" sm="12">
+                    <h5>Quality Info</h5>
+                  </Col>
+                  
+                      
+                  <Col md="9" sm="12">
+                    <Table responsive>
+                      <thead>
+                        <tr>
+                          <th className="custom-width">Category</th>
+                          <th>Quality</th>
+                          <th>Min</th>
+                          <th>Max</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <QualityCheckForm qcFormData={qcFormData} setqcFormData={setqcFormData} />
+                      </tbody>
+                    </Table>
+                  </Col>
+                  <Col className="pt-5" sm="12" md="4">
+                    <FormGroup>
+                      <Label for="nameMulti" className="d-block">
+                        Recommended Lot{" "}
+                      </Label>
+                      <Input
+                        type="text"
+                        maxLength="20"
+                        name="unloadlot"
+                        value={formData.recommended_lot}
+                        onChange={(e) => onTextChange(e, "recommended_lot")}
+                        placeholder="Recommended Lot"
+                      />
+                    </FormGroup>
+                    <span id="recommended_lot_Error" style={{color: "red"}} ></span>
+                  </Col>
+                  <Col className="pt-5" sm="12" md="4">
+                    <FormGroup>
+                      <Label for="nameMulti">Overall Result</Label>
+                      <Select
+                        className="react-select"
+                        classNamePrefix="select"
+                        options={poData.VEHICLE_TYPE !== "Rake" ? poData.SCREEN_TYPE=="SDO" ? sto_statusOptions : statusOptions : RakestatusOptions}
+                        onChange={(e) => onTextChange(e, "overall_result")}
+                      />
+                    </FormGroup>
+                    <span id="overall_result_Error" style={{color: "red"}} ></span>
+                  </Col>
+                  <Col className="pt-5" md="4" sm="12">
+                    <FormGroup>
+                      <Label>Degrade</Label>
+                      <Select
+                        className="react-select"
+                        classNamePrefix="select"
+                        options={degradeOptions}
+                        onChange={(e) => onDegradeChange(e)}
+                      />
+                    </FormGroup>
+                    <span id="degrade_Error" style={{color: "red"}} ></span>
+                  </Col>
+                  {degrade && degrade == "1" ? (
+                    <Col md="4" sm="12">
+                      <FormGroup>
+                        <Label>Wheat Variety</Label>
+                        <Select
+                          className="react-select"
+                          classNamePrefix="select"
+                          options={wheatVarityOptions}
+                          onChange={(e) => onTextChange(e, "wheat_variety")}
+                        />
+                      </FormGroup>
+                      <span id="wheat_variety_Error" style={{color: "red"}} ></span>
+                    </Col>
+                  ) : (
+                    ""
+                  )}
+                
+                  <Col sm="12" md="4">
+                    <FormGroup>
+                      <Label for="nameMulti">QC Documents</Label>
+                      <br />
+                      <input
+                        type="file"
+                        className="form-control"
+                        id="qcwrkdoc"
+                        hidden
+                        name="upload_file"
+                        accept=".pdf, image/*"
+                        onChange={(e) => {
+                          handleFileChange(e);
+                        }}
+                        
+                      />
+                     
+
+                      <span id="qcwrkdoc_Error" style={{color: "red"}} ></span>
+                     
+                      <Button.Ripple
+                        outline
+                        color="primary"
+                        onClick={(e) => {
+                          fileUploadAction();
+                        }}
+                      >
+                        <Paperclip size={14} />
+                        <span className="align-middle ml-25">Attach</span>
+                      </Button.Ripple>
+                      <div className="align-middle ml-25">{qcwrkdoc.name}</div>
+                    </FormGroup>
+                    <CaptureImage poData={poData} setPoData={setPoData} ItemName={"QCDocument"} />
+                  </Col>
+                  
+                  
+                </Row>
+                <Row>
+                  <Col>
+                    <InputControl
+                      label={"Comments"}
+                      type="textarea"
+                      value={formData.others_comment}
+                      name="comments"
+                      onChange={(e) => onTextChange(e, "others_comment")}
+                      rows="3"
+                      placeholder="Other Comments"
+                    />
+                     <span id="others_comment_Error" style={{color: "red"}} ></span>
+                  </Col>
+                </Row>
+              </>
+            ) : (
+              ""
+            )}
+            
+           
+            
+            <Col sm="12">
+              <FormGroup className="d-flex mb-0 justify-content-end">
+                <Button.Ripple outline color="secondary" tag={Link} to={`/QC`} type="reset" className="mr-2">
+                  Cancel
+                </Button.Ripple>
+                <div className="mr-1">
+                  {/* disabled={isFilledAll()} // Removed from below button */}
+                  <Button.Ripple color="primary" type="button" onClick={(e) => onQCDetails(3)}>
+                    Submit
+                  </Button.Ripple>
+                </div>
+              </FormGroup>
+            </Col>
+          </div>
+        </CardBody>
+      </Card>
+    </div>
+  );
+};
+
+export default QualityCheckDetails;

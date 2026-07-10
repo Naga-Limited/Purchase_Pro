@@ -1,0 +1,2 @@
+(this["webpackJsonppurchase-pro"]=this["webpackJsonppurchase-pro"]||[]).push([[113],{1112:function(e,s,t){"use strict";t.r(s);t(0);var p=t(885),r=t(2);s.default=function(){return Object(r.jsx)(p.default,{ViewQC:!0})}}}]);
+//# sourceMappingURL=113.d4640001.chunk.js.map

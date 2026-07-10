@@ -1,0 +1,207 @@
+
+Get Tripsheet Details
+======================
+
+[Get] [Web]
+
+http://localhost:3000/api/GatePro/master/getTripsheetDetailsForFG
+
+{
+    "Vehicle_Number": "TN57BF3425"
+}
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+Add GateIn Info
+================
+
+[POST] [Web]
+
+http://localhost:3000/api/GatePro/Gate/addGateInInfo
+
+{
+    "userInfoId": "1",
+    "movementType": "LOADING",
+    "moduleType": "FG-SALES",
+    "vehicleNo": "TN57BF3425",
+    "shipmentOrderNo": "0010082007",
+    "driverMobileNumber": "6380999129",
+    "route": "SALAM",
+    "masterColorTokenId": "2",
+    "tripSheetNumber": "OD290523021",
+    "truckType": "OWN",
+    "clean": "YES",
+    "oder": "NO",
+    "tarpaulin": "2",
+    "noOfTarpaulin": "1",
+    "platformCondition": "GOOD",
+    "isVehicleFit": "YES",
+    "previousLoadData": "DINDIGUL",
+    "truckCapacity": "10",
+    "vehicelStatusId": 1,
+    "remarks": "CHANGE QUANTITY"
+}
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+Get GateIn Info
+=================
+
+[Get] [Web]
+
+http://localhost:3000/api/GatePro/gate/getGateInInfo/TN57BF3425
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+Update Vehicle Status
+=======================
+
+[POST] [Web]
+
+http://localhost:3000/api/GatePro/Gate/updateVehicleStatus
+
+{
+    "gateInOutInfoId": 1,
+    "vehicelStatusId": 1,
+    "userInfoId": 1
+}
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+Add Master Reject Reason
+========================
+
+[POST] [Web]
+
+http://localhost:3000/api/gatepro/Master/addMasterRejectReason
+
+{
+    "rejectReason": "test",
+    "createdBy":1
+}
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+Update Master Reject Reason
+===========================
+
+[POST] [Web]
+
+http://localhost:3000/api/gatepro/Master/updateMasterRejectReason
+
+	{
+    "rejectReason": "test",
+	"isActive":1,
+	"modifiedBy": 1
+    }
+
+    -------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Add Camera Details
+=====================
+
+[POST]  [Web]
+
+{
+    "masterPlantId": 1,
+    "cameraName": "TEST",
+    "apiUrl": "test",
+    "username": "test",
+    "password": "123456",
+    "isActive": "1",
+    "userInfoId": 1
+}
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Update Camera Details
+=====================
+ 
+[POST]  [Web]
+
+http://localhost:3000/api/gatepro/Master/updateCameraDetails
+
+{
+    "cctvCameraId":1,
+    "masterPlantId": 1,
+    "cameraName":"TEST",
+    "apiUrl": "test",
+    "username":"test",
+    "password":"123456",
+    "isActive":"1",
+    "userInfoId":1
+
+}
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+Add Color Token
+===============
+
+[POST]  [Web]
+
+http://localhost:3000/api/gatepro/Master/addColorToken
+
+{
+    "colorToken": "red",
+    "isActive":"1",
+    "userInfoId": "1"
+}
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Update Color Token
+==================
+
+[POST]  [Web]
+
+http://localhost:3000/api/gatepro/Master/updateColorToken
+
+{
+    "masterColorTokenId":1,
+    "colorToken": "TEST",
+    "isActive":"1",
+    "userInfoId": "1"
+}
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+Get Master Gate
+=================
+
+[Get] [Web]
+
+http://localhost:3000/api/gatepro/master/getmastergate
+
+    {
+
+      "masterGateId": "1",
+      "gateCode": "DGL1234",
+      "gateName": "DGL",
+      "isActive": "1"
+
+    }
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+Update Master  Gate
+==================
+
+[POST]  [Web]
+
+http://localhost:3000/api/gatepro/Master/updateMasterGate
+
+{
+    "masterGateId": "1",
+    "gateCode": "1",
+    "gateName": "DGL",
+    "isActive": "1",
+    "userInfoId": "1"
+}
+
+-------------------------------------------------------------------------------------------------------------------------------------------------

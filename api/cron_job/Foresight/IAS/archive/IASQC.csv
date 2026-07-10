@@ -1,0 +1,2 @@
+AnalysisTime, ProductName, ProductCode, SampleType, SampleNumber, SampleComment, InstrumentName, InstrumentSerialNumber, Protein, Moisture, Ash, Wetgludten, Drygluten, SV, Infestation, HL, InsertDamageWheat, VANumber
+2021-10-05 10:00:00,ProductName, ProductCode, SampleType, SampleNumber, SampleComment, InstrumentName, InstrumentSerialNumber, 1,1, 1, 1,1, 1,1, 1, 1,RMIASW022100000169
