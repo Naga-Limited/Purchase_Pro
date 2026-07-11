@@ -117,13 +117,14 @@ class ReportService extends Model
     }   
 
     // Sales Report
-    public function getSalesReport($fromDate, $toDate, $moduleTypeId, $masterPlantId, $waitingStatusId, $userInfoId) { 
+    public function getSalesReport($fromDate, $toDate, $moduleTypeId, $masterPlantId, $waitingStatusId, $userInfoId,$bulker_id,$bulkerCustomerId) { 
+        // print_r($bulkerCustomerId);exit;
         $fromDateMilliSecond = $fromDate / 1000;
         $toDateMilliSecond = $toDate / 1000;
         $fromDate = date("Y-m-d", $fromDateMilliSecond);
         $toDate = date("Y-m-d", $toDateMilliSecond);
-        $sql = "CALL spSelSalesReport(?, ?, ?, ?, ?, ?)";
-        $builder = $this->db->query($sql, [$fromDate, $toDate, $moduleTypeId, $masterPlantId, $waitingStatusId, $userInfoId]);
+        $sql = "CALL spSelSalesReport(?, ?, ?, ?, ?, ?, ?, ?)";
+        $builder = $this->db->query($sql, [$fromDate, $toDate, $moduleTypeId, $masterPlantId, $waitingStatusId, $userInfoId, $bulker_id,$bulkerCustomerId]);
         $result = $builder->getResultArray();
         return $result;
     }
@@ -1092,5 +1093,21 @@ class ReportService extends Model
         }
 
         return $result;
+    }
+
+    public function getcustomerdetailsforbulker() { 
+        $builder = $this->db->table('gate_in_out_info gi');
+        $builder->select(" 
+            gi.id AS gateInOutInfoId,
+            gid.customerCode as value,
+            gid.customerName,
+            CONCAT(gid.customerCode, '-', gid.customerName) AS label
+        ");
+        $builder->join('gate_in_out_info_details gid', 'gi.id = gid.gateInOutInfoId', 'inner');
+        $builder->where('gi.vehicleType', 'BULKER');
+        $builder->groupBy('gid.customerCode');
+        $builder->distinct();
+
+        return $builder->get()->getResultArray();
     }
 }

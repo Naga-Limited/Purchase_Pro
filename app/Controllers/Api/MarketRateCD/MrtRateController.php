@@ -42,11 +42,11 @@ class MrtRateController extends BaseApiController
 
         return $this->sendSuccessResult($res);
     }
-    public function getGroceriesCategory()
+    public function getGroceriesCategory($userid = null,$role = null)
     {
 
         $model = new MrtRateModel();
-        $res = $model->getGroceriesCategory();
+        $res = $model->getGroceriesCategory($userid,$role);
         //print_r($res);exit;
 
         return $this->sendSuccessResult($res);
@@ -89,8 +89,10 @@ class MrtRateController extends BaseApiController
         $postData = $this->request->getJSON();
         //print_r($postData);exit;
         $movementtype = $postData->movement_type;
+        $userid = $postData->user_id;
+        $role = $postData->role;
         $model = new MrtRateModel();
-        $res = $model->getGrocerieslist($movementtype);
+        $res = $model->getGrocerieslist($movementtype,$userid,$role);
         //print_r($res);exit;
 
         return $this->sendSuccessResult($res);
@@ -102,7 +104,8 @@ class MrtRateController extends BaseApiController
 
     $GroceriesType = $postData->groceries_type;
     $entryDate     = $postData->entry_date;
-
+    $userrole     = $postData->user_role;
+    $userid     = $postData->created_by;
     // Take item_city from first non-empty row
     $itemCity = null;
     foreach ($postData->tableItems as $item) {
@@ -116,10 +119,18 @@ class MrtRateController extends BaseApiController
     $model = new MrtRateModel();
 
     // Check if already exists
-    $existingEntry = $model->getcountGroceriesType($GroceriesType, $entryDate, $itemCity);
+    if (strtoupper($userrole) === 'VENDOR') {
+        $existingEntry = $model->checkDuplicateVendorEntry($GroceriesType, $userid, $entryDate, $itemCity);
+    } else {
+        $existingEntry = $model->checkDuplicateOtherUserEntry($GroceriesType, $entryDate, $itemCity);
+    }
+    // print_r($existingEntry);exit;
+    if ($existingEntry > 0) {
+        $message = strtoupper($userrole) === 'VENDOR'
+            ? 'A rate entry already exists for this vendor within the last 1 hour.'
+            : 'Rate for this Groceries already exists.';
 
-    if ($existingEntry != '') {
-        return $this->sendErrorResult("Rate for this Groceries already exists.");
+        return $this->sendErrorResult($message);
     }
 
     // Filter only valid rows (item_rate should not be empty)
@@ -249,10 +260,12 @@ public function updateMrtRateMasterdetailsbyid()
     {
         $postData = $this->request->getJSON();
         $Typeid = $postData->groceries_id;
+        $userid = $postData->user_id;
+        $role = $postData->role;
         // print_r($postData);exit;
 
         $model = new MrtRateModel();
-        $res = $model->getSubGroceriesById($Typeid);
+        $res = $model->getSubGroceriesById($Typeid,$userid,$role);
         //print_r($res);exit;
 
         return $this->sendSuccessResult($res);
@@ -268,14 +281,71 @@ public function updateMrtRateMasterdetailsbyid()
         $fromdate = $postData->fromDate;
         $state = $postData->stateId;
         $district = $postData->districtId;
+        $userid = $postData->user_id;
+        $role = $postData->role;
 
 
         $model = new MrtRateModel();
-        $res = $model->getlistofsubcatogry($subTypeid, $todate, $fromdate, $state, $district);
+        $res = $model->getlistofsubcatogry($subTypeid, $todate, $fromdate, $state, $district, $userid, $role);
         // print_r($res);
         // exit;
 
         return $this->sendSuccessResult($res);
         ;
     }
+
+    public function getUserList()
+  {
+    $master = new MrtRateModel();
+    return  $this->sendSuccessResult($master->getuserinfo());
+  }
+  public function getSubGroceriesTypeList()
+  {
+    $master = new MrtRateModel();
+    return  $this->sendSuccessResult($master->getSubGroceriesAccessList());
+  }
+
+   public function saveSubGroceriesAccess()
+    {
+        $postData = $this->request->getJSON();
+        $Typeid = $postData->sub_groceries_id;
+        $userid = $postData->user_id;
+        $createdBy = $postData->created_by;
+        $state = $postData->state_id;
+        $district = $postData->district_id;
+        $city = $postData->city_id;
+        // print_r($postData);exit;
+
+        $model = new MrtRateModel();
+        $datacount = $model->getSubGroceriesAccessCount($Typeid,$userid);
+        if ($datacount > 0) {
+            return $this->sendErrorResult("Access for this Sub Groceries already exists for the user.");
+        }
+        $res = $model->saveSubGroceriesAccess($userid,$Typeid,$createdBy,$state,$district,$city);
+        //print_r($res);exit;
+
+        return $this->sendSuccessResult($res);
+        ;
+    }
+    public function getSubGroceriesAccessList()
+    {
+      
+        $model = new MrtRateModel();
+        $res = $model->getSubGroceriesAccessdataList();
+        //print_r($res);exit;
+
+        return $this->sendSuccessResult($res);
+        ;
+    }
+     public function updateSubGroceriesAccess()
+    {
+        $postData = $this->request->getJSON();
+        $model = new MrtRateModel();
+        $res = $model->updateSubGroceriesAccess($postData);
+        //print_r($res);exit;
+
+        return $this->sendSuccessResult($res);
+        ;
+    }
+
 }

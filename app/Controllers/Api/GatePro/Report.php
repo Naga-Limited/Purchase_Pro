@@ -165,9 +165,9 @@ class Report extends BaseApiController
   }
 
   // Sales Report
-  public function getSalesReport($fromDate, $toDate, $moduleTypeId, $masterPlantId, $waitingStatusId, $userInfoId) {
+  public function getSalesReport($fromDate, $toDate, $moduleTypeId, $masterPlantId, $waitingStatusId, $userInfoId,$bulker_id,$bulkerCustomerId) {
     $reportService = new ReportService();
-    $results = $reportService->getSalesReport($fromDate, $toDate, $moduleTypeId, $masterPlantId, $waitingStatusId, $userInfoId);    
+    $results = $reportService->getSalesReport($fromDate, $toDate, $moduleTypeId, $masterPlantId, $waitingStatusId, $userInfoId,$bulker_id,$bulkerCustomerId);    
 
     $dataStatus = count($results) > 0 ? true : false;
     $message = count($results) > 0 ? 'data found' : 'No data found';
@@ -470,6 +470,13 @@ class Report extends BaseApiController
   public function AutoPoSortClosureSilotoMill() {  
     $reportService = new ReportService();
     $result = $reportService->AutoPoSortClosureSilotoMill();
+    // print_r($result);exit;
+    return $this->sendSuccessResult($result);
+  }
+  
+  public function getcustomerdetailsforbulker() {  
+    $reportService = new ReportService();
+    $result = $reportService->getcustomerdetailsforbulker();
     // print_r($result);exit;
     return $this->sendSuccessResult($result);
   }
