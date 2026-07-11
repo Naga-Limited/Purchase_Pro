@@ -128,8 +128,8 @@ const SSAndPMPurchaseSAPDocument = () => {
         }
 
         showLoader();
-        console.log(apiBaseUrl + "GatePro/Gate/updateVehicleStatus", postdata);
-        apiPostMethod(apiBaseUrl + "GatePro/Gate/updateVehicleStatus", postdata)
+        console.log(apiBaseUrl + "GatePro/Weighment/rejectWeighmentInfo", postdata);
+        apiPostMethod(apiBaseUrl + "GatePro/Weighment/rejectWeighmentInfo", postdata)
             .then((response) => {
                 const res = response.data;
                 if (res.success == true) {
@@ -305,7 +305,7 @@ const SSAndPMPurchaseSAPDocument = () => {
                             <Col md="12" sm="12">
                                 <br></br>
                                 <FormGroup>
-                                    {(data?.weighmentInfoId > 0) && (data?.moduleStatusId == 4) && (data?.moduleTypeId == 14) ?
+                                    {(data?.weighmentInfoId > 0) && (data?.moduleStatusId == 4)  ?
                                         <Button.Ripple color="danger" type="button" onClick={() => setShow(true)}>
                                             <X size={16} /> Reject
                                         </Button.Ripple> : null

@@ -155,6 +155,7 @@ const RakeDeliverySmartForm = () => {
                                                 <tr>
                                                     <th style={itemsth}>HSN code</th>
                                                     <th style={itemsth}>Description of Goods</th>
+                                                    <th style={itemsth}>No.of Bags</th>
                                                     <th style={itemsth}>Quantity</th>
                                                     <th style={itemsth}>Rate</th>
                                                     <th style={itemsth}>Total Amount</th>
@@ -164,6 +165,7 @@ const RakeDeliverySmartForm = () => {
                                                 <tr>
                                                     <td style={itemstd}>10019910</td>
                                                     <td style={itemstd}>Wheat</td>
+                                                    <td style={itemstd}>{data.total_bags}</td>
                                                     <td style={itemstd}>{data.total_qty}</td>
                                                     <td style={itemstd}>{(data?.total_amount/data?.total_qty).toFixed(2)}</td>
                                                     <td style={itemstd}>{data?.total_amount}</td>

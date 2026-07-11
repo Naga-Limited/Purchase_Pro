@@ -145,8 +145,8 @@ const GatePassSapDocument = () => {
       userInfoId: UserDetails.USERID
     }
     showLoader();
-    console.log(apiBaseUrl + "GatePro/Gate/updateVehicleStatus", postdata);
-    apiPostMethod(apiBaseUrl + "GatePro/Gate/updateVehicleStatus", postdata)
+      console.log(apiBaseUrl + "GatePro/Weighment/rejectWeighmentInfo", postdata);
+      apiPostMethod(apiBaseUrl + "GatePro/Weighment/rejectWeighmentInfo", postdata)
       .then((response) => {
         const res = response.data;
         if (res.success == true) {
@@ -341,11 +341,11 @@ const GatePassSapDocument = () => {
             <Col md="12" sm="12">
               <br></br>
               <FormGroup>
-                {/* {(data?.weighmentInfoId > 0) && (data?.moduleStatusId == 3 || data?.moduleStatusId == 4) ?
+                {(data?.weighmentInfoId > 0) && (data?.moduleStatusId == 3 || data?.moduleStatusId == 4) ?
                   <Button.Ripple color="danger" type="button" onClick={() => setShow(true)}>
                     <X size={16} /> Reject
                   </Button.Ripple> : null
-                } */}
+                }
 
                 <div style={{ float: 'right' }}>
                   {(sapDeliveryData != '') && (data?.moduleStatusId == 3 || data?.moduleStatusId == 4) ?

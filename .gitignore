@@ -1,6 +1,7 @@
 node_modules/
 vendor/
 vendor_local/
+sapfileshare/
 writable/
 .env
 .env.*

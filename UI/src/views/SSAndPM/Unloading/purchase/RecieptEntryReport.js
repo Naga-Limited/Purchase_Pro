@@ -650,8 +650,8 @@ const RecieptEntryReport = ({ actionRendorer }) => {
             return [printColumn,...reportTaColumns];
         }
         return [
+             printColumn,
             ...reportTaColumns.slice(0, statusColumnIndex + 1),
-            printColumn,
             ...reportTaColumns.slice(statusColumnIndex + 1),
         ];
     }, [reportTaColumns, openPrintModal]);
