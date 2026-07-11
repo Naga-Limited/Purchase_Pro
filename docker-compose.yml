@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # PHP Application Service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: purchase_pro_app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    ports:
+      - "8080:80"
+    environment:
+      - CI_ENVIRONMENT=${CI_ENVIRONMENT:-development}
+      - database.default.hostname=db
+      - database.default.database=${MYSQL_DATABASE}
+      - database.default.username=${MYSQL_USER}
+      - database.default.password=${MYSQL_PASSWORD}
+    depends_on:
+      - db
+    networks:
+      - purchase_pro_network
+
+  # MySQL Database Service
+  db:
+    image: mysql:8.0
+    container_name: purchase_pro_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-purchase_pro}
+      MYSQL_USER: ${MYSQL_USER:-purchase_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-purchase_password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+    networks:
+      - purchase_pro_network
+    command: --default-authentication-plugin=mysql_native_password
+
+  # phpMyAdmin Service
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: purchase_pro_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: ${MYSQL_USER:-purchase_user}
+      PMA_PASSWORD: ${MYSQL_PASSWORD:-purchase_password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+    ports:
+      - "8081:80"
+    depends_on:
+      - db
+    networks:
+      - purchase_pro_network
+
+  # React Frontend Development Server
+  node:
+    image: node:18-alpine
+    container_name: purchase_pro_node
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./UI:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8080
+      - CHOKIDAR_USEPOLLING=true
+    command: sh -c "npm install && npm start"
+    networks:
+      - purchase_pro_network
+    stdin_open: true
+    tty: true
+
+networks:
+  purchase_pro_network:
+    driver: bridge
+
+volumes:
+  db_data:
+    driver: local

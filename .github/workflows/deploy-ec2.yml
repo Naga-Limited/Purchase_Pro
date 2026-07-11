@@ -1,0 +1,145 @@
+name: Deploy to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-south-1
+  EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+
+jobs:
+  deploy-to-ec2:
+    name: Deploy to EC2 Instance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key.pem
+          chmod 600 ~/.ssh/deploy_key.pem
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Build React Frontend
+        working-directory: ./UI
+        run: |
+          npm ci
+          npm run build
+
+      - name: Create deployment package
+        run: |
+          tar -czf deployment.tar.gz \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='UI/node_modules' \
+            --exclude='UI/src' \
+            --exclude='vendor' \
+            --exclude='writable/logs/*' \
+            --exclude='writable/cache/*' \
+            .
+
+      - name: Upload to EC2
+        run: |
+          scp -i ~/.ssh/deploy_key.pem \
+            -o StrictHostKeyChecking=no \
+            deployment.tar.gz \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/
+
+      - name: Deploy on EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          script: |
+            # Stop services
+            sudo systemctl stop apache2 || true
+
+            # Backup current deployment
+            if [ -d /var/www/purchase-pro ]; then
+              sudo mv /var/www/purchase-pro /var/www/purchase-pro-backup-$(date +%Y%m%d-%H%M%S)
+            fi
+
+            # Extract new deployment
+            sudo mkdir -p /var/www/purchase-pro
+            sudo tar -xzf /tmp/deployment.tar.gz -C /var/www/purchase-pro
+
+            # Set permissions
+            sudo chown -R www-data:www-data /var/www/purchase-pro
+            sudo chmod -R 755 /var/www/purchase-pro
+            sudo chmod -R 775 /var/www/purchase-pro/writable
+
+            # Install PHP dependencies
+            cd /var/www/purchase-pro
+            sudo -u www-data composer install --no-dev --optimize-autoloader
+
+            # Copy environment file
+            sudo cp /var/www/.env /var/www/purchase-pro/.env || true
+
+            # Run migrations
+            sudo -u www-data php spark migrate --all
+
+            # Clear cache
+            sudo -u www-data php spark cache:clear
+
+            # Start services
+            sudo systemctl start apache2
+
+            # Clean up
+            rm /tmp/deployment.tar.gz
+
+            # Keep only last 3 backups
+            cd /var/www
+            ls -t | grep purchase-pro-backup | tail -n +4 | xargs -r sudo rm -rf
+
+      - name: Health Check
+        run: |
+          sleep 10
+          response=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.BACKEND_URL }})
+          if [ $response -eq 200 ]; then
+            echo "✅ Deployment successful! Health check passed."
+          else
+            echo "❌ Deployment may have issues. HTTP status: $response"
+            exit 1
+          fi
+
+      - name: Rollback on Failure
+        if: failure()
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          script: |
+            sudo systemctl stop apache2
+
+            # Find latest backup
+            LATEST_BACKUP=$(ls -t /var/www/ | grep purchase-pro-backup | head -1)
+
+            if [ ! -z "$LATEST_BACKUP" ]; then
+              echo "Rolling back to: $LATEST_BACKUP"
+              sudo rm -rf /var/www/purchase-pro
+              sudo mv /var/www/$LATEST_BACKUP /var/www/purchase-pro
+            fi
+
+            sudo systemctl start apache2
+            echo "Rollback completed"
+
+      - name: Notify on Success
+        if: success()
+        run: |
+          echo "🎉 Deployment to EC2 completed successfully!"
+          echo "Backend URL: ${{ secrets.BACKEND_URL }}"
