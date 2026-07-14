@@ -307,7 +307,7 @@ const SSAndPMPurchaseSAPDocument = () => {
                                 <FormGroup>
                                     {(data?.weighmentInfoId > 0) && (data?.moduleStatusId == 4)  ?
                                         <Button.Ripple color="danger" type="button" onClick={() => setShow(true)}>
-                                            <X size={16} /> Reject
+                                            <X size={16} /> Second Weight Reject
                                         </Button.Ripple> : null
                                     }
 

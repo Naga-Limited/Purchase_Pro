@@ -1213,7 +1213,8 @@ const RecieptEntryScreenDetails = ({ setShow, show, purchaseId,poNumbers,getLoad
 
             // Computed values
             const normalTaxAmt = taxableAmount * normalTaxPct;
-            const rcmTaxAmt = taxableAmount * rcmTaxPct; // RCM taxes (not added to total)
+            // const rcmTaxAmt = taxableAmount * rcmTaxPct; // RCM taxes (not added to total)
+             const rcmTaxAmt = rcmTaxPct == 0 ? 0 : -taxableAmount * normalTaxPct
             const cessAmt = taxableAmount * cessPct;
             const jitcAmt = taxableAmount * jitcPct;
             const ineligibleTax = (Number(lineItem?.INELIGIBLE_RATE) || 0) * receivedQty;
@@ -1229,7 +1230,7 @@ const RecieptEntryScreenDetails = ({ setShow, show, purchaseId,poNumbers,getLoad
             // Total for this line
             const totalLine =
                 taxableAmount +
-                (rcmTaxPct > 0 ? 0 : normalTaxAmt) + // exclude tax if RCM applies
+                (rcmTaxPct == 0 ? 0 : -normalTaxAmt) + // exclude tax if RCM applies
                 freight +
                 packing +
                 loading +
@@ -1237,7 +1238,8 @@ const RecieptEntryScreenDetails = ({ setShow, show, purchaseId,poNumbers,getLoad
                 other +
                 cessAmt +
                 jitcAmt +
-                ineligibleTax;
+                ineligibleTax +
+                normalTaxAmt;
 
             // Aggregate totals
             totals.totalMaterialAmount += materialAmount;
@@ -1288,7 +1290,7 @@ const RecieptEntryScreenDetails = ({ setShow, show, purchaseId,poNumbers,getLoad
         { label: "Other Charges", value: totalOtherCharges, isCharge: true },
 
         { label: "Add: Total Tax", value: totalTaxAmount },
-        { label: "Less: RCM Reversal", value: -totalRCMTax, isNegative: true },
+        { label: "Less: RCM Reversal", value: totalRCMTax, isNegative: true },
         { label: "Add: Ineligible Tax", value: totalIneligibleTax },
         { label: "CESS Value", value: cessValue },
         { label: "JITC Value", value: jitcValue },
