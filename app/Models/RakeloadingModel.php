@@ -76,12 +76,14 @@ class RakeloadingModel extends Model
         $lastdate = date('Y-m-d', strtotime("$date_restrictions days", strtotime($today)));// days ago
 
 		$builder = $this->db->table("supplier_dispatch_info");
-		$builder = $builder->select("ZPO_LINE_ITEM as value, ZPO_LINE_ITEM as label");
-		$builder =  $builder->where("ZPO_NUMBER", $PO_NO);
+		$builder = $builder->join('sap_to_pp', 'sap_to_pp.SUPPLIER_CODE = supplier_dispatch_info.ZSUPPLIER_CODE AND sap_to_pp.EBELN = supplier_dispatch_info.ZPO_NUMBER AND sap_to_pp.EBELP = supplier_dispatch_info.ZPO_LINE_ITEM', 'inner');
+		$builder = $builder->select("supplier_dispatch_info.ZPO_LINE_ITEM as value, supplier_dispatch_info.ZPO_LINE_ITEM as label");
+		$builder =  $builder->where("supplier_dispatch_info.ZPO_NUMBER", $PO_NO);
 		$builder =  $builder->where("supplier_dispatch_info.DateAdded >=", $lastdate);
+		$builder =  $builder->where("sap_to_pp.LOEKZ !=", 'D');
 		// $builder =  $builder->where("FNR_NO", $FNR_NO);
 
-		return  $builder->distinct()->groupBy("ZPO_LINE_ITEM")->get()->getResultArray();
+		return  $builder->distinct()->groupBy("supplier_dispatch_info.ZPO_LINE_ITEM")->get()->getResultArray();
     } 
 
 	public function SupplierList($PO_NO,$PO_LINE){
@@ -650,7 +652,7 @@ class RakeloadingModel extends Model
 
 	public function SAPPushDataGet($id){	
 		$builder = $this->db->table("purchase_info");
-		$builder = $builder->select("purchase_info.*,gateout_info.*,quality_info.*,rake_loading.tripsheet_no,rake_loading.fnr_no,rake_loading.loading_charge,master_vendor.Code,master_vendor.Name,sap_to_pp.SGT_SCAT as segment,supplier_vehical_info.ATTI_COOLI,supplier_vehical_info.TRIPSHEET_NO,supplier_vehical_info.EXTRA_CHARGE,supplier_vehical_info.OFFICE_EXPENSE_KG,supplier_vehical_info.WEIGHTMENT_CHARGE,supplier_vehical_info.FREIGHT_COST_KG,supplier_vehical_info.GATE_EXPENSE,supplier_vehical_info.OVERALL_EXPENSE,supplier_vehical_info.FREIGHT_COST,supplier_vehical_info.COST_TYPE,supplier_vehical_info.WB_QTY,supplier_vehical_info.WB_DT,supplier_vehical_info.TRIPSHEET_NO1,sap_to_pp.MEINS");
+		$builder = $builder->select("purchase_info.*,gateout_info.*,quality_info.*,rake_loading.tripsheet_no,rake_loading.fnr_no,rake_loading.loading_charge,master_vendor.Code,master_vendor.Name,sap_to_pp.SGT_SCAT as segment,supplier_vehical_info.ATTI_COOLI,supplier_vehical_info.TRIPSHEET_NO,supplier_vehical_info.EXTRA_CHARGE,supplier_vehical_info.OFFICE_EXPENSE_KG,supplier_vehical_info.WEIGHTMENT_CHARGE,supplier_vehical_info.FREIGHT_COST_KG,supplier_vehical_info.GATE_EXPENSE,supplier_vehical_info.OVERALL_EXPENSE,supplier_vehical_info.FREIGHT_COST,supplier_vehical_info.COST_TYPE,supplier_vehical_info.WB_QTY,supplier_vehical_info.WB_DT,supplier_vehical_info.TRIPSHEET_NO1,sap_to_pp.MEINS,sap_to_pp.customerCode,sap_to_pp.customerName");
 		$builder = $builder->join('gateout_info', 'gateout_info.purchase_info_id = '.$id.'', 'inner');
 		$builder = $builder->join('quality_info', 'quality_info.purchase_info_id = '.$id.'', 'left');
 		$builder = $builder->join('rake_loading', 'rake_loading.purchase_info_id = '.$id.'', 'left');
@@ -1044,15 +1046,15 @@ class RakeloadingModel extends Model
 				CONCAT(
 					'[',
 					GROUP_CONCAT(
-						CONCAT(
+						DISTINCT CONCAT(
 							'{\"PLANT_ID\":\"',a.plant_id,
 							'\",\"TOTAL_VEHICLE\":',a.plant_count,'}'
 						)
 					),
 					']'
-				) as plant_ids,
+				) AS plant_ids,
 
-				SUM(a.plant_count) as total_count,
+				t.total_count,
 
 				b.Own_Count,
 				b.Hire_Count,
@@ -1074,7 +1076,17 @@ class RakeloadingModel extends Model
 				AND created_at >= '$lastdate'
 				GROUP BY fnr_no, plant_id
 			) a
-
+			JOIN
+			(
+			    SELECT
+				fnr_no,
+				COUNT(vehicle_no) AS total_count
+			    FROM rake_loading
+			    WHERE fnr_no <> ''
+			      AND created_at >= '$lastdate'
+			    GROUP BY fnr_no
+			) t
+			    ON t.fnr_no = a.fnr_no	
 			JOIN (
 				SELECT 
 					fnr_no,
@@ -1168,11 +1180,11 @@ public function SurveyorDetails($status, $fromDate, $toDate) {
         return $builder->get()->getResultArray();
 }
 public function Rake_Unloading_Surveyor_Update($Data,$id){	
+		// print_r($Data);exit;
 		$result=$this->db->table('rake_surveyor_report')->set($Data)->where('id',$id)->update();
 		if(!$result){
 			$error = $this->db->error();
-			print_r($error);
-			exit;
+			return ['error' => true, 'message' => $error['message']];
 		}
 		return  $result;
 } 
@@ -1205,7 +1217,7 @@ public function RakeVehicleDetails($fnr_no) {
 				master_bag.BAG_NAME as receive_bag1
             ")
         ->join('rake_surveyor_report', 'rake_surveyor_report.fnrNumber = rake_loading.fnr_no', 'inner')
-		->join('purchase_info', 'purchase_info.PI_REFID = rake_loading.purchase_info_id', 'left')
+		->join('purchase_info', 'purchase_info.PI_REFID = rake_loading.purchase_info_id', 'inner')
 		->join('master_bag', 'master_bag.BAG_CODE = rake_loading.receive_bag1', 'inner');
 		
 		$builder->where('rake_loading.fnr_no', $fnr_no);

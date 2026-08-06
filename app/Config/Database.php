@@ -37,11 +37,11 @@ class Database extends Config
 
 	public $default = [
 		'DSN'      => '',
-		'hostname' => '172.16.63.84',
+		'hostname' => 'naga-prod-digiapp-db.cv442wakabfe.ap-south-1.rds.amazonaws.com',
 		//'username' => 'admin',
 		//'password' => 'F7l3Llo39',
-		'username' => 'puRpROprOD',
-		'password' => 'gDhRVvw420iR4Qb2',
+		'username' => 'admin',
+		'password' => 'knH5tXNAXNBEsff4',
 		'database' => 'purchase_pro_nlfd',
 		'DBDriver' => 'MySQLi',
 		'DBPrefix' => '',

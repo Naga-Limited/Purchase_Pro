@@ -66,7 +66,7 @@ class SapgateoutentryController extends BaseApiController
 			"zvendor_name1"=>$res[0]['ZVENDOR_NAME'],
 			"zsupplier_code1"=>$res[0]['ZSUPPLIER_CODE'],
 			"zsupplier_name1"=>$res[0]['ZSUPPLIER_NAME'],
-			"zqty1"=>$res[0]['ZQTY'],
+			"zqty1"=>round($json->gunny_less_wt)/1000,3,
 			"meins1"=>$res[0]['MEINS'] ?? 'TON',
 			"idnlf1"=>$res[0]['IDNLF'],
 			"matnr1"=>$res[0]['MATNR'],
@@ -188,6 +188,9 @@ class SapgateoutentryController extends BaseApiController
 		$res = $model->SAPPushDataGet($json->id);
 		$resu = $model->SAPTOPPLastID();
 		$vehicleType = $res[0]['VEHICLE_TYPE'];
+		$customerCode = $res[0]['customerCode'];
+		$customerName = $res[0]['customerName'];
+		$plantCode = $res[0]['WERKS'];
 		$sap_data = array (
 			"zqi_refid"=>$res[0]['QI_REFID'],
 			"zpurchase_info_id"=>$res[0]['PI_REFID'],
@@ -328,6 +331,7 @@ class SapgateoutentryController extends BaseApiController
 			"zzloading_charg"=> $res[0]['OVERALL_EXPENSE'],
 			"zzcost_type"=>$res[0]['COST_TYPE'],
 			"ZZTRIPSHEET_NO_A"=>$res[0]['TRIPSHEET_NO1'],
+			"zcustomer"=>$res[0]['customerCode'],
 			"machine_type1"=>$res[0]['machine_type1'],
 			"machine_type2"=>$res[0]['machine_type2'],
 			"machine_type3"=>$res[0]['machine_type3'],
@@ -337,26 +341,53 @@ class SapgateoutentryController extends BaseApiController
 		  }else if ($json->formType == 'I'){
 		    $urlPath ="zrake/zrake_migoapp/migoapp?sap-client=900";
 		  }
-
-		//print_r($sap_data);exit;
-
 		  $res = SapUrlHelper::PushToSap($urlPath,json_encode([$sap_data]));
-	
 		  $message = $res[0]->MESSAGE;
+		  $db = db_connect();
+          $db->transBegin();
+	
+		//   print_r($res);exit;
 		  if($res[0]->STATUS == 0 || empty($res[0]->STATUS)){
 			return $this->sendErrorResult("$message Please Contact SAP Team");
 		  }else if(($res[0]->STATUS) > 0){
-			  $migoNo501 = 0;
-			  if(in_array($vehicleType,['CM Truck','CM Rake','CM Container'])){
-				$migoNo501 = $res[0]->MIGO501;
-			  }
+			//   $migoNo501 = 0;
+			//   if(in_array($vehicleType,['CM Truck','CM Rake','CM Container'])){
+			// 	$migoNo501 = $res[0]->MIGO501;
+			//   }
 			  $data = array (
 				"MIGO_NUM"=>$res[0]->MIGONO,
 				"MIGOApprovalDt"=>$CurrentDateTime,
 				"payment_status"=>1,
-				"MIGO501"=>$migoNo501
+				// "MIGO501"=>$migoNo501
 			   );
 			   $result = $model->Migo_Number_Update($json->id,$data);
+			  
+			   if(in_array($vehicleType,['Cm Truck','Cm Rake','Cm Container'])){
+				//  print_r($res);exit;	
+					$data1 = array (
+					"purchase_info_id"=>$json->id,
+					"reciving_plant_code"=>$plantCode,
+					"customer_code"=>$customerCode,
+					"customer_name"=>$customerName,
+					"stock"=>$json->gunny_less_wt,
+					"created_by"=>0,
+					"status"=>1
+					// "MIGO501"=>$migoNo501
+				);
+				//  print_r($vehicleType);exit;		 
+				$existingStockReport = $db->table('fi_entry_stock_report')
+					->where('purchase_info_id', $json->id)
+					->get()
+					->getRowArray();
+				if ($existingStockReport) {
+					$db->table('fi_entry_stock_report')
+						->where('purchase_info_id', $json->id)
+						->update($data1);
+				} else {
+					$db->table('fi_entry_stock_report')->insert($data1);
+				}
+			   }
+			$db->transCommit();
 			return  $this->respond(["success" => 1,"results"=>$result]);  
 		  }
 	}

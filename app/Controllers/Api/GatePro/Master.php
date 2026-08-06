@@ -45,7 +45,7 @@ class Master extends BaseApiController {
      $MovementCheck[0]['werks'] = $MovementCheck[0]['werks'];
      $MovementCheck[0]['moduleType'] = 'FG Sales - NLDV';
     $result = $MovementCheck;
-   }else if(($MovementCheck[0]['werks'] == 'MD00' || $MovementCheck[0]['werks'] == 'MD01' || $MovementCheck[0]['werks'] == 'MD02') && $json->fromType != 'PURCHASE'){
+   }else if(($MovementCheck[0]['werks'] == 'MD00' || $MovementCheck[0]['werks'] == 'MD01' || $MovementCheck[0]['werks'] == 'MD02' || $MovementCheck[0]['werks'] == 'MD03' || $MovementCheck[0]['werks'] == 'MD04' || $MovementCheck[0]['werks'] == 'MD05') && $json->fromType != 'PURCHASE'){
     $urlPath ="zgatepro/zfg_tripsheet/FG?sap-client=900&Vehicle_No=$ZZVEHICLE_NO";
     $data = SapUrlHelper::getWhDatas($urlPath);
     $res = json_decode($data, true);

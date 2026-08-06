@@ -763,31 +763,74 @@ if($subModuleTypeId == 3){
     }
      public function getBulkervehiclelist()
     {
-   
+
         $master = new GateService();
         $res = $master->getBulkervehiclelist();
         return $this->sendSuccessResult($res);
     }
-     public function saveCustomerWeight()
-  {
-    $postData = $this->request->getJSON();
-    //  print_r($postData);exit;
-    $masterService = new GateService();
-    $res = $masterService->saveCustomerWeight($postData);
-    if ($res != 0) {
-      $response = [
-        'success' => true,
-        'message' => 'Data Updated successfully',
-      ];
-    } else {
-      $response = [
-        'success' => false,
-        'message' => 'Failed to Updated data',
-      ];
+     public function getBulkerCustomerWeightApprovalList()
+    {
+
+        $master = new GateService();
+        $res = $master->getBulkerCustomerWeightApprovalList();
+        return $this->sendSuccessResult($res);
     }
-    return $this->response->setJSON($response);
-  }
-    public function getRakeTruckComparisonDashboard($fromDate, $toDate)
+    public function saveCustomerWeight()
+    {
+      $postData = $this->request->getJSON();
+      //  print_r($postData);exit;
+      $masterService = new GateService();
+      $res = $masterService->saveCustomerWeight($postData);
+      if ($res != 0) {
+        $response = [
+          'success' => true,
+          'message' => 'Data Updated successfully',
+        ];
+      } else {
+        $response = [
+          'success' => false,
+          'message' => 'Failed to Updated data',
+        ];
+      }
+      return $this->response->setJSON($response);
+    }
+    public function approveBulkerCustomerWeight()
+    {
+      $postData = $this->request->getJSON();
+      $masterService = new GateService();
+      $res = $masterService->approveBulkerCustomerWeight($postData);
+      if ($res != 0) {
+        $response = [
+          'success' => true,
+          'message' => 'Approved successfully',
+        ];
+      } else {
+        $response = [
+          'success' => false,
+          'message' => 'Failed to approve',
+        ];
+      }
+      return $this->response->setJSON($response);
+    }
+    public function rejectBulkerCustomerWeight()
+    {
+      $postData = $this->request->getJSON();
+      $masterService = new GateService();
+      $res = $masterService->rejectBulkerCustomerWeight($postData);
+      if ($res != 0) {
+        $response = [
+          'success' => true,
+          'message' => 'Rejected successfully',
+        ];
+      } else {
+        $response = [
+          'success' => false,
+          'message' => 'Failed to reject',
+        ];
+      }
+      return $this->response->setJSON($response);
+    }
+        public function getRakeTruckComparisonDashboard($fromDate, $toDate)
     {
         // print_r($fromDate);
         // print_r($toDate);exit;
@@ -804,4 +847,5 @@ if($subModuleTypeId == 3){
         $res = $master->getRakeTruckList($postData);
         return $this->sendSuccessResult($res);
     }
+
 }

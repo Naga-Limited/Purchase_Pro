@@ -283,19 +283,20 @@ class VehicleArrivalModel extends Model
             if (in_array($process, [1, 2])) {
 
                 if ($PI_REFID > 0) {
-                    $firstWt = isset($details->recievingFirstWt) ? $details->recievingFirstWt
-                            : (isset($details->FirstWeight) ? $details->FirstWeight : 0);
-
-                    $secondWt = isset($details->recievingSecondWt) ? $details->recievingSecondWt
-                            : (isset($details->SecondWeight) ? $details->SecondWeight : 0);
-
+                     $firstWt = $details->recievingFirstWt ? $details->recievingFirstWt
+                            : ($details->FirstWeight ? $details->FirstWeight : 0);
+                    // print_r($firstWt);exit;   
+                    $secondWt = $details->recievingSecondWt ? $details->recievingSecondWt
+                            : ($details->SecondWeight ? $details->SecondWeight : 0);
+                    // print_r($secondWt);exit;    
                     $netWeight = $firstWt - $secondWt;
-
-                    $gunnyWt = isset($details->gunny_wt) ? $details->gunny_wt
-                            : (isset($details->GunnyWt) ? $details->GunnyWt
-                            : (isset($details->SendingGunnyWt) ? $details->SendingGunnyWt : 0));
+                    
+                    $gunnyWt = $details->gunny_wt ? $details->gunny_wt
+                            : ($details->GunnyWt? $details->GunnyWt
+                            : ($details->SendingGunnyWt ? $details->SendingGunnyWt : 0));
 
                     $gunnyLessWt = $netWeight - $gunnyWt;
+                    //print_r($gunnyLessWt);exit;
                     // ---------- PURCHASE FLOW ----------
                     $db->table("purchase_info")
                         ->where('PI_REFID', $PI_REFID)

@@ -372,7 +372,7 @@ class Loadingunloadingcost extends Model
 	public function getVendor()
 	{
 		$builder = $this->db->table("master_vendor");
-		$builder = $builder->select("Id as value, Name as label");
+		$builder = $builder->select("Id as value, Name as label,tds_name,tds_code");
 		$builder->where('RecStatus', 1);
 		$builder->whereIn('Category', [
 		    'Unloading Vendor',
@@ -380,7 +380,7 @@ class Loadingunloadingcost extends Model
 		    'LOADING VENDOR',
 		    'UNLOADING VENDOR'
 		]);
-		
+		$builder->groupBy('Code');
 			
 		return  $builder->get()->getResultArray();
 	}

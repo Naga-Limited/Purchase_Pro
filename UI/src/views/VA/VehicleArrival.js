@@ -705,6 +705,30 @@ const onUpdateStatusLoadWaitin = (status, id) => {
     })
     .finally(() => hideLoader());
 }
+const getMovementType = () => {
+
+  // All vehicle types that mean Purchase
+  const purchaseTypes = [
+    "Truck",
+    "FCI Truck",
+    "Container",
+    "Rake",
+    "Cm Rake",
+    "Cm Truck",
+    "Cm Container"
+  ];
+
+  if (purchaseTypes.includes(VEHICLE_TYPE)) return "Purchase";
+  if (purchaseTypes.includes(vehicle_type)) return "Purchase";
+  if (purchaseTypes.includes(VECHICAL_STATUS)) return "Purchase";
+
+  if (SCREEN_TYPE === "EVADP") return "IAS";
+
+  if (moduleType && moduleType !== "") return moduleType;
+
+  return SCREEN_TYPE || "";
+};
+console.log("VEHICLE_TYPE", VEHICLE_TYPE)
   return (
     <div>
       <Card>
@@ -758,7 +782,10 @@ const onUpdateStatusLoadWaitin = (status, id) => {
                 <Col md="4" sm="12">
                   <FormGroup>
                     <Label>Movement Type</Label>
-                    <Input type="text" disabled={true} value={VEHICLE_TYPE === 'Truck' ? 'Purchase' : VEHICLE_TYPE === 'FCI Truck' ? 'Purchase' : VEHICLE_TYPE === 'Container' ? 'Purchase' : VEHICLE_TYPE === 'Rake' ? 'Purchase' : vehicle_type === 'Rake' ? 'Purchase' : SCREEN_TYPE == "EVADP" ? 'IAS' : moduleType != '' ? moduleType : SCREEN_TYPE} placeholder="Movement Type" />
+                    <Input type="text" disabled={true} 
+                    // value={VEHICLE_TYPE === 'Truck' ? 'Purchase' : VEHICLE_TYPE === 'FCI Truck' ? 'Purchase' : VEHICLE_TYPE === 'Container' ? 'Purchase' : VEHICLE_TYPE === 'Rake' ? 'Purchase' : vehicle_type === 'Rake' ? 'Purchase' : vehicle_type === 'CM Rake' ? 'Purchase' : VECHICAL_STATUS === 'Cm Truck' ? 'Purchase' : VECHICAL_STATUS === 'Cm Container' ? 'Purchase' : SCREEN_TYPE == "EVADP" ? 'IAS' : moduleType != '' ? moduleType : SCREEN_TYPE}
+                    value={getMovementType()}
+                    placeholder="Movement Type" />
                     <span id="ZPO_NUMBER_Error" style={{ color: "red" }} ></span>
                   </FormGroup>
                 </Col>}
@@ -766,9 +793,9 @@ const onUpdateStatusLoadWaitin = (status, id) => {
             {/* <TabControl tabList={tabs} /> */}
             {SCREEN_TYPE === "EVADP" ? <VehicleArrivalForm results={Results} /> : null}
             {VECHICAL_STATUS == 35 ? <TruckArrivalRedirct results={Results} /> : null}
-            {(VECHICAL_STATUS == '' || VECHICAL_STATUS == undefined) && (VEHICLE_TYPE === "Truck" || VEHICLE_TYPE === "Container" || VEHICLE_TYPE === "TRUCK" || VEHICLE_TYPE === "CONTAINER" || VEHICLE_TYPE === "FCI Truck" ) ? <TruckArrival results={Results} /> : null}
+            {(VECHICAL_STATUS == '' || VECHICAL_STATUS == undefined) && (VEHICLE_TYPE === "Truck" || VEHICLE_TYPE === "Container" || VEHICLE_TYPE === "TRUCK" || VEHICLE_TYPE === "CONTAINER" || VEHICLE_TYPE === "FCI Truck" || VEHICLE_TYPE === "Cm Truck" || VEHICLE_TYPE === "Cm Container") ? <TruckArrival results={Results} /> : null}
             {SCREEN_TYPE === "SILOTOMILL" ? <STMTruckArrival results={Results} /> : null}
-            {(vehicle_type === "Rake" || vehicle_type === "RAKE") ? <TruckArrivalRake results={Results} /> : null}
+            {(vehicle_type === "Rake" || vehicle_type === "RAKE" || vehicle_type === "Cm Rake") ? <TruckArrivalRake results={Results} /> : null}
             {moduleType == 'FG-STO' ? <STOGateIn data={stoData} setModuleType={setModuleType} setSelectedValue={setSelectedValue} getUnLoadingData={getUnLoadingData} Unloading_Gate_in_Vehicle={Unloading_Gate_in_Vehicle} /> : null}
             {returnRefNo != '' ? <FGReturnGateIn data={data} setReturnRefNo={setReturnRefNo} setSelectedValue={setSelectedValue} setData={setData} setModuleType={setModuleType} moduleType={moduleType} getUnLoadingData={getUnLoadingData} Unloading_Gate_in_Vehicle={Unloading_Gate_in_Vehicle} /> : null}
             {moduleTypeId == 6 || moduleTypeId == 20 ? <SSAndPMUnloadingGateIn data={stoData} setReturnRefNo={setReturnRefNo} setSelectedValue={setSelectedValue} setModuleTypeId={setModuleTypeId} getUnLoadingData={getUnLoadingData} Unloading_Gate_in_Vehicle={Unloading_Gate_in_Vehicle} setModuleType={setModuleType} /> : null}

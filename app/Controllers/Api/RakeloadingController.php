@@ -430,7 +430,8 @@ class RakeloadingController extends BaseApiController
 		// -------- Check FNR Number Duplicate --------
 		$Qry = "SELECT fnrNumber 
 				FROM rake_surveyor_report 
-				WHERE fnrNumber = '$json->fnrNumber' AND status = 1
+				WHERE (fnrNumber = '$json->fnrNumber' AND status != 0)
+				OR (rakeUniqueNo = '$json->rakeUniqueNumber' AND status != 0)
 				ORDER BY id DESC 
 				LIMIT 1";
 		$result1 = mysqli_query($connect, $Qry);
@@ -439,7 +440,7 @@ class RakeloadingController extends BaseApiController
 		if($row1){
 			return $this->respond([
 				"success" => false,
-				"message" => "The FNR Number Already Added"
+				"message" => "The FNR OR Rake Unique Number Already Added"
 			]);
 		}
 
@@ -470,7 +471,7 @@ class RakeloadingController extends BaseApiController
         // print_r($transcation_unique_no);exit;      
 		$data = array(
 			'rrNumber'=>$json->rrNumber,
-			'rakeUniqueNo'=>$transcation_unique_no,
+			'rakeUniqueNo'=>$json->rakeUniqueNumber ?? $transcation_unique_no,
 			'fnrNumber'=>$json->fnrNumber,
 			'placementTime'=>$json->placementTime,
 			'placementPlatform'=>$json->placementPlatform,
@@ -508,7 +509,7 @@ class RakeloadingController extends BaseApiController
 			'status'=>1,
 			);
 		$res = $model->Rake_Unloading_Surveyor_Insert($data);
-		// print_r($res);exit;
+		
 		if($res > 0){
 			return $this->response->setJSON([
 					'success' => true,
@@ -563,6 +564,7 @@ class RakeloadingController extends BaseApiController
 		} 
 		$data = array(
 			'rrNumber'=>$json->rrNumber,
+			'rakeUniqueNo'=>$json->rakeUniqueNo,
 			'fnrNumber'=>$json->fnrNumber,
 			'placementTime'=>$json->placementTime,
 			'placementPlatform'=>$json->placementPlatform,
@@ -601,7 +603,15 @@ class RakeloadingController extends BaseApiController
 			'emptyBoxOpenTime'=>$json->emptyBoxOpenTime,
 			'remarks'=>$json->remarks,
 			);
+		
 		$res = $model->Rake_Unloading_Surveyor_Update($data,$json->id);
+		// print_r($res);exit;
+		if($res['error']){
+			return $this->response->setJSON([
+				'success' => false,
+				'message' => $res['message']
+			]);	
+		}
 		if($res > 0){
 			return $this->response->setJSON([
 					'success' => true,

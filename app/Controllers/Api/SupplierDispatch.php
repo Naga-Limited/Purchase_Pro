@@ -111,9 +111,21 @@ class SupplierDispatch extends BaseApiController
         $urlPath = "zrake/zrake_sdtpo/sdtpodetails?sap-client=900&PO={$PO_NO}";
         $data = SapUrlHelper::getWhDatas($urlPath);
         $sapData = json_decode($data, true);
-        // print_r($sapData); exit;    
+       
         // 🚨 FILTER SAP DATA FIRST
         $poData = [];
+        if(!$sapData){
+            $sapData = $db->table('sap_to_pp')
+                ->select("EBELN as PO_NUMBER, EBELP as PO_LINE_ITEM, BROCKER_CODE as VENDOR_CODE, BROCKER_NAME as VENDOR_NAME, SUPPLIER_CODE, SUPPLIER_NAME, SUM(MENGE) AS VENDOR_QUANTITY, MEINS as UNIT_OF_MEASUREMENT, IDNLF as WHEAT_VARIETY, MATNR as MATERIAL_CODE, SGT_SCAT as STOCK_SEGMENT, NETPR as PO_RATE, WERKS as PLANT, LGORT as STORAGE_LOCATION, INCO1 as INCO_TERMS, BSART as PO_TYPE,DATE_FORMAT(PO_LOADING_DATE, '%Y-%m-%d') AS PO_LOADING_DATE, NUMBER_OF_VEHICLES, PURCHASE_ORG_DESC as PURCHASE_GROUP_DESCRIPTION,PO_BAG_TYPE")
+                ->where('status', 3)
+                ->where('EBELN', $PO_NO)
+                ->whereIn('PURCHASE_ORG_DESC', ['Cm Truck','Cm Container','Cm Rake'])
+                // ->where('USER_STATUS', 1)
+                ->get()
+                ->getResultArray();
+            // $sapData = $sapData ? $sapData] : [];
+        }
+        //  print_r($sapData); exit;    
         if ($role == 'VENDOR' && !empty($supplierCodes)) {
             foreach ($sapData as $row) {
                 if (in_array($row['SUPPLIER_CODE'] ?? '', $supplierCodes)) {
@@ -132,7 +144,7 @@ class SupplierDispatch extends BaseApiController
         } else {
             $poData = $sapData;  // User 1: all data
         }
-        
+        // print_r($poData); exit;
         // 🚨 VENDOR_INFO PER SUPPLIER_CODE (separate query per unique supplier)
         $vendorInfo = [];
         if (!empty($poData)) {
@@ -312,7 +324,7 @@ class SupplierDispatch extends BaseApiController
         $brokerCode  = $postData->brokerCode ?? 0;
         $supplierCode  = $postData->supplierCode ?? 0;
         $role        = $postData->role ?? 0;
-
+        $purchaseMode = $postData->purchaseMode ?? '';
         $db = db_connect();
 
         // SAP API call
@@ -320,7 +332,7 @@ class SupplierDispatch extends BaseApiController
         $data    = SapUrlHelper::getWhDatas($urlPath);
         $sapData = json_decode($data); // decode as objects
         // print_r($sapData);exit;
-        if (empty($sapData)) {
+        if (empty($sapData) && !in_array($purchaseMode, ['Cm Truck','Cm Container','Cm Rake'])) {
             return $this->respond([
                 'success'    => false,
                 'message'    => 'No SAP data found',
@@ -333,7 +345,7 @@ class SupplierDispatch extends BaseApiController
         foreach ($sapData as $po_create) {
             $rate_value = 0;
             // print_r($po_create);exit; // Debug: Check the value of PURCHASE_GROUP_DESCRIPTION
-            $allowedGroups = ['CM Truck','CM Container','CM Rake'];
+            $allowedGroups = ['Cm Truck','Cm Container','Cm Rake'];
             if (in_array((string)$po_create->PURCHASE_GROUP, $allowedGroups, true)) {
                 // print_r($po_create->PURCHASE_GROUP);exit;
              $rate = $db->table('rate_master_custom_milling rmc')
@@ -419,6 +431,7 @@ class SupplierDispatch extends BaseApiController
             ->where('SUPPLIER_CODE', $supplierCode)
             ->where('EBELN', $PO_NO)
             ->where('LOEKZ !=', 'D')   // ✅ fixed
+            ->where('status', 3)            // ✅ fixed
             ->get()
             ->getResultArray();
 
@@ -431,6 +444,7 @@ class SupplierDispatch extends BaseApiController
             'message'    => $message,
             'vendorInfo' => $vendorInfo,
         ]);
+
     }
     public function submitSupplierDispatch()
     {
@@ -486,13 +500,13 @@ class SupplierDispatch extends BaseApiController
             if(in_array($VEHICLE_TYPE, ['Cm Rake', 'Cm Truck', 'Cm Container'])){
                 $existingRakes = $db->table('rate_master_custom_milling')
                     ->join(' definitions_list', ' definitions_list.id = rate_master_custom_milling.purchase_org_id')
-                    ->join('rate_master_details_custom_milling', "rate_master_details_custom_milling.rm_id = rate_master_custom_milling.rm_id AND rate_master_details_custom_milling.condition_type_code = 'MACT'")
+                    ->join('rate_master_details_custom_milling', "rate_master_details_custom_milling.rm_id = rate_master_custom_milling.rm_id AND rate_master_details_custom_milling.condition_type_code = 'MATE'")
                     ->where('rate_master_custom_milling.status', 2)
                     ->where('rate_master_custom_milling.vaild_to >=', $now_date)
                     ->where('rate_master_custom_milling.segment', $segment)
                     ->where('definitions_list.definitionsName', $VEHICLE_TYPE)
                     ->countAllResults();
-               
+                // print_r($existingRakes->getCompiledSelect());exit;
                 if ($existingRakes == 0) {
                     throw new \Exception(
                         "Please update the rate master for '{$VEHICLE_TYPE}' as it has expired rates for segment '{$segment}'"
@@ -643,5 +657,12 @@ class SupplierDispatch extends BaseApiController
 	
 		return  $this->respond(["success" => $dataStatus, "message" => $message, "results" => $result]);
 	} 
-
+    public function getCustomMillingPoNumbersWheat($userInfoId,$fromDate,$toDate,$plantCode,$type) {
+		$gateService = new SDIModel();    
+		$result = $gateService->getCustomMillingPoNumbersWheat($userInfoId,$fromDate,$toDate,$plantCode,$type);
+		$dataStatus = count($result) > 0 ? true : false;
+		$message = count($result) > 0 ? 'data found' : 'No data found';
+	
+		return  $this->respond(["success" => $dataStatus, "message" => $message, "results" => $result]);
+}
 }

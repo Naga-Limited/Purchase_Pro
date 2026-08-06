@@ -143,6 +143,7 @@ const RakeUnloadingChange = ({ url, actionRendorer, data, getEmployeeDetails ,hi
     isInitialValid: false,
     initialValues: {
       rrNumber: "",
+      rakeUniqueNo: "",
       fnrNumber: "",
       placementTime: "",
       placementPlatform: "",
@@ -503,6 +504,7 @@ const RakeUnloadingChange = ({ url, actionRendorer, data, getEmployeeDetails ,hi
 
     form.setValues({
       rrNumber: row.rrNumber,
+      rakeUniqueNo: row.rakeUniqueNo,
       fnrNumber: row.fnrNumber,
       placementTime: row.placementTime,
       placementPlatform: row.placementPlatform,
@@ -691,6 +693,7 @@ const RakeUnloadingChange = ({ url, actionRendorer, data, getEmployeeDetails ,hi
     const f = form.values || {};
 
     if (!f.rrNumber?.trim()) newErrors.rrNumber = "RR Number is required.";
+    if (!f.rakeUniqueNo?.trim()) newErrors.rakeUniqueNo = "Rake Unique Number is required.";
     if (!f.rakeType) newErrors.rakeType = "Rake Type is required.";
     if (!f.placementTime)
       newErrors.placementTime = "Placement Date & Time is required.";
@@ -833,6 +836,7 @@ const RakeUnloadingChange = ({ url, actionRendorer, data, getEmployeeDetails ,hi
       id: formData.id,
       user_id: UserDetails.USERID,
       rrNumber: formData.rrNumber,
+      rakeUniqueNo: formData.rakeUniqueNo,
       fnrNumber: formData.fnrNumber,
       placementTime: formData.placementTime,
       placementPlatform: formData.placementPlatform,
@@ -1082,12 +1086,26 @@ const RakeUnloadingChange = ({ url, actionRendorer, data, getEmployeeDetails ,hi
                         form.setFieldValue("completionTime", selected.last_created);
                         form.setFieldValue("rrCopy", selected.rrCopy ?? form.values.rrCopy);
                         form.setFieldValue("noOfWagonReceived", selected.noOfWagan ? selected.noOfWagan : form.values.noOfWagonReceived);
-
                     }}
                 />
               </FormGroup>
             </Col>
-
+            <Col md="4" sm="12">
+              <FormGroup>
+                <Label>Rake No</Label>
+                <Input
+                  type="text"
+                  value={form.values?.rakeUniqueNo}
+                  onChange={(e) => update("rakeUniqueNo", e.target.value)}
+                  invalid={!!errors.rakeUniqueNo}
+                />
+                {errors.rakeUniqueNo && (
+                  <div className="text-danger small mt-1">
+                    {errors.rakeUniqueNo}
+                  </div>
+                )}
+              </FormGroup>
+            </Col>        
             <Col md="4" sm="12">
               <FormGroup>
                 <Label>RR NUMBER</Label>

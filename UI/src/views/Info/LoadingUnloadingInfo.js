@@ -638,6 +638,9 @@ const LoadingUnloadingInfo = () => {
             submoduleAccessData = data.results.filter((item) => (item.label == 'Hand Carry'))
           }else if (moduleTypeId == 22 && (UserDetails.GATE_ID == 17 || UserDetails.GATE_ID == 18 || UserDetails.GATE_ID == 19)){
             submoduleAccessData = data.results.filter((item) => (item.label != 'Hand Carry' && item.moduleTypeId == 22))
+          }else if (UserDetails.DEPARTMENT == 'WM'){
+            // console.log(UserDetails.DEPARTMENT)
+            submoduleAccessData = data.results.filter((item) => (item.label != 'Hand Carry'))
           }else {
             submoduleAccessData = data.results
           }

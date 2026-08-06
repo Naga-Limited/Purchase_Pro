@@ -3010,19 +3010,19 @@ public function getVehicleListForKpi(string $fromDate, string $toDate, int $Gate
 		$builder = $this->db->table("gate_in_out_info gi");
 
 		$builder->select("
-        gi.*,
-        gid.invoiceNumber,
-        gid.deliveryNumber,
-        gid.deliveryQty,
-	gid.customerName,
-        wi.firstWeight,
-        wi.secondWeight,
-        wi.netWeight,
-        wi.documentNumber,
+		gi.*,
+		gid.invoiceNumber,
+		gid.deliveryNumber,
+		gid.deliveryQty,
+		gid.customerName,
+		wi.firstWeight,
+		wi.secondWeight,
+		wi.netWeight,
+		wi.documentNumber,
 		bv.bulkerEmptyWeight,
 		master_plant.PLANT_NAME,
 		master_module.moduleType
-    ");
+	");
 
 		// Join gate_in_out_info_details
 		$builder->join(
@@ -3061,21 +3061,103 @@ public function getVehicleListForKpi(string $fromDate, string $toDate, int $Gate
 		return $builder->distinct()->get()->getResultArray();
 	}
 
+	public function getBulkerCustomerWeightApprovalList()
+	{
+		$builder = $this->db->table("gate_in_out_info gi");
+
+		$builder->select("
+		gi.*,
+		gid.invoiceNumber,
+		gid.deliveryNumber,
+		gid.deliveryQty,
+		gid.customerName,
+		wi.firstWeight,
+		wi.secondWeight,
+		wi.netWeight,
+		wi.documentNumber,
+		bv.bulkerEmptyWeight,
+		master_plant.PLANT_NAME,
+		master_module.moduleType
+	");
+
+		$builder->join(
+			"bulker_vehicle bv",
+			"bv.bulkerNo = gi.vehicleNo",
+			"inner"
+		);
+		$builder->join(
+			"gate_in_out_info_details gid",
+			"gi.id = gid.gateInOutInfoId",
+			"inner"
+		);
+		$builder->join(
+			"master_plant",
+			"gi.masterPlantId = master_plant.id",
+			"inner"
+		);
+		$builder->join(
+			"master_module",
+			"gi.moduleType = master_module.id",
+			"inner"
+		);
+
+		// Join weighment_info
+		$builder->join(
+			"weighment_info wi",
+			"gi.id = wi.gateInOutInfoId",
+			"inner"
+		);
+
+		// WHERE conditions
+		$builder->where("gi.vehicleType", "BULKER");
+		$builder->where("gi.moduleStatusId", 20);
+		$builder->where("gi.waitingAt", 20);
+
+		return $builder->distinct()->get()->getResultArray();
+	}
+
+	public function approveBulkerCustomerWeight($postData)
+	{
+		$value = array(
+		"moduleStatusId" => 5,
+		"waitingAt" => 8,
+		"customerConfirmationApprovedAt" =>  date('Y-m-d H:i:s'),
+		"customerConfirmationApprovedBy" => $postData->confirmed_by,
+		);
+		// print_r($value);exit;
+		$this->db->table('gate_in_out_info')->set($value)->where('id', $postData->gateInOutInfoId)->update();
+		return $postData->gateInOutInfoId;
+	}
+
+	public function rejectBulkerCustomerWeight($postData)
+	{
+		// print_r($postData);exit;
+		$value = array(
+		"moduleStatusId" => 19,
+		"waitingAt" => 19,
+		"customerConfirmationApprovedAt" =>  date('Y-m-d H:i:s'),
+		"customerConfirmationApprovedBy" => $postData->confirmed_by,
+		);
+		$this->db->table('gate_in_out_info')->set($value)->where('id', $postData->gateInOutInfoId)->update();
+		return $postData->gateInOutInfoId;
+	}
+
 	public function saveCustomerWeight($postData)
-  {
-    $value = array(
-      "customerNetWeight" => $postData->customerNetWeight,
-      "customerdifference" => $postData->difference,
-      "moduleStatusId" => 5,
-	  "waitingAt" => 8,
-	  "NagaOutsideWBCopy" => $postData->NagaOutsideWBCopy,
-	  "customerConfirmationAt" =>  date('Y-m-d H:i:s'),
-	  "customerConfirmationBy" => $postData->confirmed_by,
-    );
-	// print_r($value);exit;
-     $this->db->table('gate_in_out_info')->set($value)->where('id', $postData->gateInOutInfoId)->update();
-    return $postData->gateInOutInfoId;
-  }
+	{
+		$value = array(
+		"customerNetWeight" => $postData->customerNetWeight,
+		"customerdifference" => $postData->difference,
+		"customerInvoicedifference" => $postData->differenceInvoice,
+		"moduleStatusId" => $postData->differenceInvoice >= 600 ? 20 : 5,
+		"waitingAt" => $postData->differenceInvoice >= 600 ? 20 : 8,
+		"NagaOutsideWBCopy" => $postData->NagaOutsideWBCopy,
+		"customerConfirmationAt" =>  date('Y-m-d H:i:s'),
+		"customerConfirmationBy" => $postData->confirmed_by,
+		);
+		// print_r($value);exit;
+		$this->db->table('gate_in_out_info')->set($value)->where('id', $postData->gateInOutInfoId)->update();
+		return $postData->gateInOutInfoId;
+	}
   public function Getdivision()
     {
         $builder = $this->db->table("employee_master");

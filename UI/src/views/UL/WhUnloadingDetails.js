@@ -965,7 +965,7 @@ const onLoadVendorChange = (e) => {
     if(!formData['TRUCK_NO']){   showError("TRUCK_NO_Error","Invalid Vehicle No",1);  }
     if(!formData['unload_lot']){   showError("unload_lot_Error","Invalid Unloading Lot",1);  }
     if(!formData['supplier_wb_qty']){   showError("supplier_wb_qty_Error","Invalid Supplier WB quantity",1); }
-    if(!formData['invoice_rate'] && poData.VEHICLE_TYPE !== 'CM Truck' && poData.VEHICLE_TYPE !== 'CM Container'){  showError("invoice_rate_Error","Invalid Invoice Rate",1);  }
+    if(!formData['invoice_rate'] && poData.VEHICLE_TYPE !== 'Cm Truck' && poData.VEHICLE_TYPE !== 'Cm Container'){  showError("invoice_rate_Error","Invalid Invoice Rate",1);  }
     if(!formData['invoice_date']){  showError("invoice_date_Error","Invalid Invoice Date",1);  }
     if(!formData['invoice_no']){  showError("invoice_no_Error","Invalid Invoice No",1);  }
     if(!formData['invoice_qty']){  showError("invoice_qty_Error","Invalid Invoice Quantity",1);  }
@@ -993,7 +993,7 @@ const onLoadVendorChange = (e) => {
       showError("WB_COPY_Error","Upload WB Copy",1);
     }
     if (
-      poData.VEHICLE_TYPE !== "Rake" && poData.VEHICLE_TYPE !== "CM Rake" && poData.VEHICLE_TYPE !== 'CM Truck' && poData.VEHICLE_TYPE !== 'CM Container' && 
+      poData.VEHICLE_TYPE !== "Rake" && poData.VEHICLE_TYPE !== "Cm Rake" && poData.VEHICLE_TYPE !== 'Cm Truck' && poData.VEHICLE_TYPE !== 'Cm Container' && 
       (isNotFilled || (!poData.INV_COPY && !attachedFiles.supp_inv_copy.name && ImgData.SupplierInvCopy==null) || (ImgData.SupplierWBCopy==null && !poData.WB_COPY && !attachedFiles.supp_wb_copy.name))
     ) {
       console.log("File not uploaded")
@@ -1035,7 +1035,7 @@ const onLoadVendorChange = (e) => {
       "invoice_bag_count",
     ].some((a) => !formData[a]);
     if (
-      poData.VEHICLE_TYPE !== "Rake" && poData.VEHICLE_TYPE !== "CM Rake" &&
+      poData.VEHICLE_TYPE !== "Rake" && poData.VEHICLE_TYPE !== "Cm Rake" &&
       (isNotFilled || (!poData.INV_COPY && !attachedFiles.supp_inv_copy.name) || (!poData.WB_COPY && !attachedFiles.supp_wb_copy.name))
     ) {
       return true;
@@ -1136,7 +1136,6 @@ const onLoadVendorChange = (e) => {
         hideLoader();
       });
   };
-
 
   const renderModelContent = () => {
     const { PO_NUMBER, SUPPLIER_NAME, LINE_ITEM, PLANT_NAME,WERKS } = modelData;
@@ -1430,7 +1429,7 @@ useEffect(() => {
                       Add
                     </Button.Ripple>
                     </Col>
-                    {(addB2==1 || ((poData.VEHICLE_TYPE === 'Rake' || poData.VEHICLE_TYPE === 'CM Rake') && no_bags2 != null && no_bags2 !=0) ) && <Col md="4" sm="12">
+                    {(addB2==1 || ((poData.VEHICLE_TYPE === 'Rake' || poData.VEHICLE_TYPE === 'Cm Rake') && no_bags2 != null && no_bags2 !=0) ) && <Col md="4" sm="12">
                 <FormGroup>
                   <Label>Received Bag Type(2)</Label>
                   <Select className="react-select"  classNamePrefix="select" 
@@ -1442,7 +1441,7 @@ useEffect(() => {
 <span id="BagsType2_Error" style={{color: "red"}} ></span>
                 </FormGroup>
               </Col>}
-              {(addB2==1 || ((poData.VEHICLE_TYPE === 'Rake' || poData.VEHICLE_TYPE === 'CM Rake') && no_bags2 != null && no_bags2 !=0) )  &&   <Col md="2" sm="12">
+              {(addB2==1 || ((poData.VEHICLE_TYPE === 'Rake' || poData.VEHICLE_TYPE === 'Cm Rake') && no_bags2 != null && no_bags2 !=0) )  &&   <Col md="2" sm="12">
                 <FormGroup>
                   <Label for="cityMulti">Bags(2)</Label>
                   <Input
@@ -1466,7 +1465,7 @@ useEffect(() => {
                 </FormGroup>
               </Col>}
               
-              {(addB2==1 || ((poData.VEHICLE_TYPE === 'Rake' || poData.VEHICLE_TYPE === 'CM Rake') && no_bags2 != null && no_bags2 !=0) ) &&getTextElement("Gunny Weight 2", GunnyWeight2)}
+              {(addB2==1 || ((poData.VEHICLE_TYPE === 'Rake' || poData.VEHICLE_TYPE === 'Cm Rake') && no_bags2 != null && no_bags2 !=0) ) &&getTextElement("Gunny Weight 2", GunnyWeight2)}
               {addB2==1 &&<Col md="2" sm="12">
               <br></br>
                 {/*  onClick={(e) => OnUnloadingDetails()} */}
@@ -1478,7 +1477,7 @@ useEffect(() => {
                     </Button.Ripple>
                     </Col>}
                     
-              {(addB3==1 || ((poData.VEHICLE_TYPE === 'Rake' || poData.VEHICLE_TYPE === 'CM Rake') && no_bags3 != null && no_bags3 !=0)) &&  <Col md="4" sm="12">
+              {(addB3==1 || ((poData.VEHICLE_TYPE === 'Rake' || poData.VEHICLE_TYPE === 'Cm Rake') && no_bags3 != null && no_bags3 !=0)) &&  <Col md="4" sm="12">
                 <FormGroup>
                   <Label>Received Bag Type(3)</Label>
                   <Select className="react-select"  classNamePrefix="select" 
@@ -1490,7 +1489,7 @@ useEffect(() => {
 <span id="BagsType3_Error" style={{color: "red"}} ></span>
                 </FormGroup>
               </Col>}
-              {(addB3==1 || ((poData.VEHICLE_TYPE === 'Rake' || poData.VEHICLE_TYPE === 'CM Rake') && no_bags3 != null && no_bags3 !=0))  &&  <Col md="2" sm="12">
+              {(addB3==1 || ((poData.VEHICLE_TYPE === 'Rake' || poData.VEHICLE_TYPE === 'Cm Rake') && no_bags3 != null && no_bags3 !=0))  &&  <Col md="2" sm="12">
                 <FormGroup>
                   <Label for="cityMulti">Bags(3)</Label>
                   <Input
@@ -1513,7 +1512,7 @@ useEffect(() => {
                 </FormGroup>
               </Col>}
               
-              {(addB3==1 || ((poData.VEHICLE_TYPE === 'Rake' || poData.VEHICLE_TYPE === 'CM Rake') && no_bags3 != null && no_bags3 !=0)) && getTextElement("Gunny Weight 3", GunnyWeight3)}
+              {(addB3==1 || ((poData.VEHICLE_TYPE === 'Rake' || poData.VEHICLE_TYPE === 'Cm Rake') && no_bags3 != null && no_bags3 !=0)) && getTextElement("Gunny Weight 3", GunnyWeight3)}
 
               {addB3==1  &&<Col md="2" sm="12">
               <Button.Ripple color="danger" type="button" id="Remove3" onClick={() =>AddRemove(-3,"R")}>
@@ -1525,7 +1524,7 @@ useEffect(() => {
               {getTextElement("Total Bags", (Number(no_bags)+Number(no_bags2)+Number(no_bags3)).toFixed(0),"2")}
               {getTextElement("Gunny Weight (In Kgs)", gunny_wt)}
               <span id="gunny_wt_Error" style={{color: "red"}} ></span>
-              {poData.VEHICLE_TYPE !== "Rake" && poData.VEHICLE_TYPE !== "CM Rake" ? getTextElement("Recommended Lot", RECOMMENDED_LOT) : ""}
+              {poData.VEHICLE_TYPE !== "Rake" && poData.VEHICLE_TYPE !== "Cm Rake" ? getTextElement("Recommended Lot", RECOMMENDED_LOT) : ""}
               <Col md="4" sm="12">
                 {/* Dijo 001 */}
                 {/* <FormGroup>
@@ -1546,7 +1545,7 @@ useEffect(() => {
 
                 <span id="unload_lot_Error" style={{color: "red"}} ></span>
               </Col>
-              {poData.VEHICLE_TYPE !== "Rake" && poData.VEHICLE_TYPE !== "CM Rake" ? (
+              {poData.VEHICLE_TYPE !== "Rake" && poData.VEHICLE_TYPE !== "Cm Rake" ? (
                 <>
                   <Col md="4" sm="12">
                     <Label>Supplier WB Date</Label>

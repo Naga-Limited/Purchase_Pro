@@ -173,7 +173,7 @@ class UnmanWBModel extends Model
             }
         }
         // CASE A: special modules or both first+second exist -> insert new weighment row (chain)
-        if (($firstWeight && $secondWeight ) && in_array($moduleType, [5,7,13,21,33,19,29])) {
+        if (($firstWeight && $secondWeight ) && in_array($moduleType, [5,7,13,21,33,19,29,39])) {
             $this->db->transStart();
              $netWeight1 = 0;
             if ($movementType === 1) {
@@ -562,16 +562,16 @@ class UnmanWBModel extends Model
         $vehicleNo = $f['vehicleNo'];
         $loadingUnloadingInfoId = $f['loadingUnloadingInfoId'] ?? 0;
         $tripSheetNumber = $f['tripSheetNumber'];
-        if($f['moduleStatusId'] == 1 && $f['movementType'] == 1 && ($moduleType == 2 || $moduleType == 1)){
+        if($f['moduleStatusId'] == 1 && $f['movementType'] == 1 && ($moduleType == 2 || $moduleType == 1 || $moduleType == 43)){
         $fgUrl = "zgatepro/zfg_tripsheet/FG?sap-client=900&Vehicle_No=$vehicleNo";
         $fgDetails = SapUrlHelper::getWhDatas($fgUrl);
         $fgDetailsData = json_decode($fgDetails);
-            if($fgDetailsData[0]->SAP_LINE[0]->SHIPMENTORDERNO && ($moduleType == 2 || $moduleType == 1)) {
+            if($fgDetailsData[0]->SAP_LINE[0]->SHIPMENTORDERNO && ($moduleType == 2 || $moduleType == 1 || $moduleType == 43)) {
                   $sapDocument = 'shipmentOrderNo';
                   $data = array(
                       $sapDocument => $fgDetailsData[0]->SAP_LINE[0]->SHIPMENTORDERNO,
                       'tripSheetNumber' => $fgDetailsData[0]->TRIPSHEET_NO,
-                      'moduleType' => 1
+                      'moduleType' => $moduleType == 43 ? 43 : 1
                   );
                 $Landing_Data->Gate_info_Status_Change($f['gateId'], $data);			
             
@@ -976,12 +976,14 @@ if (!empty($testResult)) {
             purchase_info.SCREEN_TYPE,
             purchase_info.PI_REFID as arrivalId,
             purchase_info.VEHICLE_TYPE,
-            purchase_info.WERKS
+            purchase_info.WERKS,
+            purchase_info.TRUCK_NO
         ")
         ->join('pp_silotomillweights_unload', 'pp_silotomillweights_unload.VANumber = purchase_info.ZVA_NUMBER', 'left')
         ->where('purchase_info.TRUCK_NO', $data->vehicle)
         ->whereIn('purchase_info.VECHICAL_STATUS', [23,24])
-        ->orderBy('purchase_info.PI_REFID', 'DESC');
+        ->orderBy('purchase_info.PI_REFID', 'DESC')
+        ->groupBy('purchase_info.PI_REFID');
 
     if (!empty($plantCodes)) $pBuilder->whereIn('purchase_info.WERKS', $plantCodes);
 
@@ -998,7 +1000,10 @@ if (!empty($testResult)) {
         $firstW = (float)($p['FirstWeight'] ?? 0);
         $screenType = $p['SCREEN_TYPE'] ?? '';
         $vehicleType = $p['VEHICLE_TYPE'] ?? '';
-
+	$distinctArrivalIds = array_unique(array_column($pRes, 'TRUCK_NO'));
+        if (count($distinctArrivalIds) > 1) {
+            throw new \Exception("The Vehicle Already Stored. Please check vehicle: {$data->vehicle}");
+        }	
         if ($vehicleStatus === 23 && $firstW == 0) {
             // first weight
             $this->db->transStart();
@@ -1041,7 +1046,8 @@ if (!empty($testResult)) {
             ]);
             // determine status value logic kept from your original code
             if ($screenType == 'SILOTOMILL') {$STATUS = 4;$MODULE = 'Silo To Mill';}
-            elseif ($screenType == 'IAS') {$STATUS = 2;$MODULE = 'IAS';}
+            elseif ($screenType == 'IAS' && $p['WERKS'] == 'FR01') {$STATUS = 2;$MODULE = 'IAS';}
+            elseif ($screenType == 'IAS') {$STATUS = 4;$MODULE = 'IAS';}
             elseif (strtolower($vehicleType) == 'rake') {$STATUS = 4;$MODULE = 'RM Wheat';}
             else {$STATUS = 2;$MODULE = 'RM Wheat';}
 

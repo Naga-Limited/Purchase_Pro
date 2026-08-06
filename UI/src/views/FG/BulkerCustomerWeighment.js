@@ -49,7 +49,7 @@ const CBulkerCoustomerWeight = () => {
     const [custSecondWeight, setCustSecondWeight] = useState("");
     const [custNetWeight, setCustNetWeight] = useState(0);
     const [difference, setDifference] = useState(0);
-
+    const [differenceInvoice, setDifferenceInvoice] = useState(0);
     /* Attachment */
     const [attachedFiles, setAttachedFiles] = useState({});
     const [customerWeightCopyName, setCustomerWeightCopyName] = useState("");
@@ -102,11 +102,13 @@ const CBulkerCoustomerWeight = () => {
         const bulkerActual = Number(selectedRow?.bulkerEmptyWeight) || 0;
         const secondWeight = Number(selectedRow?.secondWeight) || 0;
         const customerNet = Number(custNetWeight) || 0;
+        const deliveryQty1 = Number(selectedRow?.deliveryQty) || 0;
 
         const calculatedNewNet = secondWeight - bulkerActual;
 
         setNewNetWeight(calculatedNewNet);
         setDifference(calculatedNewNet - customerNet);
+        setDifferenceInvoice(deliveryQty1 - customerNet);
     }, [custNetWeight, selectedRow]);
 
     /* ================= ACTIONS ================= */
@@ -116,6 +118,7 @@ const CBulkerCoustomerWeight = () => {
         setCustSecondWeight("");
         setCustNetWeight(0);
         setDifference(0);
+        setDifferenceInvoice(0);
         setAttachedFiles({});
         setPreviewUrl(null);
         setPreviewType(null);
@@ -186,6 +189,7 @@ const CBulkerCoustomerWeight = () => {
             gateInOutInfoId: selectedRow.id,
             customerNetWeight: custNetWeight,
             difference: difference,
+            differenceInvoice:differenceInvoice,
             NagaOutsideWBCopy: customerWeightCopyFileName,
             confirmed_by: UserDetails.USERID,
         };
@@ -385,11 +389,16 @@ const CBulkerCoustomerWeight = () => {
 
                         <Col md="3">
                             <FormGroup>
-                                <Label>Difference</Label>
+                                <Label>Net Weight Difference</Label>
                                 <Input value={difference} disabled />
                             </FormGroup>
                         </Col>
-
+                        <Col md="3">
+                            <FormGroup>
+                                <Label>Invoice Weight Difference</Label>
+                                <Input value={differenceInvoice} disabled />
+                            </FormGroup>
+                        </Col>
 
                         <Col md="6" className="mt-2">
                             <div style={{ display: "flex", gap: 8 }}>

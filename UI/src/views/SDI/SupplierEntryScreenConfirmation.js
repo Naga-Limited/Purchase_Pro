@@ -154,7 +154,7 @@ const SupplierEntryScreenConfirmation = () => {
     setPoValidated(false); // Reset on open
     // setButtonDisable(true); // Reset button
     setShowDetailsModal(true);
-    getPoDetails(record.poNumber, record.brokerCode ,record.supplierCode);
+    getPoDetails(record.poNumber, record.brokerCode ,record.supplierCode, record.purchaseMode);
     onFetchVessel()
   };
 
@@ -190,7 +190,7 @@ const SupplierEntryScreenConfirmation = () => {
     return changed;
   };
 
- const getPoDetails = async (poNumber, brokerCode,supplierCode) => {
+ const getPoDetails = async (poNumber, brokerCode,supplierCode,purchaseMode) => {
   if (!poNumber.trim()) {
     errorToast("Please check PO Number");
     return;
@@ -207,7 +207,8 @@ const SupplierEntryScreenConfirmation = () => {
       brokerCode: brokerCode, 
       userId: UserDetails.USERID,
       role: UserDetails.role,
-      supplierCode:supplierCode
+      supplierCode:supplierCode,
+      purchaseMode: purchaseMode
     };
 
     const response = await apiPostMethod(

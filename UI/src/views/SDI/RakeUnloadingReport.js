@@ -9,6 +9,7 @@ import { apiBaseUrl } from "../../urlConstants";
 import { errorToast } from "../../helper/appHelper";
 
 const initialState = {
+  rakeUniqueNumber: "",
   rrNumber: "",
   fnrNumber: "",
   placementTime: "",
@@ -60,6 +61,23 @@ const RakeUnloadingReport = () => {
   const [freeTimeLoading, setFreeTimeLoading] = useState(false);
   const [freeTimeError, setFreeTimeError] = useState(null);
 
+  const [rakeRunningNumber, setRakeRunningNumber] = useState("");
+
+  const getFinancialYear = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const startYear = today.getMonth() >= 3 ? year : year - 1;
+    const shortStart = String(startYear).slice(-2);
+    const shortEnd = String(startYear + 1).slice(-2);
+    return `${shortStart}-${shortEnd}`;
+  };
+
+  useEffect(() => {
+    const runningNo = rakeRunningNumber.padStart(3, "0");
+    update("rakeUniqueNumber", `R-${runningNo}-${getFinancialYear()}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rakeRunningNumber]);
+
   const update = (path, value) => {
     if (typeof path === "string" && path.includes(".")) {
       const [parent, child] = path.split(".");
@@ -77,6 +95,8 @@ const RakeUnloadingReport = () => {
     const newErrors = {};
 
     // Required text/number fields
+    if (!rakeRunningNumber?.trim()) newErrors.rakeUniqueNumber = "Rake Unique Number is required.";
+
     if (!form.rrNumber?.trim()) newErrors.rrNumber = "RR Number is required.";
 
     if (!form.fnrNumber) newErrors.fnrNumber = "FNR Number is required.";
@@ -431,6 +451,33 @@ const formatDateTime = (date) => {
                     </Input>
                     {errors.fnrNumber && (
                       <div className="text-danger small mt-1">{errors.fnrNumber}</div>
+                    )}
+                  </FormGroup>
+                </Col>
+
+                <Col md="4" sm="12">
+                  <FormGroup>
+                    <Label>RAKE UNIQUE NUMBER <span className="text-danger">*</span></Label>
+                    <div className="d-flex align-items-center">
+                      <span className="mr-1">R-</span>
+                      <Input
+                        type="text"
+                        maxLength={3}
+                        placeholder="001"
+                        value={rakeRunningNumber}
+                        invalid={!!errors.rakeUniqueNumber}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, "").slice(0, 3);
+                          setRakeRunningNumber(value);
+                          if (errors.rakeUniqueNumber) {
+                            setErrors((er) => ({ ...er, rakeUniqueNumber: "" }));
+                          }
+                        }}
+                      />
+                      <span className="ml-1">-{getFinancialYear()}</span>
+                    </div>
+                    {errors.rakeUniqueNumber && (
+                      <div className="text-danger small mt-1">{errors.rakeUniqueNumber}</div>
                     )}
                   </FormGroup>
                 </Col>

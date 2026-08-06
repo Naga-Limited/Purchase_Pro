@@ -370,53 +370,93 @@ $poline =[
             purchase_info.TRUCK_NO,
             purchase_info.PI_REFID,
 
-            rate_master_details_custom_milling.condition_type_code,
+            custom_milling_po_condtion.condition_type_code,
             CONCAT(
-                rate_master_details_custom_milling.condition_type_code,' - ',
-                rate_master_details_custom_milling.condition_description
+                custom_milling_po_condtion.condition_type_code,' - ',
+                custom_milling_po_condtion.condition_description
             ) AS condition_description,
 
-            ROUND(SUM(gateout_info.gunny_less_wt)/1000,3) AS gunny_less_wt,
+            ROUND(
+                SUM(gateout_info.gunny_less_wt)/1000
+                - COALESCE((
+                    SELECT SUM(cmfe.overall_tonnage) FROM custom_milling_fi_entry cmfe
+                    WHERE cmfe.condition_id = custom_milling_po_condtion.id
+                    AND cmfe.status != 0
+                    AND cmfe.puchase_info_id NOT LIKE '%,%'
+                    AND cmfe.puchase_info_id LIKE CONCAT('%', purchase_info.PI_REFID, '%')
+                ), 0)
+            ,3) AS gunny_less_wt,
 
-            rate_master_details_custom_milling.*,
+            custom_milling_po_condtion.*,
+            custom_milling_po_condtion.id as rmd_id, 
 
             ROUND(
-                SUM(gateout_info.gunny_less_wt)/1000 * rate_master_details_custom_milling.rate,
+                (
+                    SUM(gateout_info.gunny_less_wt)/1000
+                    - COALESCE((
+                        SELECT SUM(cmfe.overall_tonnage) FROM custom_milling_fi_entry cmfe
+                        WHERE cmfe.condition_id = custom_milling_po_condtion.id
+                        AND cmfe.status != 0
+                        AND cmfe.puchase_info_id NOT LIKE '%,%'
+                        AND cmfe.puchase_info_id LIKE CONCAT('%', purchase_info.PI_REFID, '%')
+                    ), 0)
+                ) * custom_milling_po_condtion.rate,
                 2
             ) AS condition_amount,
 
             ROUND(
-                SUM(gateout_info.gunny_less_wt)/1000 * rate_master_details_custom_milling.rate,
+                (
+                    SUM(gateout_info.gunny_less_wt)/1000
+                    - COALESCE((
+                        SELECT SUM(cmfe.overall_tonnage) FROM custom_milling_fi_entry cmfe
+                        WHERE cmfe.condition_id = custom_milling_po_condtion.id
+                        AND cmfe.status != 0
+                        AND cmfe.puchase_info_id NOT LIKE '%,%'
+                        AND cmfe.puchase_info_id LIKE CONCAT('%', purchase_info.PI_REFID, '%')
+                    ), 0)
+                ) * custom_milling_po_condtion.rate,
                 2
             ) AS actual_amount,
 
             gateout_info.invoice_no,
-            gateout_info.invoice_date
+            gateout_info.invoice_date,
+            pp_setting.customMillingGl,
+            pp_setting.customMillingCostCenter,
+            pp_setting.customMillingProfitCenter
         ");
-         $builder->join(
+        $builder->join(
             'gateout_info',
             'gateout_info.purchase_info_id = purchase_info.PI_REFID',
+            'inner'
+        );
+        $builder->join(
+            'sap_to_pp',
+            'sap_to_pp.EBELN = purchase_info.ZPO_NUMBER AND sap_to_pp.EBELP = purchase_info.PO_LINE_ITEM AND sap_to_pp.SUPPLIER_CODE AND purchase_info.ZSUPPLIER_CODE',
             'inner'
         );
         // ------------------------
         // 6. Joins
         // ------------------------
+        // $builder->join(
+        //     'rate_master_custom_milling',
+        //     'rate_master_custom_milling.material_description = purchase_info.IDNLF',
+        //     'inner'
+        // );
+        // $builder->join(
+        //     'definitions_list',
+        //     "definitions_list.id = rate_master_custom_milling.purchase_org_id AND definitions_list.definitionsName = purchase_info.VEHICLE_TYPE",
+        //     'inner'
+        // );
         $builder->join(
-            'rate_master_custom_milling',
-            'rate_master_custom_milling.material_description = purchase_info.IDNLF',
+            'custom_milling_po_condtion',
+            'custom_milling_po_condtion.pp_line_id = sap_to_pp.refid',
             'inner'
         );
         $builder->join(
-            'definitions_list',
-            "definitions_list.id = rate_master_custom_milling.purchase_org_id AND definitions_list.definitionsName = purchase_info.VEHICLE_TYPE",
+            'pp_setting',
+            'pp_setting.Id = 1',
             'inner'
         );
-        $builder->join(
-            'rate_master_details_custom_milling',
-            'rate_master_details_custom_milling.rm_id = rate_master_custom_milling.rm_id',
-            'inner'
-        );
-
        
 
         // ------------------------
@@ -424,13 +464,15 @@ $poline =[
         // ------------------------
         $builder->where('purchase_info.VECHICAL_STATUS', 7);
         $builder->where('purchase_info.MIGO_NUM IS NOT NULL');
-        $builder->where('purchase_info.MIGO501 IS NOT NULL');
+        $builder->where("purchase_info.MIGO_NUM != ''");
+        // $builder->where('purchase_info.MIGO501 IS NOT NULL');
 
-        $builder->where('rate_master_custom_milling.vaild_to >= NOW()');
-        $builder->where('rate_master_custom_milling.status', 2);
+        // $builder->where('rate_master_custom_milling.vaild_to >= NOW()');
+        $builder->where('custom_milling_po_condtion.status', 1);
 
-        $builder->whereIn('purchase_info.VEHICLE_TYPE', ['CM Truck','CM Container']);
-
+        $builder->whereIn('purchase_info.VEHICLE_TYPE', ['Cm Truck','Cm Container']);
+        $builder->whereNotIn('custom_milling_po_condtion.condition_type_code', ['MATE']);
+        $builder->where('custom_milling_po_condtion.rate > 0');
         // ------------------------
         // 8. Date Filter
         // ------------------------
@@ -456,7 +498,7 @@ $poline =[
 
         if (!empty($conditionArray)) {
             $builder->whereIn(
-                'rate_master_details_custom_milling.condition_type_code',
+                'custom_milling_po_condtion.condition_type_code',
                 $conditionArray
             );
         }
@@ -469,10 +511,30 @@ $poline =[
         // 10. GROUP BY (Vehicle + Condition)
         // ------------------------
         $builder->groupBy([
-            'rate_master_details_custom_milling.condition_type_code',
+            'custom_milling_po_condtion.condition_type_code',
             'purchase_info.PI_REFID',
         ]);
 
+        // ------------------------
+        // 10b. Exclude PI_REFID + Condition combinations already paid as part of a
+        //      multi-truck entry (can't be reduced to a remaining tonnage since the
+        //      per-truck paid share isn't stored) - recorded in
+        //      custom_milling_fi_entry.puchase_info_id
+        // ------------------------
+        $builder->where("NOT EXISTS (
+            SELECT 1 FROM custom_milling_fi_entry cmfe
+            WHERE cmfe.puchase_info_id LIKE CONCAT('%', purchase_info.PI_REFID, '%')
+            AND cmfe.puchase_info_id LIKE '%,%'
+            AND cmfe.condition_id = custom_milling_po_condtion.id
+            AND cmfe.status != 0
+        )", null, false);
+
+        // ------------------------
+        // 10c. For single-truck entries, hide the row once the remaining tonnage
+        //      (current tonnage minus already-paid tonnage) is used up
+        // ------------------------
+        $builder->having("gunny_less_wt > 0");
+        // print_r($builder->getCompiledSelect());exit;
         // ------------------------
         // 11. Execute
         // ------------------------
@@ -528,54 +590,102 @@ $poline =[
             purchase_info.VEHICLE_TYPE,
             purchase_info.ZVA_NUMBER AS vaNumber,
             GROUP_CONCAT(purchase_info.PI_REFID) AS PI_REFID,
-            rate_master_details_custom_milling.condition_type_code,
-            CONCAT(rate_master_details_custom_milling.condition_type_code,' - ',
-            rate_master_details_custom_milling.condition_description) AS condition_description,
-            ROUND(SUM(gateout_info.gunny_less_wt/1000),2) AS gunny_less_wt,
-            rate_master_details_custom_milling.*,
+            custom_milling_po_condtion.condition_type_code,
+            CONCAT(custom_milling_po_condtion.condition_type_code,' - ',
+            custom_milling_po_condtion.condition_description) AS condition_description,
+            ROUND(
+                SUM(gateout_info.gunny_less_wt/1000)
+                - COALESCE((
+                    SELECT SUM(cmfe.overall_tonnage) FROM custom_milling_fi_entry cmfe
+                    WHERE cmfe.po_numbers LIKE CONCAT('%', purchase_info.ZPO_NUMBER, '%')
+                    AND cmfe.status != 0
+                    AND FIND_IN_SET(cmfe.condition_id, GROUP_CONCAT(custom_milling_po_condtion.id))
+                ), 0)
+            ,3) AS gunny_less_wt,
+            custom_milling_po_condtion.*,
+            custom_milling_po_condtion.id as rmd_id,
             gateout_info.invoice_no,
             gateout_info.invoice_date,
-            ROUND(SUM(gateout_info.gunny_less_wt/1000 * rate_master_details_custom_milling.rate),2) AS condition_amount,
-            ROUND(SUM(gateout_info.gunny_less_wt/1000 * rate_master_details_custom_milling.rate),2) AS actual_amount
+            ROUND(
+                (
+                    SUM(gateout_info.gunny_less_wt/1000)
+                    - COALESCE((
+                        SELECT SUM(cmfe.overall_tonnage) FROM custom_milling_fi_entry cmfe
+                        WHERE cmfe.po_numbers LIKE CONCAT('%', purchase_info.ZPO_NUMBER, '%')
+                        AND cmfe.status != 0
+                        AND FIND_IN_SET(cmfe.condition_id, GROUP_CONCAT(custom_milling_po_condtion.id))
+                    ), 0)
+                ) * custom_milling_po_condtion.rate,
+                2
+            ) AS condition_amount,
+            ROUND(
+                (
+                    SUM(gateout_info.gunny_less_wt/1000)
+                    - COALESCE((
+                        SELECT SUM(cmfe.overall_tonnage) FROM custom_milling_fi_entry cmfe
+                        WHERE cmfe.po_numbers LIKE CONCAT('%', purchase_info.ZPO_NUMBER, '%')
+                        AND cmfe.status != 0
+                        AND FIND_IN_SET(cmfe.condition_id, GROUP_CONCAT(custom_milling_po_condtion.id))
+                    ), 0)
+                ) * custom_milling_po_condtion.rate,
+                2
+            ) AS actual_amount,
+            GROUP_CONCAT(custom_milling_po_condtion.id) AS rmd_ids,
+            pp_setting.customMillingGl,
+            pp_setting.customMillingCostCenter,
+            pp_setting.customMillingProfitCenter
         ");
-
+        $builder->join(
+            'sap_to_pp',
+            'sap_to_pp.EBELN = purchase_info.ZPO_NUMBER AND sap_to_pp.EBELP = purchase_info.PO_LINE_ITEM AND sap_to_pp.SUPPLIER_CODE AND purchase_info.ZSUPPLIER_CODE',
+            'inner'
+        );
         // -------------------------
         // 7. JOINS
         // -------------------------
+        // $builder->join(
+        //     'rate_master_custom_milling',
+        //     'rate_master_custom_milling.material_description = purchase_info.IDNLF',
+        //     'inner'
+        // );
+        // $builder->join(
+        //     'definitions_list',
+        //     "definitions_list.id = rate_master_custom_milling.purchase_org_id AND definitions_list.definitionsName = purchase_info.VEHICLE_TYPE",
+        //     'inner'
+        // );
+        // $builder->join(
+        //     'rate_master_details_custom_milling',
+        //     'rate_master_details_custom_milling.rm_id = rate_master_custom_milling.rm_id',
+        //     'inner'
+        // );
         $builder->join(
-            'rate_master_custom_milling',
-            'rate_master_custom_milling.material_description = purchase_info.IDNLF',
+            'custom_milling_po_condtion',
+            'custom_milling_po_condtion.pp_line_id = sap_to_pp.refid',
             'inner'
         );
-        $builder->join(
-            'definitions_list',
-            "definitions_list.id = rate_master_custom_milling.purchase_org_id AND definitions_list.definitionsName = purchase_info.VEHICLE_TYPE",
-            'inner'
-        );
-        $builder->join(
-            'rate_master_details_custom_milling',
-            'rate_master_details_custom_milling.rm_id = rate_master_custom_milling.rm_id',
-            'inner'
-        );
-
         $builder->join(
             'gateout_info',
             'gateout_info.purchase_info_id = purchase_info.PI_REFID',
             'inner'
         );
-
+        $builder->join(
+            'pp_setting',
+            'pp_setting.Id = 1',
+            'inner'
+        );
         // -------------------------
         // 8. CONDITIONS
         // -------------------------
         $builder->where('purchase_info.VECHICAL_STATUS', 7);
         $builder->where('purchase_info.MIGO_NUM IS NOT NULL');
-        $builder->where('purchase_info.MIGO501 IS NOT NULL');
+        $builder->where("purchase_info.MIGO_NUM != ''");
 
-        $builder->where('rate_master_custom_milling.vaild_to >= NOW()');
-        $builder->where('rate_master_custom_milling.status', 2);
+        // $builder->where('rate_master_custom_milling.vaild_to >= NOW()');
+        $builder->where('custom_milling_po_condtion.status', 1);
 
-        $builder->whereIn('purchase_info.VEHICLE_TYPE', ['CM RAKE']);
-
+        $builder->whereIn('purchase_info.VEHICLE_TYPE', ['Cm Rake']);
+        $builder->whereNotIn('custom_milling_po_condtion.condition_type_code', ['MATE']);
+        $builder->where('custom_milling_po_condtion.rate > 0');
         // -------------------------
         // 9. DATE FILTER
         // -------------------------
@@ -601,7 +711,7 @@ $poline =[
 
         if (!empty($conditionArray)) {
             $builder->whereIn(
-                'rate_master_details_custom_milling.condition_type_code',
+                'custom_milling_po_condtion.condition_type_code',
                 $conditionArray
             );
         }
@@ -615,12 +725,156 @@ $poline =[
         // -------------------------
         $builder->groupBy([
             'purchase_info.ZPO_NUMBER',
-            'rate_master_details_custom_milling.condition_type_code'
+            'purchase_info.WERKS',
+            'custom_milling_po_condtion.condition_type_code'   
         ]);
 
         // -------------------------
+        // 11b. Hide PO + Condition combinations already fully paid
+        // -------------------------
+        $builder->having("gunny_less_wt > 0");
+        // print_r($builder->getCompiledSelect());exit;
+        // -------------------------
         // 12. EXECUTE
         // -------------------------
-        return $builder->get()->getResultArray();
+        // print_r($builder->getCompiledSelect());exit;
+        $parentData = $builder->get()->getResultArray();
+
+        $allIds = [];
+        $conditionCodes = [];
+        foreach ($parentData as $row) {
+            if (!empty($row['PI_REFID'])) {
+                $allIds = array_merge($allIds, explode(',', $row['PI_REFID']));
+            }
+            if (!empty($row['condition_type_code'])) {
+                $conditionCodes[] = $row['condition_type_code'];
+            }
+        }
+        $allIds = array_values(array_unique($allIds));
+        $conditionCodes = array_values(array_unique($conditionCodes));
+
+        $childData = [];
+
+        if (!empty($allIds)) {
+            $childData = $this->db->table('purchase_info pi')
+                ->select("
+                    pi.PI_REFID,
+                    pi.ZVA_NUMBER,
+                    pi.ZPO_NUMBER,
+                    pi.ZVENDOR_NAME,
+                    pi.ZSUPPLIER_CODE,
+                    pi.WERKS,
+                    pi.TRUCK_NO,
+                    rmdcm.condition_type_code,
+                    ROUND(SUM(gi.gunny_less_wt/1000),3) AS total_gunny_less_wt,
+                    rmdcm.rate,
+                    ROUND(SUM(gi.gunny_less_wt/1000 * rmdcm.rate),2) AS condition_amount,
+                    gi.invoice_no
+                ")
+                ->join(
+                    'gateout_info gi',
+                    'gi.purchase_info_id = pi.PI_REFID',
+                    'inner'
+                )
+                // ->join(
+                //     'rate_master_custom_milling rmcm',
+                //     'rmcm.material_description = pi.IDNLF',
+                //     'inner'
+                // )
+                // ->join(
+                //     'definitions_list dl',
+                //     "dl.id = rmcm.purchase_org_id AND dl.definitionsName = pi.VEHICLE_TYPE",
+                //     'inner'
+                // )+
+                ->join(
+                    'sap_to_pp',
+                    'sap_to_pp.EBELN = pi.ZPO_NUMBER AND sap_to_pp.EBELP = pi.PO_LINE_ITEM AND sap_to_pp.SUPPLIER_CODE AND pi.ZSUPPLIER_CODE',
+                    'inner'
+                )
+                ->join(
+                    'custom_milling_po_condtion rmdcm',
+                    'rmdcm.pp_line_id = sap_to_pp.refid',
+                    'inner'
+                )
+                // ->join(
+                //     'rate_master_details_custom_milling rmdcm',
+                //     'rmdcm.rm_id = rmcm.rm_id',
+                //     'inner'
+                // )
+                ->whereIn('pi.PI_REFID', $allIds)
+                ->whereIn('rmdcm.condition_type_code', $conditionCodes)
+                ->orderBy('pi.PI_REFID', 'ASC')
+                ->groupBy(['pi.PI_REFID', 'rmdcm.condition_type_code'])
+                ->get()
+                ->getResultArray();
+        }
+
+        // Group child rows by PI_REFID + condition_type_code so each parent
+        // row only picks up the lines that actually match its own condition.
+        $groupedChild = [];
+        foreach ($childData as $child) {
+            $groupedChild[$child['PI_REFID']][$child['condition_type_code']][] = $child;
+        }
+
+        foreach ($parentData as &$row) {
+            $rowIds = !empty($row['PI_REFID']) ? explode(',', $row['PI_REFID']) : [];
+            $lines = [];
+            foreach ($rowIds as $rowId) {
+                $matches = $groupedChild[$rowId][$row['condition_type_code']] ?? [];
+                foreach ($matches as $match) {
+                    $lines[] = $match;
+                }
+            }
+            $row['lines'] = $lines;
+        }
+        unset($row);
+
+        return $parentData;
+
     }
+    public function getCustomMillingPoNumbersWheat($userInfoId,$fromDate,$toDate,$plantCode,$type) {
+    // Default condition, applying status condition universally
+	
+    if ($fromDate > 1000000000000) { // If it's in milliseconds, convert to seconds
+        $fromDate /= 1000;
+    }
+    if ($toDate > 1000000000000) {
+        $toDate /= 1000;
+    }
+
+    if ($fromDate == 0) {
+        // Get today's timestamp
+        $toDate = time();
+        // Get timestamp for 30 days ago
+        $fromDate = strtotime("-30 days");
+    
+        // Format dates for SQL
+        $fromDate1 = date("Y-m-d 00:00:00", $fromDate);
+        $toDate1 = date("Y-m-d 23:59:59", $toDate);
+    
+        // Apply last 30 days condition + status = 2
+        $cnd = "purchase_info.DateAdded BETWEEN '$fromDate1' AND '$toDate1' AND purchase_info.VECHICAL_STATUS = 7";
+    } else {
+        $fromDate1 = date("Y-m-d 00:00:00", $fromDate);
+        $toDate1 = date("Y-m-d 23:59:59", $toDate);
+        $cnd = "purchase_info.DateAdded BETWEEN '$fromDate1' AND '$toDate1' AND purchase_info.VECHICAL_STATUS = 7";
+    }
+    if($type == 0){
+        $cnd .= " AND purchase_info.VEHICLE_TYPE IN ('Cm Truck','Cm Container')";
+    }else{
+        $cnd .= " AND purchase_info.VEHICLE_TYPE IN ('Cm Rake')";
+    }
+ 
+
+    // Build query
+    $builder = $this->db->table('purchase_info')
+        ->select("purchase_info.ZPO_NUMBER AS value, purchase_info.ZPO_NUMBER AS label") // Selecting PO number with alias 'value' and 'label'
+        // ->join('purchase_info', 'purchase_info.PI_REFID = purchase_info.purchaseInfoId', 'inner') // Corrected join
+        ->where($cnd) // Apply the condition based on the user info
+        ->groupBy('purchase_info.ZPO_NUMBER'); // Group by PO number to avoid duplicates
+    // Execute and return the result
+    // print_r($builder->getCompiledSelect());exit;
+    $result = $builder->get()->getResultArray();
+    return $result;
+  }
 }

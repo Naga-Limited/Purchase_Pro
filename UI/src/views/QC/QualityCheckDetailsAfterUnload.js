@@ -647,35 +647,35 @@ console.log(JSON.stringify(formData));
                 <Button.Ripple outline color="secondary" tag={Link} to={`/QC`} type="reset" className="mr-2">
                   Cancel
                 </Button.Ripple>
-                {(VEHICLE_TYPE === 'FCI Truck'&& ZVA_NUMBERS.length != '20') &&
+                {((VEHICLE_TYPE === 'FCI Truck'&& ZVA_NUMBERS.length != '20') || (VEHICLE_TYPE === 'CM Container' && ZVA_NUMBERS.length != '20') || (VEHICLE_TYPE === 'CM Truck' && ZVA_NUMBERS.length != '20')) &&
                 <div className="mr-1">
                   {/* disabled={isFilledAll()} // Removed from below button */}
                   <Button.Ripple color="primary" type="button" onClick={(e) => onQCDetails(4)}>
                     Submit
                   </Button.Ripple>
                 </div>}
-                {(VEHICLE_TYPE === 'FCI TRUCK'&& ZVA_NUMBERS.length == '20') &&
+                {((VEHICLE_TYPE === 'FCI TRUCK' && ZVA_NUMBERS.length == '20')|| (VEHICLE_TYPE === 'CM CONTAINER' && ZVA_NUMBERS.length == '20') || (VEHICLE_TYPE === 'CM TRUCK'&& ZVA_NUMBERS.length == '20')) &&
                 <div className="mr-1">
                   {/* disabled={isFilledAll()} // Removed from below button */}
                   <Button.Ripple color="primary" type="button" onClick={(e) => onQCDetails(4)}>
                     Submit
                   </Button.Ripple>
                 </div>}
-                {(ZVA_NUMBERS.length != '20' && VEHICLE_TYPE != 'FCI Truck') &&
+                {(ZVA_NUMBERS.length != '20' && VEHICLE_TYPE != 'FCI Truck' && VEHICLE_TYPE != 'CM Truck' && VEHICLE_TYPE != 'CM Container') &&
                 <div className="mr-1">
                   {/* disabled={isFilledAll()} // Removed from below button */}
                   <Button.Ripple color="primary" type="button" onClick={(e) => onQCDetails(3)}>
                     Submit
                   </Button.Ripple>
                 </div>}
-                {TotalDeduction == '0' && ZVA_NUMBERS.length == '20' && VEHICLE_TYPE != 'FCI TRUCK' &&
+                {(TotalDeduction == '0' && ZVA_NUMBERS.length == '20' && VEHICLE_TYPE != 'FCI TRUCK' && VEHICLE_TYPE != 'CM Truck' && VEHICLE_TYPE != 'CM Container')&&
                 <div className="mr-1">
                   {/* disabled={isFilledAll()} // Removed from below button */}
                   <Button.Ripple color="primary" type="button" onClick={(e) => onQCDetails(6)}>
                     Submit
                   </Button.Ripple>
                 </div>}
-                {TotalDeduction != '0' && ZVA_NUMBERS.length == '20' && VEHICLE_TYPE != 'FCI TRUCK' &&
+                {(TotalDeduction != '0' && ZVA_NUMBERS.length == '20' && VEHICLE_TYPE != 'FCI TRUCK' && VEHICLE_TYPE != 'CM Truck' && VEHICLE_TYPE != 'CM Container') &&
                 <div className="mr-1">
                   {/* disabled={isFilledAll()} // Removed from below button */}
                   <Button.Ripple color="primary" type="button" onClick={(e) => onQCDetails(3)}>

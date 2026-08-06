@@ -301,7 +301,7 @@ const MApproverDetails = () => {
     } else {
       delete fmdata.wb_ticket_no;
     }
-    if (poData.VEHICLE_TYPE === "Rake") {
+    if (poData.VEHICLE_TYPE === "Rake" || poData.VEHICLE_TYPE === "Cm Rake") {
       delete fmdata.invoice_bag_count;
       delete fmdata.invoice_date;
       delete fmdata.invoice_no;
@@ -737,7 +737,7 @@ const MApproverDetails = () => {
                   <Input type="text" value={gunny_less_wt} disabled placeholder="Gunny Less Net wt (In Kgs)" />
                 </FormGroup>
               </Col>
-              {VEHICLE_TYPE !== "Rake" ? (
+              {VEHICLE_TYPE !== "Rake" && VEHICLE_TYPE !== "Cm Rake" ? (
                 <>
                   <Col md="4" sm="12">
                     <Label for="supplier_wb_dt">Supplier WB Date</Label>

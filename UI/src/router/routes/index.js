@@ -2738,6 +2738,171 @@ const Routes = [
     path: "/MRTUSERACCESS",
     component: lazy(() => import("../../views/Marketrate_CD/UserAccessGroceriestype")),
   },
+   {
+    path: "/CONDITIONTYPEMSTR",
+    component: lazy(() => import("../../views/CustomMilling/CMConditiontypemaster")),
+  },
+  {
+    path: "/RATEMSTRCONITIONTYPE",
+    component: lazy(() => import("../../views/CustomMilling/Rate_Master_ConditionType")),
+  },
+  {
+    path: "/MATERAILPURORG",
+    component: lazy(() => import("../../views/CustomMilling/Material_Pucorg")),
+  },
+  {
+    path: "/CMRATEAPPROVAL",
+    component: lazy(() => import("../../views/CustomMilling/Rate_Master_approval")),
+  },
+  {
+    path: "/PURCHASEORDER",
+    component: lazy(() => import("../../views/CustomMilling/PurchaseOrder")),
+  },
+  {
+    path: "/PURCHASEORDERCHANGE",
+    component: lazy(() => import("../../views/CustomMilling/PurchaseOrderChange")),
+  },
+  {
+    path: "/PURCHASEORDERREPORT",
+    component: lazy(() => import("../../views/CustomMilling/PurchaseOrderReport")),
+  },
+  {
+    path: "/PURCHASEORDERAPPROVALLEVEL1",
+    component: lazy(() => import("../../views/CustomMilling/PurchaseOrderApprovalLevel1")),
+  },
+  {
+    path: "/PURCHASEORDERAPPROVALLEVEL2",
+    component: lazy(() => import("../../views/CustomMilling/PurchaseOrderApprovalLevel2")),
+  },
+  { 
+    path: "/CUSTOMMILLINGFIPAYMENT", 
+    component: lazy(() => import("../../views/CustomMillingFIPayment/CustomMillingFITab")), 
+  },
+  {
+    path: "/CUSTOMMILLINGFIPAYMENTAPPROVALLEVEL1",
+    component: lazy(() => import("../../views/CustomMillingFIPayment/CustomMillingFIPaymentApprovalLevel1")),
+  },
+  {
+    path: "/CUSTOMMILLINGFIPAYMENTAPPROVALLEVEL2",
+    component: lazy(() => import("../../views/CustomMillingFIPayment/CustomMillingFIPaymentApprovalLevel2")),
+  },
+  {
+    path: "/CUSTOMMILLINGFIPAYMENTAPPROVALLEVEL3",
+    component: lazy(() => import("../../views/CustomMillingFIPayment/CustomMillingFIPaymentApprovalLevel3")),
+  },
+  {
+    path: "/CUSTOMMILLINGFIPAYMENTREPORT",
+    component: lazy(() => import("../../views/CustomMillingFIPayment/CustomMillingFIPaymentReport")),
+  },
+  {
+    path: "/FIENTRYSTOCKDASHBOARD",
+    component: lazy(() => import("../../views/FiEntryStockReport/FiEntryStockDashboard")),
+  },
+  {
+    path: "/FIENTRYSTOCKREPORT",
+    component: lazy(() => import("../../views/FiEntryStockReport/FiEntryStockReport")),
+  },
+  {
+    path: "/FIENTRYSTOCKCOMPLETIONENTRY",
+    component: lazy(() => import("../../views/FiEntryStockReport/FiEntryStockCompletionEntry")),
+  },
+  {
+    path: "/MIGO501REVERSAL",
+    component: lazy(() => import("../../views/FiEntryStockReport/Migo501ReversalList")),
+  },
+  { 
+    path: "/VENDORINVOICESUBMIT", 
+    component: lazy(() => import("../../views/FIPayment/VendorInvoiceSubmit")), 
+  },
+   {
+    path: "/VENDORINVOICEMGAPP:Id",
+    component: lazy(() => import("../../views/FIPayment/InvoiceMGApproval")),
+  },
+  {
+    path: "/INVOICERECEIPTLIST",
+    component: lazy(() => import("../../views/FIPayment/InvoiceReceiptMGlist.js")),
+  },
+  {
+    path: "/INVOICERECEIPTREJECTEDLIST",
+    component: lazy(() => import("../../views/FIPayment/InvoiceReceiptRejectedlist.js")),
+  },
+  {
+    path: "/VENDORINVOICEEDIT:Id",
+    component: lazy(() => import("../../views/FIPayment/VendorInvoiceEdit")),
+  },
+  {
+    path: "/INVOICERECEIPTSTOREACK",
+    component: lazy(() => import("../../views/FIPayment/InvoiceReceiptStoreAck")),
+  },
+  {
+    path: "/INVOICERECEIPTGFALIST",
+    component: lazy(() => import("../../views/FIPayment/InvoiceReceiptGFAlist")),
+  },
+  {
+    path: "/GFAVERIFICATION:Id",
+    component: lazy(() => import("../../views/FIPayment/GFAVerification")),
+  },
+  {
+    path: "/EXPENSETYPEMAPPING",
+    component: lazy(() => import("../../views/FIPayment/Expensetypemapping")),
+  },
+  {
+    path: "/COSTCENTREMAPPING",
+    component: lazy(() => import("../../views/FIPayment/CostCentremapping")),
+  },
+  {
+    path: "/DEPARTMENTMAPPING",
+    component: lazy(() => import("../../views/FIPayment/DepartmentMapping")),
+  },
+  // Non PO Credit Memo Parking
+  {
+    path: "/NONPOCREDITMEMOPARKING",
+    component: lazy(() => import("../../views/FIPayment/NonPoCreditMemoParking")),
+  },
+  {
+    path: "/CREDITMEMOEDIT:Id",
+    component: lazy(() => import("../../views/FIPayment/CreditMemoEdit")),
+  },
+  {
+    path: "/CREDITMEMOMGAPP:Id",
+    component: lazy(() => import("../../views/FIPayment/CreditMemoMGApproval")),
+  },
+  {
+    path: "/CREDITMEMORECEIPTLIST",
+    component: lazy(() => import("../../views/FIPayment/CreditMemoReceiptMGlist")),
+  },
+  {
+    path: "/CREDITMEMORECEIPTSTOREACK",
+    component: lazy(() => import("../../views/FIPayment/CreditMemoReceiptStoreAck")),
+  },
+  {
+    path: "/CREDITMEMORECEIPTGFALIST",
+    component: lazy(() => import("../../views/FIPayment/CreditMemoReceiptGFAlist")),
+  },
+  {
+    path: "/CREDITMEMOGFAVERIFICATION:Id",
+    component: lazy(() => import("../../views/FIPayment/CreditMemoGFAVerification")),
+  },
+  {
+    path: "/CREDITMEMORECEIPTREJECTEDLIST",
+    component: lazy(() => import("../../views/FIPayment/CreditMemoReceiptRejectedlist")),
+  },
+  {
+    path: "/FIPAYMENTREPORT",
+    component: lazy(() => import("../../views/FIPayment/FIPaymentReport")),
+  },
+  {
+    path: "/CREDITMEMOREPORT",
+    component: lazy(() => import("../../views/FIPayment/CreditMemoReport")),
+  },
+  {
+    path: "/VENDORLIST",
+    component: lazy(() => import("../../views/FIPayment/VendorList")),
+  },
+  {
+    path: "/BULKERCOUSTOMERWEIGHTAPPROVAL",
+    component: lazy(() => import("../../views/FG/BulkerCustomerWeighmentApproval")),
+  },
 ];
 
 export { DefaultRoute, TemplateTitle, Routes };

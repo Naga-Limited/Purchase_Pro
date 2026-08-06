@@ -12,6 +12,7 @@ import { regexValidation } from "../../constants/validConstant";
 import { VHConstant, VHConstants } from "./constant";
 import { useLoader } from "../../utility/hooks/useLoader";
 import { ShowToast } from "../../helper/appHelper";
+import Uploader from "../Uploader";
 
 const TruckArrivalRake = ({ onAdded,results }) => {
   let { showLoader, hideLoader } = useLoader();
@@ -20,6 +21,7 @@ const TruckArrivalRake = ({ onAdded,results }) => {
   const [isVehicleDrop, setVehicleDrop] = useState(false);
   const [vhOptions, setVHdata] = useState([]);
   const [VehicleType, setVehicleType] = useState("");
+  const [invoiceCopy, setInvoiceCopy] = useState("");
 
 
   const onTextChange = (e, key, validKey) => {
@@ -43,6 +45,7 @@ const TruckArrivalRake = ({ onAdded,results }) => {
     PLANT_NAME:results.PLANT_NAME,
     STORAGE_LOCATION:results.STORAGE_LOCATION
     });
+    setInvoiceCopy(results?.INV_COPY)
   }, [results.id]);
 
   const onTruckDdlChange = (e, key) => {
@@ -265,7 +268,21 @@ const TruckArrivalRake = ({ onAdded,results }) => {
             <span id="DRIVER_NO_Error" style={{color: "red"}} ></span>
           </FormGroup>
         </Col>}
-
+        {invoiceCopy &&
+        <Col md="4" sm="12">
+          <FormGroup>
+            {/* <Label>Invoice Copy</Label> */}
+            <Uploader
+                    isReadOnly
+                    // canEdit
+                    // setAttachment={handleFileChange}
+                    label={"Invoice Copy"}
+                    // title="Invoice Copy"
+                    id={"INV_COPY"}
+                    selectedFileName={invoiceCopy}
+                  />
+          </FormGroup>
+        </Col>}  
         <Col sm="12">
           <FormGroup className="d-flex justify-content-end mb-0">
             <div className="mr-1">

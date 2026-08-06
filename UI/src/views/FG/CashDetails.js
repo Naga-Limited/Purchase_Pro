@@ -220,9 +220,9 @@ const CashDetails = ({ actionRendorer }) => {
             })
     }
 
-    useEffect(() => {
-        getCashInfo()
-    }, [])
+    // useEffect(() => {
+    //     getCashInfo()
+    // }, [])
 
     const [attachedFiles, setAttachment] = useState({ invoiceCopy: {} });
 

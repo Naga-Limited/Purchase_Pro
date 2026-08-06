@@ -69,7 +69,7 @@ const TruckArrival = ({ onAdded,results }) => {
       VECHICAL_STATUS: status, 
       formType: "A", 
        screenType: (formData.INCO1 == 'INCO1' || formData.INCO1 == 'OW1' || formData.INCO1 == 'OW2' || formData.INCO1 == 'OY1') ? 'SDO' : 'SDI'  , 
-       TRUCK_NO:formData.PURCHASE_ORG == 12 ? formData.TRAILER_NO :results.VEHICAL_NO,ZPO_NUMBER:formData.EBELN , PO_LINE_ITEM:formData.EBELP , ZSUPPLIER_CODE:formData.SUPPLIER_CODE , CONT_NO:formData.PURCHASE_ORG == 12 ? results.VEHICAL_NO : '', DRIVER_NO:formData.DRIVER_NO || driverNo ,ZSUPPLIER_NAME:formData.SUPPLIER_NAME,IDNLF:formData.IDNLF};
+       TRUCK_NO:(formData.PURCHASE_ORG == 12 || formData.PURCHASE_ORG == 'CMO' || formData.PURCHASE_ORG == 3) ? formData.TRAILER_NO :results.VEHICAL_NO,ZPO_NUMBER:formData.EBELN , PO_LINE_ITEM:formData.EBELP , ZSUPPLIER_CODE:formData.SUPPLIER_CODE , CONT_NO:(formData.PURCHASE_ORG == 12 || formData.PURCHASE_ORG == 'CMO' || formData.PURCHASE_ORG == 3) ? results.VEHICAL_NO : '', DRIVER_NO:formData.DRIVER_NO || driverNo ,ZSUPPLIER_NAME:formData.SUPPLIER_NAME,IDNLF:formData.IDNLF};
     //alert(JSON.stringify(fdata));
   //  return false;
     if(fdata.ZPO_NUMBER == "" || fdata.ZPO_NUMBER == undefined){
@@ -81,7 +81,7 @@ const TruckArrival = ({ onAdded,results }) => {
     }else if(fdata.ZSUPPLIER_CODE == "" || fdata.ZSUPPLIER_CODE == undefined){
       errorToast('Please Check Supplier Code...')
       return false
-    }else if(formData.PURCHASE_ORG == 12 && (fdata.CONT_NO == "" || fdata.CONT_NO == undefined)){
+    }else if((formData.PURCHASE_ORG == 12 || formData.PURCHASE_ORG == 'CMO' || formData.PURCHASE_ORG == 3) && (fdata.CONT_NO == "" || fdata.CONT_NO == undefined)){
       errorToast('Please Check Container No...')
       return false
     }else if(!/^[\d]{10}/.test(fdata.DRIVER_NO) || fdata.DRIVER_NO == undefined){
@@ -325,7 +325,7 @@ const TruckArrival = ({ onAdded,results }) => {
             <span id="StorageLocation_Error" style={{color: "red"}} ></span>
           </FormGroup>
         </Col>
-        {PURCHASE_ORG == 12 &&
+        {(PURCHASE_ORG == 12 || PURCHASE_ORG == 'CMO' || PURCHASE_ORG == 3) &&
         <Col md="4" sm="12">
           <FormGroup>
             <Label>Trailer Number</Label>
