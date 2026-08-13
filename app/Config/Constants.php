@@ -78,20 +78,27 @@ defined('EXIT_DATABASE')       || define('EXIT_DATABASE', 8); // database error
 defined('EXIT__AUTO_MIN')      || define('EXIT__AUTO_MIN', 9); // lowest automatically-assigned error code
 defined('EXIT__AUTO_MAX')      || define('EXIT__AUTO_MAX', 125); // highest automatically-assigned error code
 
-define('CCTV_IMG_SRG_PATH', '/var/www/purchasepro/sapfileshare');
-define('SAP_FILE_PATH', '/var/www/purchasepro/sapfileshare');
+define('CCTV_IMG_SRG_PATH', '/var/www/testpurchasepro/sapfileshare');
+define('SAP_FILE_PATH', '/var/www/testpurchasepro/sapfileshare');
 
 //SAP API Details
-define('IP_ADDRESS', 'http://103.249.96.242:50000/');
+// define('IP_ADDRESS', 'http://103.249.96.242:50000/');
 #define('IP_ADDRESS', 'http://172.16.63.4:50000/'); // DR IP
-define('USER_NAME', 'srdgitm1');
-define('PASS_WORD', 'ERP@Sap2kh6');
-define('BASIC_AUTH', 'c3JkZ2l0bTE6RVJQQFNhcDJraDY=');
-
+// define('USER_NAME', 'srdgitm1');
+// define('PASS_WORD', 'ERP@Sap2kh6');
+define('USER_NAME', 'NAGAABAP'); //QA
+define('PASS_WORD', 'Naga@123456'); // QA
+// define('BASIC_AUTH', 'c3JkZ2l0bTE6RVJQQFNhcDJraDY=');
+define('BASIC_AUTH', 'U1JER0lUTTM6TmFnYUA1NDMyMQ=='); //QA
 //OCR
 //define('OCR_URL', 'http://bi.nagamills.com/Invoice_Parser1/process-invoice');
 define('OCR_URL', 'http://aipro.nagamills.com/invoice/extract');
 define('OCR_URL_KEY', 'sk_9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e');
+
+
+//RakeCM Share API
+define('RAKECM_TRIPSHEET_URL', 'http://127.0.0.1:8000/api/v1/RakeCM/Share/TripsheetInfo');
+define('RAKECM_API_KEY', '1a8cf3597b5f9c39d28bb503f250e6400fc86885ad3b2c7fab42ea778e0de87');
 
 //ZING HR API 
 define('ZINGHRURL','https://portal.zinghr.com/2015/route/EmployeeDetails/GetEmployeeMasterDetails'); 
