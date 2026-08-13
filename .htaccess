@@ -4,5 +4,5 @@
 </Files>
 
 <IfModule mod_alias.c>
-RedirectMatch 301 ^/$ https://purchasepro.nagamills.com/public/#/login
+RedirectMatch 301 ^/$ https://testpurchasepro.nagamills.com/public/#/login
 </IfModule>
