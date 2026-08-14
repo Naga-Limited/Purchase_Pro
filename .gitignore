@@ -10,7 +10,7 @@ build/
 dist/
 *.log
 *.zip
-public/
-app/Config/Database.php
-app/Config/Constant.php
+# public/
+# app/Config/Database.php
+# app/Config/Constant.php
 # .htaccess
