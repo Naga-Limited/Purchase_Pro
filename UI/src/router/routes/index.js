@@ -2727,8 +2727,8 @@ const Routes = [
     component: lazy(() => import("../../views/warehouse/SsStockReport")),
   },
   {
-    path: "/warehouse/SsStockAuditReport",
-    component: lazy(() => import("../../views/warehouse/SsStockReport")),
+    path: "/warehouse/SSRelotting",
+    component: lazy(() => import("../../views/warehouse/SSRelotting")),
   },
   {
     path: "/warehouse/LotUpdationScreen",

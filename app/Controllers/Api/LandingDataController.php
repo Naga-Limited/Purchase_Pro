@@ -64,10 +64,13 @@ class LandingDataController extends BaseApiController
                         $data = SapUrlHelper::getWhDatas($urlPath);
 			$res = json_decode($data, true);
 			$TRIPSHEET_NO = $res[0]['TRIPSHEET_NO'];
-			$SHIPMENTORDERNO = $res[0]['SAP_LINE'][0]['SHIPMENTORDERNO'];
-			$model->updateTripsheetOrShipment($gate_in_info_id, $TRIPSHEET_NO, $SHIPMENTORDERNO);
+			$SHIPMENTORDERNO = $res[0]['SAP_LINE'][0]['SHIPMENTORDERNO'] ?? $json->shipmentOrderNo;
+			if($TRIPSHEET_NO){	
+				$model->updateTripsheetOrShipment($gate_in_info_id, $TRIPSHEET_NO, $SHIPMENTORDERNO);
+			}
+			// $model->updateTripsheetOrShipment($gate_in_info_id, $TRIPSHEET_NO, $SHIPMENTORDERNO);
 		}		
-
+		// print_r($gateInData);exit;
 		$urlPath = "zgatepro/zwb_reject/sap_GP_WB_Reject?sap-client=900&Shipment_No=$Shipment_No";
 		$res = SapUrlHelper::getWhDatas($urlPath);
 		$WB_Weight_Reverse = json_decode($res);
@@ -112,7 +115,29 @@ class LandingDataController extends BaseApiController
 					$model->Gate_info_Status_Change($gate_in_info_id, $data);			
 				}
 			}
-		}
+	    }else if($gateInData[0]['moduleTypeId'] == 43){
+			
+			foreach($fg_detail_shipment as $fg_detail_shipment_data){
+			
+				if(count($fg_detail_shipment) > 0 && $fg_detail_shipment_data->FROM_PLANT) {
+					// print_r($fg_detail_shipment_data);exit;
+					if($fg_detail_shipment_data->TYPE == 'FG-Sales'){
+						$sapDocument = 'shipmentOrderNo';
+					}else {
+						$sapDocument = 'stoPoNo';
+					}
+					$plant_id=$model->PlantByID($fg_detail_shipment_data->FROM_PLANT);
+					
+						$data = array(
+							"moduleType" => $fg_detail_shipment_data->TYPE == 'FG-STO'? 2 : 43,
+							"masterPlantId" => $plant_id[0]['ID'],
+							$sapDocument => $fg_detail_shipment_data->SAP_DOCUMENT
+						);
+					
+					$model->Gate_info_Status_Change($gate_in_info_id, $data);			
+				}
+			}
+	    }
 		if(count($WB_Weight_Reverse) > 0){
 			// if($Type == 'POST') {
 				$data = array(
@@ -136,7 +161,7 @@ class LandingDataController extends BaseApiController
 			
 			foreach($fg_details_data_array as $fg_details_data){
 			
-				if(count($SAP_Sales_Invoice) > 0 && $fg_details_data->TYPE == 'FG-Sales') {
+				if(count($SAP_Sales_Invoice) > 0 && $fg_details_data->TYPE == 'FG-Sales' && $gateInData[0]['moduleTypeId'] != 43) {
 					if($Type == 'POST') {
 					$SAP_Line_Sales = $fg_details_data->SAP_LINE;
 						$data = array(
@@ -175,7 +200,7 @@ class LandingDataController extends BaseApiController
 						$success = true;
 						$message = 'Shipment Created Successfully';
 					}					
-				}else if($fg_details_data->TYPE == 'FG-STO'){
+				}else if(($fg_details_data->TYPE == 'FG-STO') || ($fg_detail_shipment == 'FG-STO' && $gateInData[0]['moduleTypeId'] != 43)){
 					if($Type == 'POST'){
 						$SAP_Line_Sto = $fg_details_data->SAP_LINE;
 						$data = array(
@@ -221,7 +246,7 @@ class LandingDataController extends BaseApiController
 			if(count($SAP_Sales_Invoice) == 0 && $gateInData[0]['moduleTypeId'] != 43 && $gateInData[0]['moduleTypeId'] != 39){
 				$success = false;
 				$message = 'No Data Found';
-			}else if($fg_detail_shipment && ($gateInData[0]['moduleTypeId'] == 43 || $gateInData[0]['moduleTypeId'] == 39)){
+			}else if($fg_detail_shipment && $fg_details_data->TYPE != 'FG-STO'  && ($gateInData[0]['moduleTypeId'] == 43 || $gateInData[0]['moduleTypeId'] == 39)){
 				if($Type == 'POST'){
 					$data = array(
 						"moduleStatusId" => 4,

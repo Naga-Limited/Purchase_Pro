@@ -4,6 +4,7 @@ namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
 use App\Helpers\SapUrlHelper;
+use App\Helpers\RakeCMHelper;
 use App\Helpers\VANumberHelper;
 use App\Models\FCIModel;
 use App\Models\RakeloadingModel;
@@ -63,8 +64,32 @@ class RakeloadingController extends BaseApiController
 	    //}
 
 		$urlPath ="zrake/zrake_tripsheet/raketripsheet?sap-client=900&FNR_No=$FNR_No&Vehicle_No=$Vehicle_No";
-		$sapResult = SapUrlHelper::getWhDatas($urlPath);
-		return $this->sendSuccessResult(json_decode($sapResult));
+		$sapResult = json_decode(SapUrlHelper::getWhDatas($urlPath));
+
+		if(!empty($sapResult)){
+			return $this->sendSuccessResult($sapResult);
+		}
+
+		$rakeCMResult = json_decode(RakeCMHelper::getRakeCMTripsheetInfo($FNR_No, $Vehicle_No), true);
+		$rakeCMData = $rakeCMResult['data'] ?? [];
+
+		$result = array_map(function($item) use ($FNR_No) {
+			return (object) [
+				"TRIPSHEET_NO" => $item['TRIPSHEET_NO'] ?? "",
+				"FNR_NO" => $FNR_No,
+				"VEHICLE_NO" => $item['VEHICLE_NO'] ?? "",
+				"VENDOR_CODE" => $item['VENDOR_CODE'] ?? "",
+				"VENDOR_NAME" => $item['VENDOR_NAME'] ?? "",
+				"DRIVER_NAME" => $item['DRIVER_NAME'] ?? "",
+				"DRIVER_PH_NO" => $item['DRIVER_PH_NO'] ?? "",
+				"PLANT" => "",
+				"VENDOR_TYPE" => "",
+				"SCREEN_TYPE" => "",
+				"FROM_PLANT_NAME" => "",
+			];
+		}, $rakeCMData);
+
+		return $this->sendSuccessResult($result);
 	}
 
 	public function Unloading_Gate_in_Vehicle(){       

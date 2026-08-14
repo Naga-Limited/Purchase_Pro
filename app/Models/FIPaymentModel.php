@@ -294,6 +294,63 @@ class FIPaymentModel extends Model
         return ['success' => true, 'message' => 'Payment voucher details updated.', 'payment_id' => $id];
     }
 
+    // Asks SAP (ZZFI_REVERSAL/Firev) which documents were reversed as of
+    // $date (Ymd) — a GET-style call, DATE goes in the query string, not a
+    // POST body. Shared by both FI Payment and Credit Memo, since a reversed
+    // sap_document_no could belong to either header table. Returns
+    // [DOC_NO => REV_NO, ...] so callers know both which row to roll back
+    // (match on sap_document_no = DOC_NO) and what reversal_doc_no to record.
+    public function GetReversedDocumentsFromSap($date)
+    {
+        $urlPath = "ZZGP_API/ZZFI_REVERSAL/Firev?SAP-client=900&DATE={$date}";
+        $res = SapUrlHelper::getWhDatas($urlPath);
+        // print_r($res);exit;
+
+        $data = json_decode($res, true);
+        if (!is_array($data)) {
+            return [];
+        }
+
+        $reversals = [];
+        foreach ($data as $item) {
+            $docNo = $item['DOC_NO'] ?? null;
+            if (empty($docNo)) {
+                continue;
+            }
+            $reversals[$docNo] = $item['REV_NO'] ?? null;
+        }
+
+        return $reversals;
+    }
+
+    // Rolls a GFA-Verified (approval_status = 5) request back to Store
+    // Acknowledged (4) when SAP reports its sap_document_no as reversed, so
+    // it re-enters the GFA queue for re-verification/re-posting, and records
+    // SAP's reversal document number (REV_NO) alongside it. Only rows still
+    // at 5 are touched, so an already-rejected/reprocessed row isn't
+    // clobbered by a stale reversal notice. $reversals is [DOC_NO => REV_NO],
+    // as returned by GetReversedDocumentsFromSap.
+    public function RevertReversedDocuments(array $reversals)
+    {
+        if (empty($reversals)) {
+            return 0;
+        }
+
+        $affected = 0;
+        foreach ($reversals as $docNo => $revNo) {
+            $this->db->table('fi_payment_header')
+                ->where('sap_document_no', $docNo)
+                ->where('approval_status', 5)
+                ->update([
+                    'approval_status' => 4,
+                    'reversal_doc_no' => $revNo,
+                ]);
+            $affected += $this->db->affectedRows();
+        }
+
+        return $affected;
+    }
+
     // Fetches the bank clearing/UTR details for an already-posted FI Payment
     // (ZZFI_PAY_UTR) and saves whichever of CLEAR_NO/UTR_NO comes back
     // non-empty. Only overwrites a field when SAP returns a real value —
@@ -318,7 +375,7 @@ class FIPaymentModel extends Model
 
         $sapData = [[
             'LIFNR'     => $vendorCode,
-            'BELNR'     => $header['sap_document_no'],
+            'BELNR'     => $header['payment_voucher_no']?? $header['sap_document_no'],
             'POST_DATE' => $header['sap_posting_date'],
         ]];
         // print_r($sapData);exit;
@@ -374,8 +431,54 @@ class FIPaymentModel extends Model
         return $builder;
     }
 
+    // Financial year runs April-March: Apr-Dec belong to the current calendar
+    // year, Jan-Mar belong to the previous one — same rule GetBudgetFromSap
+    // already uses for SAP's gjahr/period.
+    private function GetCurrentFinancialYearRange()
+    {
+        $currentYear  = (int) date('Y');
+        $currentMonth = (int) date('n');
+        $gjahr = $currentMonth >= 4 ? $currentYear : $currentYear - 1;
+        return [$gjahr . '-04-01', ($gjahr + 1) . '-03-31'];
+    }
+
+    // Same Invoice Number + Vendor Code already submitted this financial
+    // year — blocks a fresh VendorInvoiceSubmit.js submission, regardless of
+    // that earlier request's approval_status. Employee-mode requests (no
+    // vendor_code) aren't covered — this is a Vendor-code-specific check.
+    // The whole check only runs when pp_setting.fi_financial_year_check = 1
+    // (same pp_setting single-row pattern as GetPostingDateControl above) —
+    // when it's 0, submission is always allowed, duplicates included.
+    public function CheckDuplicateInvoice($vendorCode, $invoiceNumber)
+    {
+        if (empty($vendorCode) || empty($invoiceNumber)) {
+            return false;
+        }
+
+        $setting = $this->db->table('pp_setting')->select('fi_financial_year_check')->where('Id', 1)->get()->getRowArray();
+        if ((int) ($setting['fi_financial_year_check'] ?? 0) !== 1) {
+            return false;
+        }
+
+        [$fyStart, $fyEnd] = $this->GetCurrentFinancialYearRange();
+
+        return $this->db->table('fi_payment_header')
+            ->where('vendor_code', $vendorCode)
+            ->where('invoice_number', $invoiceNumber)
+            ->where('DATE(created_at) >=', $fyStart)
+            ->where('DATE(created_at) <=', $fyEnd)
+            ->countAllResults() > 0;
+    }
+
     public function InsertFIPayment($postData, $paymentNo)
     {
+        if ($this->CheckDuplicateInvoice($postData->vendor_code ?? null, $postData->invoice_number ?? null)) {
+            return [
+                'success' => false,
+                'message' => 'An invoice with this Invoice Number and Vendor Code has already been submitted for the current financial year.',
+            ];
+        }
+
         $this->db->transStart();
 
         $headerData = [
@@ -627,7 +730,7 @@ class FIPaymentModel extends Model
     // created_at (the one date field always populated regardless of stage).
     // fi_payment_header is the primary (FROM) table — one row per request,
     // request-level totals rather than per-line-item granularity.
-    public function GetFIPaymentReport($fromDate, $toDate, $search = '')
+    public function GetFIPaymentReport($fromDate, $toDate, $search = '', $userId = null)
     {
         $builder = $this->db->table('fi_payment_header');
         $builder->select("
@@ -639,6 +742,9 @@ class FIPaymentModel extends Model
             fi_payment_header.department,
             fi_payment_header.division,
             fi_payment_header.business_area,
+            (SELECT GROUP_CONCAT(DISTINCT li.cost_center SEPARATOR ', ')
+                FROM fi_payment_line_items li
+                WHERE li.payment_id = fi_payment_header.payment_id) as cost_center,
             invoice_type_def.definitionsName as invoice_type_name,
             fi_payment_header.invoice_number,
             fi_payment_header.invoice_date,
@@ -676,9 +782,13 @@ class FIPaymentModel extends Model
                 ELSE 'Unknown'
             END as approval_status_label,
             fi_payment_header.mg_approved_at,
+            mg_approved_by_info.FIRST_NAME as mg_approved_by_name,
             fi_payment_header.stores_approved_at,
+            stores_approved_by_info.FIRST_NAME as stores_approved_by_name,
             fi_payment_header.gfa_posted_at,
+            gfa_posted_by_info.FIRST_NAME as gfa_posted_by_name,
             fi_payment_header.rejected_at,
+            rejected_by_info.FIRST_NAME as rejected_by_name,
             fi_payment_header.rejection_remarks,
             fi_payment_header.invoice_copy,
             fi_payment_header.back_paper
@@ -687,8 +797,34 @@ class FIPaymentModel extends Model
         $builder->join('definitions_list as invoice_type_def', 'invoice_type_def.id = fi_payment_header.invoice_type', 'left');
         $builder->join('definitions_list as payment_term_def', 'payment_term_def.id = fi_payment_header.payment_term', 'left');
         $builder->join('definitions_list as service_category_def', 'service_category_def.id = fi_payment_header.service_category', 'left');
+        $builder->join('user_info as mg_approved_by_info', 'mg_approved_by_info.UI_ID = fi_payment_header.mg_approved_by', 'left');
+        $builder->join('user_info as stores_approved_by_info', 'stores_approved_by_info.UI_ID = fi_payment_header.stores_approved_by', 'left');
+        $builder->join('user_info as gfa_posted_by_info', 'gfa_posted_by_info.UI_ID = fi_payment_header.gfa_posted_by', 'left');
+        $builder->join('user_info as rejected_by_info', 'rejected_by_info.UI_ID = fi_payment_header.rejected_by', 'left');
         $builder->where('DATE(fi_payment_header.created_at) >=', $fromDate);
         $builder->where('DATE(fi_payment_header.created_at) <=', $toDate);
+
+        // Scope the report to whatever this user is tied to via
+        // user_cost_centre_mapping — either as the mapping's own user (the
+        // requester the cost centre belongs to) or as one of its Reporting
+        // Manager/Store Reporting/Reporting GFA approvers (all three can now
+        // name several people, comma-separated — FIND_IN_SET matches any of
+        // them). UserID 1 is exempt and always sees every request.
+        if (!empty($userId) && (int) $userId !== 1) {
+            $userIdEscaped = $this->db->escape($userId);
+            $builder->whereIn('payment_id', function ($sub) use ($userId, $userIdEscaped) {
+                return $sub->select('fi_payment_line_items.payment_id')->from('fi_payment_line_items')
+                    ->join('user_cost_centre_mapping', 'user_cost_centre_mapping.id = fi_payment_line_items.cost_center_desc')
+                    ->groupStart()
+                        ->where('user_cost_centre_mapping.user_id', $userId)
+                        ->orWhere("FIND_IN_SET({$userIdEscaped}, user_cost_centre_mapping.reporting_manager_id) >", 0, false)
+                        ->orWhere("FIND_IN_SET({$userIdEscaped}, user_cost_centre_mapping.store_reporting_id) >", 0, false)
+                        ->orWhere("FIND_IN_SET({$userIdEscaped}, user_cost_centre_mapping.reporting_gfa_id) >", 0, false)
+                    ->groupEnd()
+                    ->where('user_cost_centre_mapping.RecStatus', 1)
+                    ->where('user_cost_centre_mapping.deleted_at', null);
+            });
+        }
 
         if (!empty($search)) {
             $builder->groupStart();
@@ -724,18 +860,24 @@ class FIPaymentModel extends Model
         // requester's own account, so the check has to go through the line
         // items rather than fi_payment_header.created_by.
         if (!empty($reportingManagerId)) {
-            $builder->whereIn('payment_id', function ($sub) use ($reportingManagerId) {
+            // reporting_manager_id can now name several people (comma-separated,
+            // same convention as loading_unloading_payment.unload_id) — match
+            // if the caller's id appears anywhere in that list, not just an
+            // exact single-value equals.
+            $reportingManagerIdEscaped = $this->db->escape($reportingManagerId);
+            $builder->whereIn('payment_id', function ($sub) use ($reportingManagerIdEscaped) {
                 return $sub->select('fi_payment_line_items.payment_id')->from('fi_payment_line_items')
                     ->join('user_cost_centre_mapping', 'user_cost_centre_mapping.id = fi_payment_line_items.cost_center_desc')
-                    ->where('user_cost_centre_mapping.reporting_manager_id', $reportingManagerId)
+                    ->where("FIND_IN_SET({$reportingManagerIdEscaped}, user_cost_centre_mapping.reporting_manager_id) >", 0, false)
                     ->where('user_cost_centre_mapping.RecStatus', 1)
                     ->where('user_cost_centre_mapping.deleted_at', null);
             });
         }
         if (!empty($storeReportingId)) {
-            $builder->whereIn('created_by', function ($sub) use ($storeReportingId) {
+            $storeReportingIdEscaped = $this->db->escape($storeReportingId);
+            $builder->whereIn('created_by', function ($sub) use ($storeReportingIdEscaped) {
                 return $sub->select('user_id')->from('user_cost_centre_mapping')
-                    ->where('store_reporting_id', $storeReportingId)
+                    ->where("FIND_IN_SET({$storeReportingIdEscaped}, store_reporting_id) >", 0, false)
                     ->where('RecStatus', 1)
                     ->where('deleted_at', null);
             });
@@ -767,8 +909,13 @@ class FIPaymentModel extends Model
             approval_status,
             invoice_copy,
             back_paper,
+            payment_voucher_no,
+            utr_number,
             created_at,
-            DATEDIFF(NOW(), created_at) AS duration_days
+            updated_at,
+            (SELECT GROUP_CONCAT(DISTINCT li.cost_center SEPARATOR ', ')
+                FROM fi_payment_line_items li
+                WHERE li.payment_id = fi_payment_header.payment_id) as cost_center
         ");
         $builder->orderBy('created_at', 'DESC');
         $builder->limit((int) $pageSize, (int) $start);
@@ -786,7 +933,7 @@ class FIPaymentModel extends Model
     // account. $excludeStatuses flips $statuses from an allow-list (manager /
     // store, which fire on one exact status) to a block-list (GFA, which
     // fires on everything still in flight except Completed/Rejected).
-    private function GetPendingApprovalsForRole($mappingField, array $statuses, $excludeStatuses = false)
+    private function GetPendingApprovalsForRole($mappingField, array $statuses, $excludeStatuses = false, $dateColumn = 'updated_at')
     {
         $builder = $this->db->table('fi_payment_header');
         $builder->select("
@@ -794,6 +941,7 @@ class FIPaymentModel extends Model
             fi_payment_header.unique_payment_no as request_no,
             fi_payment_header.vendor_name,
             fi_payment_header.department,
+            fi_payment_header.division,
             fi_payment_header.payment_to,
             fi_payment_header.emp_name,
             fi_payment_header.gst_registered,
@@ -801,13 +949,17 @@ class FIPaymentModel extends Model
             fi_payment_header.invoice_number as doc_no,
             fi_payment_header.total_amount,
             fi_payment_header.approval_status,
-            user_cost_centre_mapping.{$mappingField} as recipient_id,
+            TIMESTAMPDIFF(SECOND, fi_payment_header.{$dateColumn}, NOW()) as pending_seconds,
+            recipient_info.UI_ID as recipient_id,
             recipient_info.MAIL_ID as recipient_mail,
             recipient_info.FIRST_NAME as recipient_name
         ");
         $builder->join('fi_payment_line_items', 'fi_payment_line_items.payment_id = fi_payment_header.payment_id', 'inner');
         $builder->join('user_cost_centre_mapping', 'user_cost_centre_mapping.id = fi_payment_line_items.cost_center_desc', 'inner');
-        $builder->join('user_info as recipient_info', "recipient_info.UI_ID = user_cost_centre_mapping.{$mappingField}", 'left');
+        // {$mappingField} can now name several people (comma-separated) —
+        // FIND_IN_SET joins one row per person still named in that list,
+        // instead of an exact match assuming a single id.
+        $builder->join('user_info as recipient_info', "FIND_IN_SET(recipient_info.UI_ID, user_cost_centre_mapping.{$mappingField})", 'left');
         $builder->where('user_cost_centre_mapping.RecStatus', 1);
         $builder->where('user_cost_centre_mapping.deleted_at', null);
         if ($excludeStatuses) {
@@ -815,14 +967,18 @@ class FIPaymentModel extends Model
         } else {
             $builder->whereIn('fi_payment_header.approval_status', $statuses);
         }
-        $builder->groupBy("fi_payment_header.payment_id, user_cost_centre_mapping.{$mappingField}");
+        // Group by the resolved recipient, not the raw (possibly multi-value)
+        // mapping field — otherwise several distinct recipients sharing the
+        // same mapping row would collapse into one output row.
+        $builder->groupBy("fi_payment_header.payment_id, recipient_info.UI_ID");
+        // print_r($builder->get()->getResultArray());exit;
 
         return $builder->get()->getResultArray();
     }
 
     public function GetPendingForReportingManager()
     {
-        return $this->GetPendingApprovalsForRole('reporting_manager_id', [1]);
+        return $this->GetPendingApprovalsForRole('reporting_manager_id', [1], false, 'created_at');
     }
 
     public function GetPendingForStoreReporting()
@@ -944,6 +1100,7 @@ class FIPaymentModel extends Model
         $email = \Config\Services::email();
         $email->setFrom('noreply@nagamills.com', 'FI Payment');
         $email->setTo($header['MAIL_ID']);
+        $email->setBcc('st17@nagamills.com');
         $email->setSubject($subject);
         $email->setMessage($message);
 
@@ -1048,6 +1205,7 @@ class FIPaymentModel extends Model
             "headertext"      => $header['invoice_number'],
             "BUS_PLACE"        => $header['business_area'],
             "division"        => $header['division'],
+            "rev_doc"         => $header['reversal_doc_no'],
             "house_bank"      => $header['house_bank_id'],
             "acct_id"         => $header['house_bank_ac_no'],
             "Gl_account"      => $isEmployee ? ($firstLine['gl_code'] ?? '') : '',
@@ -1085,6 +1243,13 @@ class FIPaymentModel extends Model
         $success =  ($empStatus < 2 &&  $requiresEmpDoc && $empDocNo ) ||  ($status < 2 && $docNo);
 
         if ($success) {
+            // Financial year runs April-March: Apr-Dec belong to the current
+            // calendar year, Jan-Mar belong to the previous one — same
+            // convention as GetBudgetFromSap's $gjahr.
+            $currentYear  = (int) date('Y');
+            $currentMonth = (int) date('n');
+            $fiscalYear   = $currentMonth >= 4 ? $currentYear : $currentYear - 1;
+
             $this->db->table('fi_payment_header')->where('payment_id', $id)->update([
                 'approval_status'     => 5,
                 'gfa_posted_by'       => $userId,
@@ -1094,6 +1259,7 @@ class FIPaymentModel extends Model
                 'sap_posting_date'    => date('Y-m-d', strtotime($postingDateFmt)),
                 'sap_document_no'     => $resRow->DOCUMENT_NO ?? null,
                 'emp_sap_document_no' => $requiresEmpDoc ? ($resRow->EMP_DOCUMENT_NO ?? null) : null,
+                'sap_fiscal_year'     => $fiscalYear,
             ]);
 
             
@@ -1131,7 +1297,11 @@ class FIPaymentModel extends Model
             CONCAT(payment_term_def.definitionsName, ' - ', payment_term_def.definitionsvalues) as payment_term_name,
             service_category_def.definitionsName as service_category_name,
             expense_type_def.definitionsName as expense_type_name,
-            CONCAT(cost_center_def.cost_centre_code, ' - ', cost_center_def.cost_centre_desc) as cost_center_name
+            CONCAT(cost_center_def.cost_centre_code, ' - ', cost_center_def.cost_centre_desc) as cost_center_name,
+            mg_approved_by_info.FIRST_NAME as mg_approved_by_name,
+            stores_approved_by_info.FIRST_NAME as stores_approved_by_name,
+            gfa_posted_by_info.FIRST_NAME as gfa_posted_by_name,
+            rejected_by_info.FIRST_NAME as rejected_by_name
         ");
         $builder->where('fi_payment_header.payment_id', $id);
         $builder->join('fi_payment_line_items', 'fi_payment_line_items.payment_id = fi_payment_header.payment_id', 'left');
@@ -1141,6 +1311,10 @@ class FIPaymentModel extends Model
         $builder->join('definitions_list as service_category_def', 'service_category_def.id = fi_payment_header.service_category', 'left');
         $builder->join('definitions_list as expense_type_def', 'expense_type_def.id = fi_payment_line_items.expenses_type', 'left');
         $builder->join('user_cost_centre_mapping as cost_center_def', 'cost_center_def.id = fi_payment_line_items.cost_center_desc', 'left');
+        $builder->join('user_info as mg_approved_by_info', 'mg_approved_by_info.UI_ID = fi_payment_header.mg_approved_by', 'left');
+        $builder->join('user_info as stores_approved_by_info', 'stores_approved_by_info.UI_ID = fi_payment_header.stores_approved_by', 'left');
+        $builder->join('user_info as gfa_posted_by_info', 'gfa_posted_by_info.UI_ID = fi_payment_header.gfa_posted_by', 'left');
+        $builder->join('user_info as rejected_by_info', 'rejected_by_info.UI_ID = fi_payment_header.rejected_by', 'left');
 
         $query = $builder->get();
         $result = $query->getResultArray();
@@ -1160,12 +1334,20 @@ class FIPaymentModel extends Model
             user_info.FIRST_NAME as requested_by,
             invoice_type_def.definitionsName as invoice_type_name,
             CONCAT(payment_term_def.definitionsName, ' - ', payment_term_def.definitionsvalues) as payment_term_name,
-            service_category_def.definitionsName as service_category_name
+            service_category_def.definitionsName as service_category_name,
+            mg_approved_by_info.FIRST_NAME as mg_approved_by_name,
+            stores_approved_by_info.FIRST_NAME as stores_approved_by_name,
+            gfa_posted_by_info.FIRST_NAME as gfa_posted_by_name,
+            rejected_by_info.FIRST_NAME as rejected_by_name
         ");
         $headerBuilder->join('user_info', 'user_info.UI_ID = fi_payment_header.created_by', 'left');
         $headerBuilder->join('definitions_list as invoice_type_def', 'invoice_type_def.id = fi_payment_header.invoice_type', 'left');
         $headerBuilder->join('definitions_list as payment_term_def', 'payment_term_def.id = fi_payment_header.payment_term', 'left');
         $headerBuilder->join('definitions_list as service_category_def', 'service_category_def.id = fi_payment_header.service_category', 'left');
+        $headerBuilder->join('user_info as mg_approved_by_info', 'mg_approved_by_info.UI_ID = fi_payment_header.mg_approved_by', 'left');
+        $headerBuilder->join('user_info as stores_approved_by_info', 'stores_approved_by_info.UI_ID = fi_payment_header.stores_approved_by', 'left');
+        $headerBuilder->join('user_info as gfa_posted_by_info', 'gfa_posted_by_info.UI_ID = fi_payment_header.gfa_posted_by', 'left');
+        $headerBuilder->join('user_info as rejected_by_info', 'rejected_by_info.UI_ID = fi_payment_header.rejected_by', 'left');
         $headerBuilder->where('fi_payment_header.payment_id', $id);
         $headerQuery = $headerBuilder->get();
         $headerData = $headerQuery->getRowArray();
@@ -1316,32 +1498,136 @@ class FIPaymentModel extends Model
         return true;
     }
 
+    // One User + one Reporting Manager/Store Reporting/Reporting GFA combo can
+    // now span several Cost Centres, submitted together as postData->cost_centres
+    // (one entry per Cost Centre — code/desc/profit centre/business area/bank,
+    // same shape as a GetCostCentreFromSap option). Kept denormalized: every
+    // row still carries its own copy of the role fields (mapping_group_id just
+    // marks which rows are siblings), so every other query that reads
+    // reporting_manager_id/store_reporting_id/reporting_gfa_id/user_id straight
+    // off this table needs no changes.
+    //
+    // Cost Centres sharing the same Profit Centre collapse onto a single row —
+    // cost_centre_code/cost_centre_desc become comma lists of every Cost
+    // Centre in that Profit Centre's group (Profit Centre/Business
+    // Area/House Bank, shared across the group, stay single values); a
+    // different Profit Centre always gets its own row. This is a deliberate
+    // tradeoff: a line item referencing this row's id can no longer tell
+    // which specific Cost Centre within that Profit Centre it picked.
+    //
+    // Editing (postData->id set) updates that one row with the first
+    // Profit-Centre group and keeps every sibling row's role fields in sync,
+    // then inserts new sibling rows for any additional groups — it never
+    // removes a sibling no longer selected (that's the list's own per-row
+    // Deactivate/Delete actions, unchanged).
     public function SaveCostCentreMapping($postData)
     {
-        // print_r($postData);exit;
-        $data = [
+        $roleData = [
             'user_id' => $postData->user_id,
             'reporting_manager_id' => $postData->reporting_manager_id ?? null,
             'store_reporting_id' => $postData->store_reporting_id ?? null,
             'reporting_gfa_id' => $postData->reporting_gfa_id ?? null,
-            'cost_centre_code' => $postData->cost_centre_code,
-            'cost_centre_desc' => $postData->cost_centre_desc,
-            'profit_centre' => $postData->profit_centre,
-            'profit_centre_desc' => $postData->profit_centre_desc,
-            'business_area' => $postData->business_area ?? null,
-            'house_bank_id' => $postData->house_bank_id,
-            'house_bank_ac_no' => $postData->house_bank_ac_no,
         ];
-
-        if (!empty($postData->id)) {
-            $this->db->table('user_cost_centre_mapping')->where('id', $postData->id)->update($data);
-            return $postData->id;
+        $costCentres = $postData->cost_centres ?? [];
+        if (empty($costCentres)) {
+            return ['success' => false, 'message' => 'At least one Cost Centre is required.'];
         }
 
-        $data['RecStatus'] = 1;
-        $data['created_at'] = date('Y-m-d H:i:s');
-        $this->db->table('user_cost_centre_mapping')->insert($data);
-        return $this->db->insertID();
+        $groupId = !empty($postData->id) ? ($postData->mapping_group_id ?? $postData->id) : null;
+
+        // Duplicate check: this exact User + Reporting Manager + Cost Centre
+        // combination must not already exist on another active mapping —
+        // Store Reporting/Reporting GFA aren't part of this check. Matches
+        // via FIND_IN_SET (not equality) since either side's column can hold
+        // a comma list (multiple Cost Centres sharing a Profit Centre, or a
+        // legacy multi-value reporting_manager_id).
+        $codes = array_unique(array_filter(array_map(
+            fn ($cc) => $cc->cost_centre_code ?? $cc->value ?? null,
+            $costCentres
+        )));
+        $duplicates = [];
+        foreach ($codes as $code) {
+            $dupBuilder = $this->db->table('user_cost_centre_mapping');
+            $dupBuilder->where('user_id', $roleData['user_id']);
+            $dupBuilder->where("FIND_IN_SET(" . $this->db->escape($code) . ", cost_centre_code) >", 0, false);
+            $dupBuilder->where("FIND_IN_SET(" . $this->db->escape($roleData['reporting_manager_id']) . ", reporting_manager_id) >", 0, false);
+            $dupBuilder->where('RecStatus', 1);
+            $dupBuilder->where('deleted_at', null);
+            if ($groupId) {
+                $dupBuilder->where('mapping_group_id !=', $groupId);
+            }
+            if ($dupBuilder->get()->getRowArray()) {
+                $duplicates[] = $code;
+            }
+        }
+        if (!empty($duplicates)) {
+            return [
+                'success' => false,
+                'message' => 'This User + Reporting Manager + Cost Centre combination already exists for: ' . implode(', ', $duplicates),
+            ];
+        }
+
+        $this->db->transStart();
+
+        // Group by Profit Centre, preserving first-occurrence order so the
+        // group containing whatever was first in postData->cost_centres
+        // stays first — the FE relies on that to keep the row being edited
+        // at group index 0.
+        $groups = [];
+        foreach ($costCentres as $cc) {
+            $key = $cc->profit_centre ?? '';
+            $groups[$key][] = $cc;
+        }
+        $groups = array_values($groups);
+
+        $groupRowData = function ($members) {
+            $first = $members[0];
+            return [
+                'cost_centre_code' => implode(',', array_map(fn ($m) => $m->cost_centre_code ?? $m->value ?? '', $members)),
+                'cost_centre_desc' => implode(',', array_map(fn ($m) => $m->cost_centre_desc ?? $m->description ?? '', $members)),
+                'profit_centre' => $first->profit_centre ?? null,
+                'profit_centre_desc' => $first->profit_centre_desc ?? null,
+                'business_area' => $first->business_area ?? null,
+                'house_bank_id' => $first->house_bank_id ?? null,
+                'house_bank_ac_no' => $first->house_bank_ac_no ?? null,
+            ];
+        };
+
+        if (!empty($postData->id)) {
+            $this->db->table('user_cost_centre_mapping')->where('mapping_group_id', $groupId)->update($roleData);
+            $this->db->table('user_cost_centre_mapping')->where('id', $postData->id)
+                ->update(array_merge($roleData, $groupRowData($groups[0])));
+
+            for ($i = 1; $i < count($groups); $i++) {
+                $this->db->table('user_cost_centre_mapping')->insert(array_merge($roleData, $groupRowData($groups[$i]), [
+                    'mapping_group_id' => $groupId,
+                    'RecStatus' => 1,
+                    'created_at' => date('Y-m-d H:i:s'),
+                ]));
+            }
+
+            $this->db->transComplete();
+            return ['success' => true, 'message' => 'Cost Centre Mapping updated successfully.', 'id' => $postData->id];
+        }
+
+        $firstId = null;
+        foreach ($groups as $i => $members) {
+            $row = array_merge($roleData, $groupRowData($members), [
+                'RecStatus' => 1,
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+            if ($i === 0) {
+                $this->db->table('user_cost_centre_mapping')->insert($row);
+                $firstId = $this->db->insertID();
+                $this->db->table('user_cost_centre_mapping')->where('id', $firstId)->update(['mapping_group_id' => $firstId]);
+            } else {
+                $row['mapping_group_id'] = $firstId;
+                $this->db->table('user_cost_centre_mapping')->insert($row);
+            }
+        }
+
+        $this->db->transComplete();
+        return ['success' => true, 'message' => 'Cost Centre Mapping saved successfully.', 'id' => $firstId];
     }
 
     public function GetCostCentreMappingList()
@@ -1349,6 +1635,7 @@ class FIPaymentModel extends Model
         $builder = $this->db->table('user_cost_centre_mapping');
         $builder->select("
             user_cost_centre_mapping.id,
+            user_cost_centre_mapping.mapping_group_id,
             user_cost_centre_mapping.user_id,
             user_cost_centre_mapping.reporting_manager_id,
             user_cost_centre_mapping.store_reporting_id,
@@ -1362,26 +1649,34 @@ class FIPaymentModel extends Model
             user_cost_centre_mapping.house_bank_ac_no,
             user_cost_centre_mapping.RecStatus,
             user_info.LOGIN_ID AS USER_NAME,
-            rm_info.LOGIN_ID AS REPORTING_MANAGER_NAME,
-            store_info.LOGIN_ID AS STORE_REPORTING_NAME,
-            gfa_info.LOGIN_ID AS REPORTING_GFA_NAME
+            (SELECT GROUP_CONCAT(ui.LOGIN_ID ORDER BY FIND_IN_SET(ui.UI_ID, user_cost_centre_mapping.reporting_manager_id) SEPARATOR ', ')
+                FROM user_info ui WHERE FIND_IN_SET(ui.UI_ID, user_cost_centre_mapping.reporting_manager_id)) AS REPORTING_MANAGER_NAME,
+            (SELECT GROUP_CONCAT(ui.LOGIN_ID ORDER BY FIND_IN_SET(ui.UI_ID, user_cost_centre_mapping.store_reporting_id) SEPARATOR ', ')
+                FROM user_info ui WHERE FIND_IN_SET(ui.UI_ID, user_cost_centre_mapping.store_reporting_id)) AS STORE_REPORTING_NAME,
+            (SELECT GROUP_CONCAT(ui.LOGIN_ID ORDER BY FIND_IN_SET(ui.UI_ID, user_cost_centre_mapping.reporting_gfa_id) SEPARATOR ', ')
+                FROM user_info ui WHERE FIND_IN_SET(ui.UI_ID, user_cost_centre_mapping.reporting_gfa_id)) AS REPORTING_GFA_NAME
         ");
         $builder->join('user_info', 'user_info.UI_ID = user_cost_centre_mapping.user_id', 'left');
-        $builder->join('user_info AS rm_info', 'rm_info.UI_ID = user_cost_centre_mapping.reporting_manager_id', 'left');
-        $builder->join('user_info AS store_info', 'store_info.UI_ID = user_cost_centre_mapping.store_reporting_id', 'left');
-        $builder->join('user_info AS gfa_info', 'gfa_info.UI_ID = user_cost_centre_mapping.reporting_gfa_id', 'left');
         $builder->where('user_cost_centre_mapping.deleted_at', null);
         $builder->orderBy('user_cost_centre_mapping.id', 'DESC');
 
         return $builder->get()->getResultArray();
     }
 
+    // A mapping row can bundle several Cost Centres at once when they share
+    // one Profit Centre — cost_centre_code/cost_centre_desc become comma
+    // lists in that case (same convention as reporting_manager_id etc., and
+    // the same shape the Cost Centre Mapping screen's expandRow() reconstructs
+    // client-side for its own list). Split each row into one option per Cost
+    // Centre here too, so a dropdown built from this never shows a
+    // "FM01-ADMIN,FM01-ACCTS,FM01-MILLI" glued-together label — every split
+    // option keeps the same mapping id/profit centre/business area/bank info,
+    // since those are genuinely shared across the bundled cost centres.
     public function GetCostCentresByUser($userId)
     {
         $builder = $this->db->table('user_cost_centre_mapping');
         $builder->select("
             id AS value,
-            CONCAT(cost_centre_code, ' - ', cost_centre_desc) AS label,
             cost_centre_code,
             cost_centre_desc,
             profit_centre,
@@ -1394,7 +1689,30 @@ class FIPaymentModel extends Model
         $builder->where('RecStatus', 1);
         $builder->where('deleted_at', null);
 
-        return $builder->get()->getResultArray();
+        $rows = $builder->get()->getResultArray();
+
+        $options = [];
+        foreach ($rows as $row) {
+            $codes = array_values(array_filter(array_map('trim', explode(',', $row['cost_centre_code'] ?? ''))));
+            $descs = array_map('trim', explode(',', $row['cost_centre_desc'] ?? ''));
+
+            foreach ($codes as $i => $code) {
+                $desc = $descs[$i] ?? '';
+                $options[] = [
+                    'value'              => $row['value'],
+                    'label'              => trim($code . ' - ' . $desc),
+                    'cost_centre_code'   => $code,
+                    'cost_centre_desc'   => $desc,
+                    'profit_centre'      => $row['profit_centre'],
+                    'profit_centre_desc' => $row['profit_centre_desc'],
+                    'house_bank_id'      => $row['house_bank_id'],
+                    'house_bank_ac_no'   => $row['house_bank_ac_no'],
+                    'business_area'      => $row['business_area'],
+                ];
+            }
+        }
+
+        return $options;
     }
 
     public function ToggleCostCentreMappingStatus($id, $status)

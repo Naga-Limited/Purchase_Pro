@@ -89,6 +89,7 @@ const transformPaymentRows = (rows) => {
         house_bank_ac_no: first.house_bank_ac_no,
         business_area: first.business_area,
         nature_of_expenses: first.nature_of_expenses,
+        cost_center: [...new Set(rows.filter((r) => r.line_id !== null && r.line_id !== undefined).map((r) => r.cost_center).filter(Boolean))].join(', '),
         tds_code: first.tds_code,
         tds_description: first.tds_description,
 
@@ -97,9 +98,13 @@ const transformPaymentRows = (rows) => {
 
         created_at: first.created_at,
         mg_approved_at: first.mg_approved_at,
+        mg_approved_by_name: first.mg_approved_by_name,
         stores_approved_at: first.stores_approved_at,
+        stores_approved_by_name: first.stores_approved_by_name,
         gfa_posted_at: first.gfa_posted_at,
+        gfa_posted_by_name: first.gfa_posted_by_name,
         rejected_at: first.rejected_at,
+        rejected_by_name: first.rejected_by_name,
         rejection_remarks: first.rejection_remarks,
 
         line_items: rows.filter((r) => r.line_id !== null && r.line_id !== undefined).map((r, i) => ({
@@ -658,10 +663,10 @@ function GFAVerificationView() {
 
     const historyStages = [
         { label: 'Submitted', at: d.created_at },
-        { label: 'Manager Approved', at: d.mg_approved_at },
-        { label: 'Store Acknowledged', at: d.stores_approved_at },
-        { label: 'GFA Verified', at: d.gfa_posted_at },
-        { label: 'Rejected', at: d.rejected_at },
+        { label: 'Manager Approved', at: d.mg_approved_at, by: d.mg_approved_by_name },
+        { label: 'Store Acknowledged', at: d.stores_approved_at, by: d.stores_approved_by_name },
+        { label: 'GFA Verified', at: d.gfa_posted_at, by: d.gfa_posted_by_name },
+        { label: 'Rejected', at: d.rejected_at, by: d.rejected_by_name },
     ].filter((s) => s.label !== 'Rejected' || d.rejected_at);
 
     return (
@@ -730,6 +735,13 @@ function GFAVerificationView() {
                     <Col md="2" sm="6" xs="6"><Field label="Invoice Type" value={d.invoice_type} /></Col>
                     <Col md="2" sm="6" xs="6"><Field label="MIGO Number" value={d.migo_number} /></Col>
                     <Col md="2" sm="6" xs="6"><Field label="Service Category" value={d.service_category} /></Col>
+                    <Col md="2" sm="6" xs="6"><Field label="Cost Centre" value={d.cost_center} /></Col>
+                </Row>
+                <Row>
+                    <Col md="2" sm="6" xs="6"><Field label="Manager Approved By" value={d.mg_approved_by_name} /></Col>
+                    <Col md="2" sm="6" xs="6"><Field label="Store Acknowledged By" value={d.stores_approved_by_name} /></Col>
+                    <Col md="2" sm="6" xs="6"><Field label="GFA Posted By" value={d.gfa_posted_by_name} /></Col>
+                    <Col md="2" sm="6" xs="6"><Field label="Rejected By" value={d.rejected_by_name} /></Col>
                 </Row>
             </Card>
 
@@ -902,14 +914,14 @@ function GFAVerificationView() {
                                         </Input>
                                     </td>
                                     <td style={{ padding: '4px', minWidth: 90 }}>
-                                        <Input type="text" bsSize="sm" value={item.gl_code} disabled style={{ background: '#f0f0f0' }} readOnly />
+                                        <Input type="text" bsSize="sm" value={item.gl_code} disabled style={{ background: '#f0f0f0' }}  />
                                     </td>
                                     <td style={{ padding: '4px', minWidth: 120 }}>
-                                        <Input type="text" bsSize="sm" value={item.gl_description} disabled style={{ background: '#f0f0f0' }} readOnly />
+                                        <Input type="text" bsSize="sm" value={item.gl_description} disabled style={{ background: '#f0f0f0' }}  />
                                     </td>
                                     <td style={{ padding: '4px', minWidth: 150 }}>
                                         <InputGroup size="sm">
-                                            <Input type="number" bsSize="sm" value={item.budget} disabled style={{ background: '#f0f0f0' }} readOnly />
+                                            <Input type="number" bsSize="sm" value={item.budget} disabled style={{ background: '#f0f0f0' }}  />
                                             <Button color="outline-secondary" size="sm"
                                                 title="Re-fetch budget from SAP"
                                                 disabled={!isActionable || !item.gl_code || !item.cost_center || syncingBudgetId === item.id}
@@ -943,7 +955,7 @@ function GFAVerificationView() {
                                         </Input>
                                     </td>
                                     <td style={{ padding: '4px', minWidth: 90 }}>
-                                        <Input type="text" bsSize="sm" value={item.cost_center} disabled style={{ background: '#f0f0f0' }} readOnly />
+                                        <Input type="text" bsSize="sm" value={item.cost_center} disabled style={{ background: '#f0f0f0' }}  />
                                     </td>
                                     <td style={{ padding: '4px', minWidth: 140 }}>
                                         <Input type="select" bsSize="sm" value={item.tax_type} disabled={!isActionable}
@@ -955,32 +967,32 @@ function GFAVerificationView() {
                                         </Input>
                                     </td>
                                     <td style={{ padding: '4px', minWidth: 70 }}>
-                                        <Input type="text" bsSize="sm" value={item.tax_code} disabled style={{ background: '#f0f0f0' }} readOnly />
+                                        <Input type="text" bsSize="sm" value={item.tax_code} disabled style={{ background: '#f0f0f0' }}  />
                                     </td>
                                     <td style={{ padding: '4px', minWidth: 120 }}>
-                                        <Input type="text" bsSize="sm" value={item.tax_description} disabled style={{ background: '#f0f0f0' }} readOnly />
+                                        <Input type="text" bsSize="sm" value={item.tax_description} disabled style={{ background: '#f0f0f0' }}  />
                                     </td>
                                     <td style={{ padding: '4px', minWidth: 90 }}>
-                                        <Input type="number" bsSize="sm" value={baseAmt.toFixed(2)} disabled style={{ background: '#f0f0f0' }} readOnly />
+                                        <Input type="number" bsSize="sm" value={baseAmt.toFixed(2)} disabled style={{ background: '#f0f0f0' }}  />
                                     </td>
                                     <td style={{ padding: '4px', minWidth: 80 }}>
-                                        <Input type="number" bsSize="sm" value={cgstAmt.toFixed(2)} disabled style={{ background: '#f0f0f0' }} readOnly />
+                                        <Input type="number" bsSize="sm" value={cgstAmt.toFixed(2)} disabled style={{ background: '#f0f0f0' }}  />
                                     </td>
                                     <td style={{ padding: '4px', minWidth: 80 }}>
-                                        <Input type="number" bsSize="sm" value={sgstAmt.toFixed(2)} disabled style={{ background: '#f0f0f0' }} readOnly />
+                                        <Input type="number" bsSize="sm" value={sgstAmt.toFixed(2)} disabled style={{ background: '#f0f0f0' }}  />
                                     </td>
                                     <td style={{ padding: '4px', minWidth: 80 }}>
-                                        <Input type="number" bsSize="sm" value={igstAmt.toFixed(2)} disabled style={{ background: '#f0f0f0' }} readOnly />
+                                        <Input type="number" bsSize="sm" value={igstAmt.toFixed(2)} disabled style={{ background: '#f0f0f0' }}  />
                                     </td>
                                     <td style={{ padding: '4px', minWidth: 90 }}>
                                         <Input type="text" bsSize="sm" value={item.text} disabled={!isActionable}
                                             onChange={(e) => updateLineItem(item.id, 'text', e.target.value)} />
                                     </td>
                                     <td style={{ padding: '4px', minWidth: 90 }}>
-                                        <Input type="text" bsSize="sm" value={item.profit_center} disabled style={{ background: '#f0f0f0' }} readOnly />
+                                        <Input type="text" bsSize="sm" value={item.profit_center} disabled style={{ background: '#f0f0f0' }}  />
                                     </td>
                                     <td style={{ padding: '4px', minWidth: 130 }}>
-                                        <Input type="text" bsSize="sm" value={item.profit_center_desc} disabled style={{ background: '#f0f0f0' }} readOnly />
+                                        <Input type="text" bsSize="sm" value={item.profit_center_desc} disabled style={{ background: '#f0f0f0' }}  />
                                     </td>
                                     <td style={{ padding: '4px', minWidth: 90 }}>
                                         <Input type="text" bsSize="sm" value={item.hsn_sac} disabled={!isActionable}
@@ -1077,7 +1089,12 @@ function GFAVerificationView() {
                                     width: 8, height: 8, borderRadius: '50%',
                                     background: s.at ? '#1e9e5a' : '#dee2e6',
                                 }} />
-                                <span style={{ fontWeight: 600, color: s.at ? '#2b3245' : '#adb5bd' }}>{s.label}</span>
+                                <div>
+                                    <div style={{ fontWeight: 600, color: s.at ? '#2b3245' : '#adb5bd' }}>{s.label}</div>
+                                    {s.at && s.by && (
+                                        <div style={{ fontSize: 11, color: '#8a94a6' }}>by {s.by}</div>
+                                    )}
+                                </div>
                             </div>
                             <span style={{ fontSize: 12, color: '#8a94a6' }}>
                                 {s.at ? formatDateTime(s.at) : 'Pending'}

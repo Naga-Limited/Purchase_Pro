@@ -95,7 +95,7 @@ class UnmanWBModel extends Model
         $SAP_DOCUMENT = '';
         // compute netWeight
         $netWeight = 0;
-        if (!isset($data->weight) || $data->weight < 100) {
+        if (!isset($data->weight) || $data->weight < 80) {
             throw new \Exception("Invalid weight. Please check vehicle: {$data->vehicle}");
         }
 		if ($firstWeight > 0 && $currentWeight > 0) {
@@ -549,7 +549,7 @@ class UnmanWBModel extends Model
 
     $firstWtResult = $firstWt->get()->getResultArray();
     if (!empty($firstWtResult)) {
-        if (!isset($data->weight) || $data->weight < 100) {
+        if (!isset($data->weight) || $data->weight < 80) {
             throw new \Exception("Invalid weight. Please check vehicle: {$data->vehicle}");
         }
         $Landing_Data = new LandingDataModel();

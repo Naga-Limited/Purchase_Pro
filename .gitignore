@@ -1,6 +1,7 @@
 node_modules/
 vendor/
 vendor_local/
+vendor_prod/
 sapfileshare/
 writable/
 .env
@@ -10,5 +11,6 @@ dist/
 *.log
 *.zip
 public/
-# app/Config/Database.php
-# app/Config/Constant.php
+app/Config/Database.php
+app/Config/Constant.php
+# .htaccess

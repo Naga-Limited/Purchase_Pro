@@ -28,6 +28,16 @@ export default function DateComponent(page) {
         sendingdateValidation()
       }
     }, [page=='courier']);
+    useEffect(() => {
+      if(page=='RecPayment'){
+        getDateRecPaymentpostingDate()
+      }
+    }, [page=='RecPayment']);
+    useEffect(() => {
+      if(page=='fiPayment'){
+        getFiPaymentPostingDate()
+      }
+    }, [page=='fiPayment']);
     const getDateControl = () => {
         apiPostMethod(apiBaseUrl + "Processcancel/FumigationDateGet")
           .then((response) => {
@@ -54,6 +64,20 @@ export default function DateComponent(page) {
         .then((response) => {
           const { data } = response;
           setdate_control(data.results[0]?.courier_sending_date)
+        })
+    }
+    const getDateRecPaymentpostingDate = () => {
+      apiPostMethod(apiBaseUrl + "Loadingunloadingcost/SAP_PostingDate")
+        .then((response) => {
+          const { data } = response;
+          setdate_control(data.results[0]?.sap_posting_date)
+        })
+    }
+    const getFiPaymentPostingDate = () => {
+      apiPostMethod(apiBaseUrl + "FIPaymentController/GetPostingDateControl")
+        .then((response) => {
+          const { data } = response;
+          setdate_control(data.results[0]?.fi_payment_posting_date)
         })
     }
     const getDateXDaysAgo = (numOfDays, date = new Date()) => {
@@ -127,3 +151,4 @@ export  const getAllowedPastDate = (numOfDays) => {
 
   return needed_date;
 }
+

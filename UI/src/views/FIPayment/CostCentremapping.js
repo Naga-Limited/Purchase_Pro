@@ -1,12 +1,12 @@
 import React, { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { useFormik } from "formik";
-import { validation, Yup, CustomDropdownInput, CustomTextInput } from "../forms/custom-form";
+import { validation, Yup, CustomDropdownInput } from "../forms/custom-form";
 import { apiBaseUrl } from "../../urlConstants";
 import { useLoader } from "../../utility/hooks/useLoader";
 import { RefreshBlock } from "../common/RefreshBlock";
 import { apiPostMethod } from "@helpers/axiosHelper";
-import { errorToast, ShowToast } from "@helpers/appHelper";
+import { ShowToast } from "@helpers/appHelper";
 import { CardComponent } from "../common/CardComponent";
 import { Row, Col, Button } from "reactstrap";
 import TableComponent from "../common/TableComponent";
@@ -24,51 +24,53 @@ const CostCentreMappingForm = ({ form, onSubmit, plantIds, isEditing, onCancelEd
           <CustomDropdownInput url={`${apiBaseUrl}marketdata/master/getuserinfo`} label="Reporting Manager" form={form} id="REPORTING_MANAGER" />
         </Col>
         <Col md="3" sm="12">
-          <CustomDropdownInput url={`${apiBaseUrl}marketdata/master/getuserinfo`} label="Store Reporting" form={form} id="STORE_REPORTING" />
+          <CustomDropdownInput url={`${apiBaseUrl}marketdata/master/getuserinfo`} label="Store Reporting" form={form} id="STORE_REPORTING" isMulti />
         </Col>
         <Col md="3" sm="12">
-          <CustomDropdownInput url={`${apiBaseUrl}marketdata/master/getuserinfo`} label="Reporting GFA" form={form} id="REPORTING_GFA" />
+          <CustomDropdownInput url={`${apiBaseUrl}marketdata/master/getuserinfo`} label="Reporting GFA" form={form} id="REPORTING_GFA" isMulti />
         </Col>
       </Row>
       <Row>
-        <Col md="3" sm="12">
+        <Col md="6" sm="12">
           <CustomDropdownInput
             url={`${apiBaseUrl}FIPaymentController/GetCostCentreFromSap`}
             label="Cost Centre"
             form={form}
             id="COST_CENTRE"
-            onChange={(e) => {
-              form.setFieldValue("COST_CENTRE", e);
-              form.setFieldValue("COST_CENTRE_DESC", e ? e.description : "");
-              form.setFieldValue("PROFIT_CENTRE", e ? e.profit_centre : "");
-              form.setFieldValue("PROFIT_CENTRE_DESC", e ? e.profit_centre_desc : "");
-              form.setFieldValue("BUSINESS_AREA", e ? e.business_area : "");
-              form.setFieldValue("HOUSE_BANK", e ? e.house_bank_id : "");
-              form.setFieldValue("HOUSE_BANK_ID", e ? e.house_bank_ac_no : "");
-            }}
+            isMulti
           />
         </Col>
-        <Col md="3" sm="12">
-          <CustomTextInput form={form} id="COST_CENTRE_DESC" label="Cost Center Desc" disabled />
-        </Col>
-        <Col md="3" sm="12">
-          <CustomTextInput form={form} id="PROFIT_CENTRE" label="Profit Centre" disabled />
-        </Col>
-        <Col md="3" sm="12">
-          <CustomTextInput form={form} id="PROFIT_CENTRE_DESC" label="Profit Centre Desc" disabled />
-        </Col>
       </Row>
-      <Row>
-        <Col md="3" sm="12">
-          <CustomTextInput form={form} id="BUSINESS_AREA" label="Business Area" disabled />
-        </Col>
-        <Col md="3" sm="12">
-          <CustomTextInput form={form} id="HOUSE_BANK" label="House Bank" disabled />
-        </Col>
-        <Col md="3" sm="12">
-          <CustomTextInput form={form} id="HOUSE_BANK_ID" label="House Bank Id" disabled />
-        </Col>
-      </Row>
+      {form.values.COST_CENTRE && form.values.COST_CENTRE.length > 0 && (
+        <Row>
+          <Col sm="12" style={{ overflowX: "auto", marginBottom: 16 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: "#f8f9fa", borderBottom: "1px solid #dee2e6" }}>
+                  {["Cost Centre", "Cost Center Desc", "Profit Centre", "Profit Centre Desc", "Business Area", "House Bank", "House Bank Id"].map((col) => (
+                    <th key={col} style={{ padding: "6px 8px", textAlign: "left", fontWeight: 600, color: "#495057", borderRight: "1px solid #e9ecef" }}>
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {form.values.COST_CENTRE.map((cc) => (
+                  <tr key={cc.value} style={{ borderBottom: "1px solid #f1f2f4" }}>
+                    <td style={{ padding: "6px 8px" }}>{cc.value}</td>
+                    <td style={{ padding: "6px 8px" }}>{cc.description}</td>
+                    <td style={{ padding: "6px 8px" }}>{cc.profit_centre}</td>
+                    <td style={{ padding: "6px 8px" }}>{cc.profit_centre_desc}</td>
+                    <td style={{ padding: "6px 8px" }}>{cc.business_area}</td>
+                    <td style={{ padding: "6px 8px" }}>{cc.house_bank_id}</td>
+                    <td style={{ padding: "6px 8px" }}>{cc.house_bank_ac_no}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Col>
+        </Row>
+      )}
       <Row>
         <Col md="4" sm="12" className="d-flex" style={{ gap: 8 }}>
           <Button.Ripple color="primary" type="button" onClick={() => onSubmit()}>
@@ -85,11 +87,24 @@ const CostCentreMappingForm = ({ form, onSubmit, plantIds, isEditing, onCancelEd
   );
 };
 
+// Same buttonless red confirmDialog used for errors throughout the FIPayment
+// module (VendorInvoiceSubmit.js, GFAVerification.js, etc.).
+const showErrorDialog = (message) => {
+  confirmDialog({
+    title: `<h5><strong class="text-white">${message || "Something went wrong"}</strong></h5>`,
+    cancelButton: false,
+    confirmText: false,
+    confirmButton: false,
+    background: "#f50e0a",
+  });
+};
+
 const CostCentremapping = () => {
   const { showLoader, hideLoader } = useLoader();
   const UserDetails = useSelector((state) => (state && state.auth ? state.auth.userData : {}));
   const [mappingList, setMappingList] = useState([]);
   const [editingId, setEditingId] = useState(null);
+  const [editingGroupId, setEditingGroupId] = useState(null);
 
   const fetchMappingList = useCallback(() => {
     apiPostMethod(apiBaseUrl + "FIPaymentController/GetCostCentreMappingList", {})
@@ -100,7 +115,7 @@ const CostCentremapping = () => {
         }
       })
       .catch(() => {
-        errorToast("Something went wrong, please try again after sometime");
+        showErrorDialog("Something went wrong, please try again after sometime");
       });
   }, []);
 
@@ -113,7 +128,7 @@ const CostCentremapping = () => {
     initialValues: {},
     validationSchema: Yup.object().shape({
       USER_ID: validation.required({ message: "User should not be empty", isObject: true }),
-      COST_CENTRE: validation.required({ message: "Cost Centre should not be empty", isObject: true }),
+      COST_CENTRE: Yup.array().min(1, "Cost Centre should not be empty"),
     }),
     onSubmit() {},
   });
@@ -125,19 +140,29 @@ const CostCentremapping = () => {
       return;
     }
     const values = form.values;
+    // Store Reporting/Reporting GFA are multi-select — stored as a
+    // comma-separated id list, same convention as
+    // loading_unloading_payment.unload_id. Reporting Manager is single-select.
+    const joinMulti = (selected) => (selected && selected.length ? selected.map((o) => o.value).join(",") : null);
     const postData = {
       id: editingId || undefined,
+      mapping_group_id: editingGroupId || undefined,
       user_id: values.USER_ID.value,
       reporting_manager_id: values.REPORTING_MANAGER ? values.REPORTING_MANAGER.value : null,
-      store_reporting_id: values.STORE_REPORTING ? values.STORE_REPORTING.value : null,
-      reporting_gfa_id: values.REPORTING_GFA ? values.REPORTING_GFA.value : null,
-      cost_centre_code: values.COST_CENTRE.value,
-      cost_centre_desc: values.COST_CENTRE_DESC,
-      profit_centre: values.PROFIT_CENTRE,
-      profit_centre_desc: values.PROFIT_CENTRE_DESC,
-      business_area: values.BUSINESS_AREA,
-      house_bank_id: values.HOUSE_BANK,
-      house_bank_ac_no: values.HOUSE_BANK_ID,
+      store_reporting_id: joinMulti(values.STORE_REPORTING),
+      reporting_gfa_id: joinMulti(values.REPORTING_GFA),
+      // One User + one set of Reporting Manager/Store Reporting/Reporting GFA
+      // can span several Cost Centres — each selected option already carries
+      // its own code/desc/profit centre/business area/bank info from SAP.
+      cost_centres: values.COST_CENTRE.map((cc) => ({
+        cost_centre_code: cc.value,
+        cost_centre_desc: cc.description,
+        profit_centre: cc.profit_centre,
+        profit_centre_desc: cc.profit_centre_desc,
+        business_area: cc.business_area,
+        house_bank_id: cc.house_bank_id,
+        house_bank_ac_no: cc.house_bank_ac_no,
+      })),
     };
     showLoader();
     apiPostMethod(apiBaseUrl + "FIPaymentController/SaveCostCentreMapping", postData)
@@ -147,41 +172,81 @@ const CostCentremapping = () => {
           ShowToast(editingId ? "Updated Successfully..." : "Saved Successfully...");
           form.resetForm();
           setEditingId(null);
+          setEditingGroupId(null);
           fetchMappingList();
         } else {
-          errorToast(data.ErrorMsg || "Unable to save record");
+          showErrorDialog(data.message || "Unable to save record");
         }
       })
       .catch(() => {
-        errorToast("Something went wrong, please try again after sometime");
+        showErrorDialog("Something went wrong, please try again after sometime");
       })
       .finally(() => {
         hideLoader();
       });
   };
 
+  // Splits a comma-separated id list and its matching GROUP_CONCAT'd name
+  // list (backend orders both by the same FIND_IN_SET position, so pairing
+  // by index lines them up correctly) back into react-select's [{value,
+  // label}] shape for the multi-select fields.
+  const splitMulti = (idsStr, namesStr) => {
+    const ids = (idsStr || "").split(",").map((s) => s.trim()).filter(Boolean);
+    const names = (namesStr || "").split(",").map((s) => s.trim());
+    return ids.map((id, i) => ({ value: id, label: names[i] || id }));
+  };
+
+  // A row can hold several Cost Centres at once when they share one Profit
+  // Centre (cost_centre_code/cost_centre_desc become comma lists in that
+  // case) — expand it back into one multi-select chip per Cost Centre, each
+  // carrying that row's shared Profit Centre/Business Area/Bank info, so
+  // re-submitting without touching the chips re-groups back to the same row.
+  const expandRow = (r) => {
+    const codes = (r.cost_centre_code || "").split(",").map((s) => s.trim()).filter(Boolean);
+    const descs = (r.cost_centre_desc || "").split(",").map((s) => s.trim());
+    return codes.map((code, i) => ({
+      value: code,
+      label: code,
+      description: descs[i] || "",
+      profit_centre: r.profit_centre,
+      profit_centre_desc: r.profit_centre_desc,
+      business_area: r.business_area,
+      house_bank_id: r.house_bank_id,
+      house_bank_ac_no: r.house_bank_ac_no,
+    }));
+  };
+
   // Prefills the form from a list row so it can be resubmitted as an update
   // (SaveCostCentreMapping updates in place when `id` is present in postData).
+  // Every row sharing this one's mapping_group_id is the same role
+  // assignment's Cost Centre family — reload all of them into the
+  // multi-select (not just the clicked row) so editing shows/extends the
+  // whole set, reconstructed into the same shape a fresh SAP pick would have.
   const startEdit = (row) => {
+    // The row being edited must stay first — SaveCostCentreMapping groups
+    // postData.cost_centres by Profit Centre and writes group[0] onto
+    // postData.id, so editing without touching the Cost Centre chips has to
+    // stay a true no-op.
+    const otherSiblings = mappingList.filter((r) => r.mapping_group_id === row.mapping_group_id && r.id !== row.id);
+    const siblings = [row, ...otherSiblings];
+    // Reporting Manager is single-select — a legacy row saved before this
+    // change could still hold more than one id, so just take the first.
+    const reportingManagerOptions = splitMulti(row.reporting_manager_id, row.REPORTING_MANAGER_NAME);
     form.setValues({
       USER_ID: row.user_id ? { value: row.user_id, label: row.USER_NAME } : null,
-      REPORTING_MANAGER: row.reporting_manager_id ? { value: row.reporting_manager_id, label: row.REPORTING_MANAGER_NAME } : null,
-      STORE_REPORTING: row.store_reporting_id ? { value: row.store_reporting_id, label: row.STORE_REPORTING_NAME } : null,
-      REPORTING_GFA: row.reporting_gfa_id ? { value: row.reporting_gfa_id, label: row.REPORTING_GFA_NAME } : null,
-      COST_CENTRE: row.cost_centre_code ? { value: row.cost_centre_code, label: row.cost_centre_code } : null,
-      COST_CENTRE_DESC: row.cost_centre_desc || "",
-      PROFIT_CENTRE: row.profit_centre || "",
-      PROFIT_CENTRE_DESC: row.profit_centre_desc || "",
-      BUSINESS_AREA: row.business_area || "",
-      HOUSE_BANK: row.house_bank_id || "",
-      HOUSE_BANK_ID: row.house_bank_ac_no || "",
+      REPORTING_MANAGER: reportingManagerOptions[0] || null,
+      STORE_REPORTING: splitMulti(row.store_reporting_id, row.STORE_REPORTING_NAME),
+      REPORTING_GFA: splitMulti(row.reporting_gfa_id, row.REPORTING_GFA_NAME),
+      COST_CENTRE: siblings.flatMap(expandRow),
     });
     setEditingId(row.id);
+    setEditingGroupId(row.mapping_group_id);
   };
 
   const cancelEdit = () => {
     form.resetForm();
     setEditingId(null);
+    setEditingGroupId(null);
   };
 
   const toggleStatus = (id, status) => {
@@ -197,7 +262,7 @@ const CostCentremapping = () => {
           }
         })
         .catch(() => {
-          errorToast("Something went wrong, please try again after sometime");
+          showErrorDialog("Something went wrong, please try again after sometime");
         });
     });
   };
@@ -214,7 +279,7 @@ const CostCentremapping = () => {
           }
         })
         .catch(() => {
-          errorToast("Something went wrong, please try again after sometime");
+          showErrorDialog("Something went wrong, please try again after sometime");
         });
     });
   };

@@ -53,7 +53,9 @@ const TruckArrivalRake = ({ onAdded,results }) => {
     setFormaData({ ...formData, [key]: value, PER_TRUCK_QTY: isVehicleDrop ? Number(weight || 0) : 0 });
   };
   const onAddTruckDetails = (status) => {
-
+    if(formData.VEHICLE_TYPE == 'Cm Rake'){ 
+      onAddTruckDetail(status)
+    }else{
     let fdata = { ZQTY: results.ZSUPPLIER_INV_QTY || 0, 
       VECHICAL_STATUS: status, 
       formType: "A", 
@@ -94,7 +96,7 @@ const TruckArrivalRake = ({ onAdded,results }) => {
     }).catch((error) => {
         errorToast("Something went wrong, please try again after sometime");
       })
-    
+    }  
   };
 
   

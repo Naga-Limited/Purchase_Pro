@@ -50,8 +50,44 @@ class CreditMemoModel extends Model
         return $builder;
     }
 
+    // Financial year runs April-March: Apr-Dec belong to the current calendar
+    // year, Jan-Mar belong to the previous one — same rule
+    // FIPaymentModel::GetBudgetFromSap already uses for SAP's gjahr/period.
+    private function GetCurrentFinancialYearRange()
+    {
+        $currentYear  = (int) date('Y');
+        $currentMonth = (int) date('n');
+        $gjahr = $currentMonth >= 4 ? $currentYear : $currentYear - 1;
+        return [$gjahr . '-04-01', ($gjahr + 1) . '-03-31'];
+    }
+
+    // Same Memo No + Vendor Code already submitted this financial year —
+    // blocks a fresh NonPoCreditMemoParking.js submission, regardless of
+    // that earlier request's approval_status.
+    public function CheckDuplicateMemo($vendorCode, $memoNo)
+    {
+        if (empty($vendorCode) || empty($memoNo)) {
+            return false;
+        }
+        [$fyStart, $fyEnd] = $this->GetCurrentFinancialYearRange();
+
+        return $this->db->table('fi_credit_memo_header')
+            ->where('vendor_code', $vendorCode)
+            ->where('memo_no', $memoNo)
+            ->where('DATE(created_at) >=', $fyStart)
+            ->where('DATE(created_at) <=', $fyEnd)
+            ->countAllResults() > 0;
+    }
+
     public function InsertCreditMemo($postData, $memoNo)
     {
+        if ($this->CheckDuplicateMemo($postData->vendor_code ?? null, $postData->memo_no ?? null)) {
+            return [
+                'success' => false,
+                'message' => 'A credit memo with this Memo No and Vendor Code has already been submitted for the current financial year.',
+            ];
+        }
+
         $this->db->transStart();
 
         $headerData = [
@@ -207,7 +243,7 @@ class CreditMemoModel extends Model
     // created_at (the one date field always populated regardless of stage).
     // fi_credit_memo_header is the primary (FROM) table — one row per
     // request, request-level totals rather than per-line-item granularity.
-    public function GetCreditMemoReport($fromDate, $toDate, $search = '')
+    public function GetCreditMemoReport($fromDate, $toDate, $search = '', $userId = null)
     {
         $builder = $this->db->table('fi_credit_memo_header');
         $builder->select("
@@ -222,6 +258,9 @@ class CreditMemoModel extends Model
             fi_credit_memo_header.vendor_code,
             fi_credit_memo_header.vendor_name,
             fi_credit_memo_header.division,
+            (SELECT GROUP_CONCAT(DISTINCT li.cost_center SEPARATOR ', ')
+                FROM fi_credit_memo_line_items li
+                WHERE li.credit_memo_id = fi_credit_memo_header.credit_memo_id) as cost_center,
             fi_credit_memo_header.reason,
             fi_credit_memo_header.memo_no,
             fi_credit_memo_header.memo_date,
@@ -251,9 +290,13 @@ class CreditMemoModel extends Model
                 ELSE 'Unknown'
             END as approval_status_label,
             fi_credit_memo_header.mg_approved_at,
+            mg_approved_by_info.FIRST_NAME as mg_approved_by_name,
             fi_credit_memo_header.stores_approved_at,
+            stores_approved_by_info.FIRST_NAME as stores_approved_by_name,
             fi_credit_memo_header.gfa_posted_at,
+            gfa_posted_by_info.FIRST_NAME as gfa_posted_by_name,
             fi_credit_memo_header.rejected_at,
+            rejected_by_info.FIRST_NAME as rejected_by_name,
             fi_credit_memo_header.rejection_remarks,
             fi_credit_memo_header.invoice_copy,
             fi_credit_memo_header.back_paper
@@ -261,8 +304,34 @@ class CreditMemoModel extends Model
         $builder->join('user_info', 'user_info.UI_ID = fi_credit_memo_header.created_by', 'left');
         $builder->join('definitions_list as invoice_type_def', 'invoice_type_def.id = fi_credit_memo_header.invoice_type', 'left');
         $builder->join('fi_payment_header', 'fi_payment_header.payment_id = fi_credit_memo_header.request_payment_id', 'left');
+        $builder->join('user_info as mg_approved_by_info', 'mg_approved_by_info.UI_ID = fi_credit_memo_header.mg_approved_by', 'left');
+        $builder->join('user_info as stores_approved_by_info', 'stores_approved_by_info.UI_ID = fi_credit_memo_header.stores_approved_by', 'left');
+        $builder->join('user_info as gfa_posted_by_info', 'gfa_posted_by_info.UI_ID = fi_credit_memo_header.gfa_posted_by', 'left');
+        $builder->join('user_info as rejected_by_info', 'rejected_by_info.UI_ID = fi_credit_memo_header.rejected_by', 'left');
         $builder->where('DATE(fi_credit_memo_header.created_at) >=', $fromDate);
         $builder->where('DATE(fi_credit_memo_header.created_at) <=', $toDate);
+
+        // Scope the report to whatever this user is tied to via
+        // user_cost_centre_mapping — either as the mapping's own user (the
+        // requester the cost centre belongs to) or as one of its Reporting
+        // Manager/Store Reporting/Reporting GFA approvers (all three can now
+        // name several people, comma-separated — FIND_IN_SET matches any of
+        // them). UserID 1 is exempt and always sees every request.
+        if (!empty($userId) && (int) $userId !== 1) {
+            $userIdEscaped = $this->db->escape($userId);
+            $builder->whereIn('credit_memo_id', function ($sub) use ($userId, $userIdEscaped) {
+                return $sub->select('fi_credit_memo_line_items.credit_memo_id')->from('fi_credit_memo_line_items')
+                    ->join('user_cost_centre_mapping', 'user_cost_centre_mapping.id = fi_credit_memo_line_items.cost_center_desc')
+                    ->groupStart()
+                        ->where('user_cost_centre_mapping.user_id', $userId)
+                        ->orWhere("FIND_IN_SET({$userIdEscaped}, user_cost_centre_mapping.reporting_manager_id) >", 0, false)
+                        ->orWhere("FIND_IN_SET({$userIdEscaped}, user_cost_centre_mapping.store_reporting_id) >", 0, false)
+                        ->orWhere("FIND_IN_SET({$userIdEscaped}, user_cost_centre_mapping.reporting_gfa_id) >", 0, false)
+                    ->groupEnd()
+                    ->where('user_cost_centre_mapping.RecStatus', 1)
+                    ->where('user_cost_centre_mapping.deleted_at', null);
+            });
+        }
 
         if (!empty($search)) {
             $builder->groupStart();
@@ -298,18 +367,24 @@ class CreditMemoModel extends Model
         // requester's own account, so the check has to go through the line
         // items rather than fi_credit_memo_header.created_by.
         if (!empty($reportingManagerId)) {
-            $builder->whereIn('credit_memo_id', function ($sub) use ($reportingManagerId) {
+            // reporting_manager_id can now name several people (comma-separated,
+            // same convention as loading_unloading_payment.unload_id) — match
+            // if the caller's id appears anywhere in that list, not just an
+            // exact single-value equals.
+            $reportingManagerIdEscaped = $this->db->escape($reportingManagerId);
+            $builder->whereIn('credit_memo_id', function ($sub) use ($reportingManagerIdEscaped) {
                 return $sub->select('fi_credit_memo_line_items.credit_memo_id')->from('fi_credit_memo_line_items')
                     ->join('user_cost_centre_mapping', 'user_cost_centre_mapping.id = fi_credit_memo_line_items.cost_center_desc')
-                    ->where('user_cost_centre_mapping.reporting_manager_id', $reportingManagerId)
+                    ->where("FIND_IN_SET({$reportingManagerIdEscaped}, user_cost_centre_mapping.reporting_manager_id) >", 0, false)
                     ->where('user_cost_centre_mapping.RecStatus', 1)
                     ->where('user_cost_centre_mapping.deleted_at', null);
             });
         }
         if (!empty($storeReportingId)) {
-            $builder->whereIn('created_by', function ($sub) use ($storeReportingId) {
+            $storeReportingIdEscaped = $this->db->escape($storeReportingId);
+            $builder->whereIn('created_by', function ($sub) use ($storeReportingIdEscaped) {
                 return $sub->select('user_id')->from('user_cost_centre_mapping')
-                    ->where('store_reporting_id', $storeReportingId)
+                    ->where("FIND_IN_SET({$storeReportingIdEscaped}, store_reporting_id) >", 0, false)
                     ->where('RecStatus', 1)
                     ->where('deleted_at', null);
             });
@@ -338,8 +413,13 @@ class CreditMemoModel extends Model
             approval_status,
             invoice_copy,
             back_paper,
+            payment_voucher_no,
+            utr_number,
             created_at,
-            DATEDIFF(NOW(), created_at) AS duration_days
+            updated_at,
+            (SELECT GROUP_CONCAT(DISTINCT li.cost_center SEPARATOR ', ')
+                FROM fi_credit_memo_line_items li
+                WHERE li.credit_memo_id = fi_credit_memo_header.credit_memo_id) as cost_center
         ");
         $builder->orderBy('created_at', 'DESC');
         $builder->limit((int) $pageSize, (int) $start);
@@ -363,16 +443,21 @@ class CreditMemoModel extends Model
             fi_credit_memo_header.credit_memo_id,
             fi_credit_memo_header.unique_credit_memo_no as request_no,
             fi_credit_memo_header.vendor_name,
+            fi_credit_memo_header.division,
             fi_credit_memo_header.memo_no as doc_no,
             fi_credit_memo_header.total_amount,
             fi_credit_memo_header.approval_status,
-            user_cost_centre_mapping.{$mappingField} as recipient_id,
+            TIMESTAMPDIFF(SECOND, fi_credit_memo_header.created_at, NOW()) as pending_seconds,
+            recipient_info.UI_ID as recipient_id,
             recipient_info.MAIL_ID as recipient_mail,
             recipient_info.FIRST_NAME as recipient_name
         ");
         $builder->join('fi_credit_memo_line_items', 'fi_credit_memo_line_items.credit_memo_id = fi_credit_memo_header.credit_memo_id', 'inner');
         $builder->join('user_cost_centre_mapping', 'user_cost_centre_mapping.id = fi_credit_memo_line_items.cost_center_desc', 'inner');
-        $builder->join('user_info as recipient_info', "recipient_info.UI_ID = user_cost_centre_mapping.{$mappingField}", 'left');
+        // {$mappingField} can now name several people (comma-separated) —
+        // FIND_IN_SET joins one row per person still named in that list,
+        // instead of an exact match assuming a single id.
+        $builder->join('user_info as recipient_info', "FIND_IN_SET(recipient_info.UI_ID, user_cost_centre_mapping.{$mappingField})", 'left');
         $builder->where('user_cost_centre_mapping.RecStatus', 1);
         $builder->where('user_cost_centre_mapping.deleted_at', null);
         if ($excludeStatuses) {
@@ -380,7 +465,10 @@ class CreditMemoModel extends Model
         } else {
             $builder->whereIn('fi_credit_memo_header.approval_status', $statuses);
         }
-        $builder->groupBy("fi_credit_memo_header.credit_memo_id, user_cost_centre_mapping.{$mappingField}");
+        // Group by the resolved recipient, not the raw (possibly multi-value)
+        // mapping field — otherwise several distinct recipients sharing the
+        // same mapping row would collapse into one output row.
+        $builder->groupBy("fi_credit_memo_header.credit_memo_id, recipient_info.UI_ID");
 
         return $builder->get()->getResultArray();
     }
@@ -562,6 +650,34 @@ class CreditMemoModel extends Model
         return ['success' => true, 'message' => 'Line items updated.', 'credit_memo_id' => $id];
     }
 
+    // Rolls a GFA-Verified (approval_status = 5) Credit Memo back to Store
+    // Acknowledged (4) when SAP reports its sap_document_no as reversed, and
+    // records SAP's reversal document number (REV_NO) alongside it — Credit
+    // Memo counterpart of FIPaymentModel::RevertReversedDocuments, sharing
+    // the same [DOC_NO => REV_NO] map from
+    // FIPaymentModel::GetReversedDocumentsFromSap (one SAP call covers both
+    // header tables). Only rows still at 5 are touched.
+    public function RevertReversedDocuments(array $reversals)
+    {
+        if (empty($reversals)) {
+            return 0;
+        }
+
+        $affected = 0;
+        foreach ($reversals as $docNo => $revNo) {
+            $this->db->table('fi_credit_memo_header')
+                ->where('sap_document_no', $docNo)
+                ->where('approval_status', 5)
+                ->update([
+                    'approval_status' => 4,
+                    'reversal_doc_no' => $revNo,
+                ]);
+            $affected += $this->db->affectedRows();
+        }
+
+        return $affected;
+    }
+
     // GFA Verification approve step: posts the credit memo to SAP via the
     // documented ZZFI_DEDUCT contract and, only on a successful SAP response,
     // marks the request GFA Verified.
@@ -610,6 +726,7 @@ class CreditMemoModel extends Model
             "BUS_PLACE"    => $header['business_area'],
             "house_bank"   => $header['house_bank_id'],
             "acct_id"      => $header['house_bank_ac_no'],
+            "rev_doc"      => $header['reversal_doc_no'],
             "LINE"         => $sapLines,
         ];
         
@@ -680,7 +797,11 @@ class CreditMemoModel extends Model
             invoice_type_def.definitionsName as invoice_type_name,
             expense_type_def.definitionsName as expense_type_name,
             CONCAT(cost_center_def.cost_centre_code, ' - ', cost_center_def.cost_centre_desc) as cost_center_name,
-            fi_payment_header.total_amount as original_invoice_total_amount
+            fi_payment_header.total_amount as original_invoice_total_amount,
+            mg_approved_by_info.FIRST_NAME as mg_approved_by_name,
+            stores_approved_by_info.FIRST_NAME as stores_approved_by_name,
+            gfa_posted_by_info.FIRST_NAME as gfa_posted_by_name,
+            rejected_by_info.FIRST_NAME as rejected_by_name
         ");
         $builder->where('fi_credit_memo_header.credit_memo_id', $id);
         $builder->join('fi_credit_memo_line_items', 'fi_credit_memo_line_items.credit_memo_id = fi_credit_memo_header.credit_memo_id', 'left');
@@ -689,6 +810,10 @@ class CreditMemoModel extends Model
         $builder->join('definitions_list as expense_type_def', 'expense_type_def.id = fi_credit_memo_line_items.expenses_type', 'left');
         $builder->join('user_cost_centre_mapping as cost_center_def', 'cost_center_def.id = fi_credit_memo_line_items.cost_center_desc', 'left');
         $builder->join('fi_payment_header', 'fi_payment_header.payment_id = fi_credit_memo_header.request_payment_id', 'left');
+        $builder->join('user_info as mg_approved_by_info', 'mg_approved_by_info.UI_ID = fi_credit_memo_header.mg_approved_by', 'left');
+        $builder->join('user_info as stores_approved_by_info', 'stores_approved_by_info.UI_ID = fi_credit_memo_header.stores_approved_by', 'left');
+        $builder->join('user_info as gfa_posted_by_info', 'gfa_posted_by_info.UI_ID = fi_credit_memo_header.gfa_posted_by', 'left');
+        $builder->join('user_info as rejected_by_info', 'rejected_by_info.UI_ID = fi_credit_memo_header.rejected_by', 'left');
 
         $query = $builder->get();
         $result = $query->getResultArray();
@@ -710,10 +835,18 @@ class CreditMemoModel extends Model
         $headerBuilder->select("
             fi_credit_memo_header.*,
             user_info.FIRST_NAME as requested_by,
-            invoice_type_def.definitionsName as invoice_type_name
+            invoice_type_def.definitionsName as invoice_type_name,
+            mg_approved_by_info.FIRST_NAME as mg_approved_by_name,
+            stores_approved_by_info.FIRST_NAME as stores_approved_by_name,
+            gfa_posted_by_info.FIRST_NAME as gfa_posted_by_name,
+            rejected_by_info.FIRST_NAME as rejected_by_name
         ");
         $headerBuilder->join('user_info', 'user_info.UI_ID = fi_credit_memo_header.created_by', 'left');
         $headerBuilder->join('definitions_list as invoice_type_def', 'invoice_type_def.id = fi_credit_memo_header.invoice_type', 'left');
+        $headerBuilder->join('user_info as mg_approved_by_info', 'mg_approved_by_info.UI_ID = fi_credit_memo_header.mg_approved_by', 'left');
+        $headerBuilder->join('user_info as stores_approved_by_info', 'stores_approved_by_info.UI_ID = fi_credit_memo_header.stores_approved_by', 'left');
+        $headerBuilder->join('user_info as gfa_posted_by_info', 'gfa_posted_by_info.UI_ID = fi_credit_memo_header.gfa_posted_by', 'left');
+        $headerBuilder->join('user_info as rejected_by_info', 'rejected_by_info.UI_ID = fi_credit_memo_header.rejected_by', 'left');
         $headerBuilder->where('fi_credit_memo_header.credit_memo_id', $id);
         $headerQuery = $headerBuilder->get();
         $headerData = $headerQuery->getRowArray();
@@ -739,7 +872,7 @@ class CreditMemoModel extends Model
 
         $sapData = [[
             'LIFNR'     => str_pad($header['vendor_code'], 10, '0', STR_PAD_LEFT),
-            'BELNR'     => $header['sap_document_no'],
+            'BELNR'     => $header['payment_voucher_no'] ?? $header['sap_document_no'],
             'POST_DATE' => $header['sap_posting_date'],
         ]];
 

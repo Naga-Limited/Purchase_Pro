@@ -631,7 +631,7 @@ class Weighment extends BaseApiController
         return  $this->respond(["success" => $dataStatus, "message" => $message, "results" => $documentDetailsData]);
     }
 
-    public function getShipmentNo($vehicleNo, $shipmentNo, $gateInOutInfoId, $userInfoId,$sap) {
+    public function getShipmentNo($vehicleNo, $shipmentNo, $gateInOutInfoId, $userInfoId,$sap,$firstWt = null,$secondWt = null, $netWt = null) {
         $Landing_Data = new LandingDataModel();
         $Url = "zgatepro/zfg_shipment/zsap_gp_shipment_md?sap-client=900&Shipment_no=$shipmentNo&Truck=$vehicleNo";
         
@@ -728,9 +728,9 @@ class Weighment extends BaseApiController
                 "ZZREASON" => $getData[0]['rejectReason'],
                 "ZZREMARKS" => $getData[0]['remarks'],
                 "ZZTRIPSHEET_NO" => $getData[0]['tripSheetNumber'] ?? 'No Tripsheet',
-                "ZZFirstWeight" => $getData[0]['firstWeight'],
-                "ZZSecondWeight" => $getData[0]['secondWeight'],
-                "ZZNetweight" => $getData[0]['netWeight'],
+                "ZZFirstWeight" => $getData[0]['firstWeight'] ?? $firstWt,
+                "ZZSecondWeight" => $getData[0]['secondWeight'] ?? $secondWt,
+                "ZZNetweight" => $getData[0]['netWeight'] ?? $netWt,
                 "ZZSHIPMENT_NO" => $result[0]->SAP_DOCUMENT,
                 "ZZGATEIN_TIME" => $getData[0]['gateInDateStamp'],
                 "ZZPO_NO" => "",
@@ -739,7 +739,7 @@ class Weighment extends BaseApiController
                 "ZZREC_PLANT" => "",
                 "ZZREC_STORAGE_LOC" => "",
                  // ✅ Correct fallback logic
-                "NETWEIGHT"  => $getData[0]['netWeight'],
+                "NETWEIGHT"  => $getData[0]['netWeight'] ?? $netWt,
                 "DIFFWEIGHT" => 0,
                 "veh_type" => $getData[0]['vehicleType'],
                 "METHOD" => 'POST',
@@ -753,9 +753,16 @@ class Weighment extends BaseApiController
             // If SAP validation is required
             if ($res[0]->STATUS > 0) {
                  $data = ['shipmentOrderNo' => $result[0]->SAP_DOCUMENT,
-                 'overAllDeliveryQuantity' => $result[0]->OVERALL_DELIVERY_WT,
+                 'overAllDeliveryQuantity' => trim($result[0]->OVERALL_DELIVERY_WT),
+                 'outsidefirstWt' => $getData[0]['firstWeight'] ?? $firstWt,
+                 'outsidesecondWt' => $getData[0]['secondWeight'] ?? $secondWt,
+                 'outsidenetWt' => $getData[0]['netWeight'] ?? $netWt,
                 ];
+                // print_r($gateInOutInfoId);exit;
                  $Landing_Data->Gate_info_Status_Change($gateInOutInfoId, $data);
+                //  print_r($Landing_Data);exit;
+                
+                // print_r($Landing_Data);exit;
                 return $this->respond([
                     "success" => true,
                     "message" => "Data found",

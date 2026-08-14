@@ -504,19 +504,39 @@ const FGSAPDocument = () => {
     }
 
     const [shipmentValue, setShipmentValue] = useState('')
+    const [firstWtValue, setFirstWtValue] = useState('')
+    const [secondWtValue, setSecondWtValue] = useState('')
+    const [firstWt, setFirstWt] = useState('')
+    const [secondWt, setSecondWt] = useState('')
     const [isDisabled1, setIsDisabled1] = useState(false)
 
     const selectShipmentNo = (e) => {
         setShipmentValue(e.target.value)
-      }
+    }
+    const selectFirstWt = (e) => {
+        setFirstWtValue(e.target.value)
+    }
+    const selectSecondWt = (e) => {
+        setSecondWtValue(e.target.value)
+    }
       const getShipmentNo = () => {
+        let netWeight = (Number(secondWtValue) - Number(firstWtValue)).toFixed(0)
         if(!shipmentValue){
           errorToast('Please Enter Shipment No')
+          return
+        }else if(!firstWtValue){
+          errorToast('Please Enter First Weight')
+          return
+        }else if(!secondWtValue){
+          errorToast('Please Enter Second Weight')
+          return
+        }else if(netWeight <= 0){
+          errorToast('Net Weight should be positive')
           return
         }
         showLoader();
         console.log(apiBaseUrl + `GatePro/Weighment/getShipmentNo/${data?.vehicleNo}/${shipmentValue}/${gateInOutInfoId}/${UserDetails.USERID}`);
-        apiPostMethod(apiBaseUrl + `GatePro/Weighment/getShipmentNo/${data?.vehicleNo}/${shipmentValue}/${gateInOutInfoId}/${UserDetails.USERID}/0`)
+        apiPostMethod(apiBaseUrl + `GatePro/Weighment/getShipmentNo/${data?.vehicleNo}/${shipmentValue}/${gateInOutInfoId}/${UserDetails.USERID}/0/${firstWtValue}/${secondWtValue}/${netWeight}`)
           .then((response) => {
             const { data } = response;
             if (data.success == true) {
@@ -688,7 +708,19 @@ const FGSAPDocument = () => {
                     </Row>
                     {data?.moduleTypeId == 43 && data?.OwnWB == 0 && !data.shipmentOrderNo ?
                     <Row>
-                    <Col md="4" sm="4">
+                    <Col md="3" sm="3">
+                     <Label>First Weight</Label>
+                      <Input type="text" id="FirstWt" placeholder="First Weight" onChange={selectFirstWt} value={firstWtValue} disabled={isDisabled1} />
+                    </Col>
+                    <Col md="3" sm="3">
+                     <Label>Second Weight</Label>
+                      <Input type="text" id="SecondWt" placeholder="Second Weight" onChange={selectSecondWt} value={secondWtValue} disabled={isDisabled1} />
+                    </Col>
+                    <Col md="3" sm="3">
+                     <Label>Net Weight</Label>
+                      <Input type="text" id="netWt" placeholder="Net Weight" value={(secondWtValue - firstWtValue).toFixed(0)} disabled={isDisabled1} />
+                    </Col>
+                    <Col md="3" sm="3">
                         <FormGroup>
                         <Label>Shipment No</Label>
                         <InputGroup>

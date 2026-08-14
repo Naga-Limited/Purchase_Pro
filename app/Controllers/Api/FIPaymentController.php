@@ -351,7 +351,7 @@ class FIPaymentController extends BaseApiController
         // print_r($postData);exit;
         $master = new FIPaymentModel();
         $res = $master->SaveCostCentreMapping($postData);
-        return $this->sendSuccessResult($res);
+        return $this->response->setJSON($res);
     }
 
     public function GetCostCentreMappingList()

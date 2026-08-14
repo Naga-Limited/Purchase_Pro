@@ -17,9 +17,18 @@ const statusLabelByApprovalStatus = {
 const currency = (n) =>
     `INR ${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const formatDuration = (days) => {
-    const n = Number(days) || 0;
-    return `${n} Day${n === 1 ? '' : 's'}`;
+// "Duration" = time in the current stage (since the row was last updated);
+// "Overall Duration" = total elapsed time since submission. Falls back to
+// created_at when updated_at is still null (never touched since creation).
+const formatDurationSince = (dateStr) => {
+    if (!dateStr) return '-';
+    const then = new Date(dateStr.replace(' ', 'T'));
+    if (Number.isNaN(then.getTime())) return '-';
+    let totalMinutes = Math.max(0, Math.floor((Date.now() - then.getTime()) / 60000));
+    const days = Math.floor(totalMinutes / 1440); totalMinutes %= 1440;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${days}d ${hours}h ${minutes}m`;
 };
 
 const statusStyles = {
@@ -65,7 +74,8 @@ function InvoiceReceiptlist() {
                     const results = (data.results || []).map((r) => ({
                         ...r,
                         status_label: statusLabelByApprovalStatus[r.approval_status] || 'PENDING',
-                        duration_label: formatDuration(r.duration_days),
+                        duration_label: formatDurationSince(r.updated_at || r.created_at),
+                        overall_duration_label: formatDurationSince(r.created_at),
                     }));
                     setInvoiceList(results);
                 }
@@ -95,12 +105,13 @@ function InvoiceReceiptlist() {
             name: 'Invoice Date', selector: (row) => row.invoice_date, sortable: true, minWidth: '120px',
         },
         { name: 'Division', selector: (row) => row.division, sortable: true, minWidth: '120px' },
+        { name: 'Cost Centre', selector: (row) => row.cost_center, sortable: true, minWidth: '140px' },
         {
             name: 'Waiting At', selector: (row) => row.status_label, sortable: true, minWidth: '180px',
             cell: (row) => <StatusBadge status={row.status_label} />,
         },
-        { name: 'Duration', selector: (row) => row.duration_label, minWidth: '100px' },
-        { name: 'Overall Duration', selector: (row) => row.duration_label, minWidth: '150px' },
+        { name: 'Duration', selector: (row) => row.duration_label, minWidth: '130px' },
+        { name: 'Overall Duration', selector: (row) => row.overall_duration_label, minWidth: '150px' },
         {
             name: 'Action',
             minWidth: '110px',

@@ -52,6 +52,7 @@ const transformCreditMemoRows = (rows) => {
         house_bank_ac_no: first.house_bank_ac_no,
         account_no: first.account_no,
         business_area: first.business_area,
+        cost_center: [...new Set(lineRows.map((r) => r.cost_center).filter(Boolean))].join(', '),
 
         invoice_copy_url: first.invoice_copy,
         back_paper_url: first.back_paper,
@@ -331,6 +332,9 @@ function CreditMemoMGApproval({ data: dataProp, requestId }) {
                                 <Col md="4" sm="6"><Field label="FI Doc Date" value={d.fi_doc_date} /></Col>
                             </Row>
                         )}
+                        <Row>
+                            <Col md="4" sm="6"><Field label="Cost Centre" value={d.cost_center} /></Col>
+                        </Row>
                     </Col>
 
                     <Col md="6" sm="12">
@@ -368,7 +372,7 @@ function CreditMemoMGApproval({ data: dataProp, requestId }) {
                         <thead>
                             <tr style={{ background: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
                                 {['Expense Type', 'GL Code', 'GL Description', 'Budget (Auto)',
-                                  'Cost Center Desc (Auto)', 'Cost Center (Auto)', 'Tax Type (Auto)',
+                                  'Cost Center (Auto)', 'Tax Type (Auto)',
                                   'Tax Code (Auto)', 'Tax Code Desc (Auto)',
                                   ...(hasTaxSplit ? ['Base Amt', 'CGST', 'SGST', 'IGST'] : []),
                                   'Text', 'Profit Center (Auto)', 'Profit Center Desc (Auto)', 'Amount',
@@ -392,7 +396,6 @@ function CreditMemoMGApproval({ data: dataProp, requestId }) {
                                     <td style={{ padding: '10px 8px' }}>{item.gl_code}</td>
                                     <td style={{ padding: '10px 8px' }}>{item.gl_description}</td>
                                     <td style={{ padding: '10px 8px' }}>{item.budget != null ? currency(item.budget) : '-'}</td>
-                                    <td style={{ padding: '10px 8px' }}>{item.cost_center_desc}</td>
                                     <td style={{ padding: '10px 8px' }}>{item.cost_center}</td>
                                     <td style={{ padding: '10px 8px' }}>{item.tax_type}</td>
                                     <td style={{ padding: '10px 8px' }}>{item.tax_code}</td>
@@ -421,7 +424,7 @@ function CreditMemoMGApproval({ data: dataProp, requestId }) {
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td colSpan={(isRelatedToFI ? 13 : 12) + (hasTaxSplit ? 4 : 0)} style={{
+                                <td colSpan={(isRelatedToFI ? 12 : 11) + (hasTaxSplit ? 4 : 0)} style={{
                                     padding: '12px 8px', textAlign: 'right', fontWeight: 700, color: '#343a40',
                                 }}>
                                     Total Deduction Amount

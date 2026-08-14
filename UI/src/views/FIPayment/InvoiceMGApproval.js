@@ -56,6 +56,7 @@ const transformPaymentRows = (rows) => {
         house_bank_ac_no: first.house_bank_ac_no,
         business_area: first.business_area,
         nature_of_expenses: first.nature_of_expenses,
+        cost_center: [...new Set(rows.map((r) => r.cost_center).filter(Boolean))].join(', '),
 
         invoice_copy_url: first.invoice_copy,
         back_paper_url: first.back_paper,
@@ -347,6 +348,7 @@ function FIPaymentAuditView({ data: dataProp, requestId }) {
                         )}
                         <Row>
                             <Col md="4" sm="6"><Field label="Service Category" value={d.service_category} /></Col>
+                            <Col md="4" sm="6"><Field label="Cost Centre" value={d.cost_center} /></Col>
                         </Row>
                     </Col>
 
@@ -387,7 +389,7 @@ function FIPaymentAuditView({ data: dataProp, requestId }) {
                         <thead>
                             <tr style={{ background: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
                                 {['Expenses Type', 'GL Code', 'GL Description', 'Budget (Auto)',
-                                  'Cost Center Desc (Auto)', 'Cost Center (Auto)', 'Tax Type (Auto)',
+                                  'Cost Center (Auto)', 'Tax Type (Auto)',
                                   'Tax Code (Auto)', 'Tax Code Desc (Auto)',
                                   ...(hasTaxSplit ? ['Base Amt', 'CGST', 'SGST', 'IGST'] : []),
                                   'Text', 'Profit Center (Auto)', 'Profit Center Desc (Auto)', 'Amount'].map((col) => (
@@ -409,7 +411,6 @@ function FIPaymentAuditView({ data: dataProp, requestId }) {
                                     <td style={{ padding: '10px 8px' }}>{item.gl_code}</td>
                                     <td style={{ padding: '10px 8px' }}>{item.gl_description}</td>
                                     <td style={{ padding: '10px 8px' }}>{item.budget != null ? currency(item.budget) : '-'}</td>
-                                    <td style={{ padding: '10px 8px' }}>{item.cost_center_desc}</td>
                                     <td style={{ padding: '10px 8px' }}>{item.cost_center}</td>
                                     <td style={{ padding: '10px 8px' }}>{item.tax_type}</td>
                                     <td style={{ padding: '10px 8px' }}>{item.tax_code}</td>
@@ -433,7 +434,7 @@ function FIPaymentAuditView({ data: dataProp, requestId }) {
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td colSpan={12 + (hasTaxSplit ? 4 : 0)} style={{
+                                <td colSpan={11 + (hasTaxSplit ? 4 : 0)} style={{
                                     padding: '12px 8px', textAlign: 'right', fontWeight: 700, color: '#343a40',
                                 }}>
                                     Total Reconciled Amount

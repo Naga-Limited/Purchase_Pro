@@ -1676,14 +1676,17 @@ class CustomMillingMasterModel extends Model
     {
         $builder = db_connect()->table('purchase_info');
 
-        $builder->select('purchase_info.ZPO_NUMBER AS PO_NUMBER,purchase_info.TRUCK_NO AS TRUCK_NUMBER,purchase_info.WERKS AS PLANT,purchase_info.VEHICLE_TYPE AS VEHICLE_TYPE,purchase_info.ZQTY AS QTY,rake_loading.tripsheet_no AS TRIPSHEET_NO,purchase_info.MIGO_NUM AS MIGO_NUMBER,sap_to_pp.Freight_cost AS FREIGHT_COST')
+         $builder->select('purchase_info.ZPO_NUMBER AS PO_NUMBER,purchase_info.TRUCK_NO AS TRUCK_NUMBER,purchase_info.WERKS AS PLANT,purchase_info.VEHICLE_TYPE AS VEHICLE_TYPE,gateout_info.wb_net_wt AS QTY,rake_loading.tripsheet_no AS TRIPSHEET_NO,purchase_info.MIGO_NUM AS MIGO_NUMBER,sap_to_pp.Freight_cost AS FREIGHT_COST,purchase_info.ZVA_NUMBER, SUM(sap_to_pp.Freight_cost * gateout_info.wb_net_wt) AS TOTAL_FREIGHT_COST,
+    DATE_FORMAT(purchase_info.MIGOApprovalDt, "%Y-%m-%d") AS MIGO_APPROVAL_DATE')
                 // ->where('MIGOApprovalDt >=', date('Y-m-d') . ' 00:00:00')
                 // ->where('MIGOApprovalDt <', date('Y-m-d', strtotime('+1 day')) . ' 00:00:00')
                 ->join('rake_loading', 'rake_loading.purchase_info_id = purchase_info.PI_REFID', 'inner')
                 ->join('sap_to_pp', 'sap_to_pp.EBELN = purchase_info.ZPO_NUMBER AND sap_to_pp.EBELP = purchase_info.PO_LINE_ITEM AND sap_to_pp.BROCKER_CODE = purchase_info.ZVENDOR_CODE AND sap_to_pp.SUPPLIER_CODE = purchase_info.ZSUPPLIER_CODE', 'inner')
-                ->whereIn('purchase_info.VECHICAL_STATUS', [6,7])
+                ->join('gateout_info', 'gateout_info.purchase_info_id = purchase_info.PI_REFID', 'inner')
+                ->whereIn('purchase_info.VECHICAL_STATUS', [7])
                 ->whereIn('purchase_info.VEHICLE_TYPE', ['Cm Rake'])
-                ->where('rake_loading.tripsheet_no', $tripsheetNo);
+                ->where('rake_loading.tripsheet_no', $tripsheetNo)
+                ->groupBy('purchase_info.PI_REFID');
         return $builder->get()->getResultArray();
     }
 }
