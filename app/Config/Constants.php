@@ -80,8 +80,11 @@ defined('EXIT__AUTO_MAX')      || define('EXIT__AUTO_MAX', 125); // highest auto
 
 define('CCTV_IMG_SRG_PATH', '/var/www/testpurchasepro/sapfileshare');
 define('SAP_FILE_PATH', '/var/www/testpurchasepro/sapfileshare');
+// define('SAP_FILE_PATH', '../api/upload');
+// define('PDF_STORAGE_PATH', SAP_FILE_PATH);
 
 //SAP API Details
+define('IP_ADDRESS', 'http://10.10.63.139:50000/'); // QA
 // define('IP_ADDRESS', 'http://103.249.96.242:50000/');
 #define('IP_ADDRESS', 'http://172.16.63.4:50000/'); // DR IP
 // define('USER_NAME', 'srdgitm1');
