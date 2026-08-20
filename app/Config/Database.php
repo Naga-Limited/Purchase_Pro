@@ -37,14 +37,14 @@ class Database extends Config
 
 	public $default = [
 		'DSN'      => '',
-		// 'hostname' => 'naga-prod-digiapp-db.cv442wakabfe.ap-south-1.rds.amazonaws.com', //Prod
-		'hostname' => 'localhost',
-		'username' => 'root',
-		'password' => 'welcome',
-		// 'username' => 'admin', //Prod
-		// 'password' => 'knH5tXNAXNBEsff4', //Prod
-		'database' => 'purchase_pro_live',
-		// 'database' => 'purchase_pro_nlfd',
+		'hostname' => 'naga-prod-digiapp-db.cv442wakabfe.ap-south-1.rds.amazonaws.com', //Prod
+		// 'hostname' => 'localhost',
+		// 'username' => 'root',
+		// 'password' => 'welcome',
+		'username' => 'admin', //Prod
+		'password' => 'knH5tXNAXNBEsff4', //Prod
+		// 'database' => 'purchase_pro_live',
+		'database' => 'purchase_pro_nlfd',//Prod
 		'DBDriver' => 'MySQLi',
 		'DBPrefix' => '',
 		'pConnect' => false,
