@@ -445,7 +445,7 @@ class MasterModel extends Model
       ];
     }
 
-    $urlPath = '/zzgp_api/wh_qc?sap-client=900';
+    $urlPath = '/zzgp_api/zzwh_ss/wh_qc?sap-client=900';
     $body = json_encode([$payloadRow], JSON_UNESCAPED_UNICODE);
     $payloadJson = $body === false ? '[]' : $body;
    
