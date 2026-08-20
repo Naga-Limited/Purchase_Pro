@@ -78,9 +78,9 @@ defined('EXIT_DATABASE')       || define('EXIT_DATABASE', 8); // database error
 defined('EXIT__AUTO_MIN')      || define('EXIT__AUTO_MIN', 9); // lowest automatically-assigned error code
 defined('EXIT__AUTO_MAX')      || define('EXIT__AUTO_MAX', 125); // highest automatically-assigned error code
 
-// define('CCTV_IMG_SRG_PATH', '/var/www/testpurchasepro/sapfileshare');
-// define('SAP_FILE_PATH', '/var/www/testpurchasepro/sapfileshare');
-define('SAP_FILE_PATH', '../api/upload');
+define('CCTV_IMG_SRG_PATH', '/var/www/testpurchasepro/sapfileshare');
+define('SAP_FILE_PATH', '/var/www/testpurchasepro/sapfileshare');
+// define('SAP_FILE_PATH', '../api/upload');
 define('PDF_STORAGE_PATH', SAP_FILE_PATH);
 //SAP API Details
 define('IP_ADDRESS', 'http://10.10.63.139:50000/'); // QA
