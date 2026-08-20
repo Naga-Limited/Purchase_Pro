@@ -52,3 +52,8 @@ docs/
 docker-compose.yml
 Dockerfile
 .dockerignore
+
+public/
+app/Config/Database.php
+app/Config/Constant.php
+.htaccess
