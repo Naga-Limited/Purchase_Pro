@@ -359,15 +359,22 @@ function VendorInvoiceEdit() {
 
     const [houseBankLocked, setHouseBankLocked] = useState(false);
 
-    const handleCostCentreChange = (id, mappingId) => {
-        const selected = costCentreOptions.find(opt => String(opt.value) === String(mappingId));
+    // A single mapping row can carry several comma-separated Cost Centre
+    // codes (GetCostCentresByUser explodes each into its own option), so
+    // multiple options can share the same mapping id — matching on id alone
+    // would always resolve to whichever code was exploded first, not
+    // whichever option the user actually picked. The option's array index is
+    // the only thing guaranteed unique per <option>, so the select is keyed
+    // on that; cost_center_desc still stores the option's real mapping id.
+    const handleCostCentreChange = (id, optionIdx) => {
+        const selected = costCentreOptions[Number(optionIdx)];
         const costCenterCode = selected ? selected.cost_centre_code : '';
         let nextItem = null;
         setLineItems(p => p.map(i => {
             if (i.id !== id) return i;
             nextItem = {
                 ...i,
-                cost_center_desc: mappingId,
+                cost_center_desc: selected ? selected.value : '',
                 cost_center: costCenterCode,
                 profit_center: selected ? selected.profit_centre : '',
                 profit_center_desc: selected ? selected.profit_centre_desc : '',
@@ -1534,12 +1541,12 @@ function VendorInvoiceEdit() {
                                                 <td style={{ padding: '4px', minWidth: 170 }}>
                                                     <Input
                                                         type="select" bsSize="sm"
-                                                        value={item.cost_center_desc}
+                                                        value={costCentreOptions.findIndex(opt => String(opt.value) === String(item.cost_center_desc) && opt.cost_centre_code === item.cost_center)}
                                                         onChange={e => handleCostCentreChange(item.id, e.target.value)}
                                                     >
-                                                        <option value="">Select...</option>
-                                                        {costCentreOptions.map(opt => (
-                                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                        <option value="-1">Select...</option>
+                                                        {costCentreOptions.map((opt, idx) => (
+                                                            <option key={idx} value={idx}>{opt.label}</option>
                                                         ))}
                                                     </Input>
                                                 </td>

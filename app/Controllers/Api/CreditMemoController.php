@@ -64,7 +64,10 @@ class CreditMemoController extends BaseApiController
             return $this->response->setJSON(['success' => false, 'message' => 'credit_memo_id is required']);
         }
 
-        $res = $master->UpdateGFADetails($id, $postData);
+        // Accounts Verification reuses this same save-line-items endpoint but
+        // tags the audit log with its own action name instead of 'gfa_update'.
+        $actionLabel = (is_object($postData) ? ($postData->action ?? null) : ($postData['action'] ?? null)) ?: 'gfa_update';
+        $res = $master->UpdateGFADetails($id, $postData, $actionLabel);
 
         return $this->response->setJSON($res);
     }
@@ -80,6 +83,7 @@ class CreditMemoController extends BaseApiController
         $userId = null;
         $reportingManagerId = null;
         $storeReportingId = null;
+        $reportingAccountsId = null;
         if (is_object($postData)) {
             $start = $postData->startCount ?? 0;
             $pageSize = $postData->pageSize ?? 25;
@@ -88,6 +92,7 @@ class CreditMemoController extends BaseApiController
             $userId = $postData->userid ?? null;
             $reportingManagerId = $postData->reporting_manager_id ?? null;
             $storeReportingId = $postData->store_reporting_id ?? null;
+            $reportingAccountsId = $postData->reporting_accounts_id ?? null;
         } elseif (is_array($postData)) {
             $start = $postData['startCount'] ?? 0;
             $pageSize = $postData['pageSize'] ?? 25;
@@ -96,10 +101,11 @@ class CreditMemoController extends BaseApiController
             $userId = $postData['userid'] ?? null;
             $reportingManagerId = $postData['reporting_manager_id'] ?? null;
             $storeReportingId = $postData['store_reporting_id'] ?? null;
+            $reportingAccountsId = $postData['reporting_accounts_id'] ?? null;
         }
 
         $master = new CreditMemoModel();
-        $data = $master->GetCreditMemoList($start, $pageSize, $search, $approvalStatus, $userId, $reportingManagerId, $storeReportingId);
+        $data = $master->GetCreditMemoList($start, $pageSize, $search, $approvalStatus, $userId, $reportingManagerId, $storeReportingId, $reportingAccountsId);
 
         return $this->response->setJSON([
             'success' => true,
@@ -181,6 +187,36 @@ class CreditMemoController extends BaseApiController
         return $this->response->setJSON($res);
     }
 
+    public function SimulatePosting()
+    {
+        $postData = $this->request->getJSON();
+
+        $id = null;
+        $tdsCode = null;
+        $tdsDescription = null;
+        $postingDate = null;
+        if (is_object($postData)) {
+            $id = $postData->id ?? null;
+            $tdsCode = $postData->tds_code ?? null;
+            $tdsDescription = $postData->tds_description ?? null;
+            $postingDate = $postData->posting_date ?? null;
+        } elseif (is_array($postData)) {
+            $id = $postData['id'] ?? null;
+            $tdsCode = $postData['tds_code'] ?? null;
+            $tdsDescription = $postData['tds_description'] ?? null;
+            $postingDate = $postData['posting_date'] ?? null;
+        }
+
+        if (!$id || !$postingDate) {
+            return $this->response->setJSON(['success' => false, 'message' => 'id and posting_date are required']);
+        }
+
+        $master = new CreditMemoModel();
+        $res = $master->SimulatePosting($id, $tdsCode, $tdsDescription, $postingDate);
+
+        return $this->response->setJSON($res);
+    }
+
     public function GetCreditMemoById()
     {
         $postData = $this->request->getJSON();
@@ -220,14 +256,17 @@ class CreditMemoController extends BaseApiController
         $fromDate = null;
         $toDate = null;
         $search = '';
+        $userId = null;
         if (is_object($postData)) {
             $fromDate = $postData->fromDate ?? null;
             $toDate = $postData->toDate ?? null;
             $search = $postData->searchTxt ?? '';
+            $userId = $postData->userid ?? null;
         } elseif (is_array($postData)) {
             $fromDate = $postData['fromDate'] ?? null;
             $toDate = $postData['toDate'] ?? null;
             $search = $postData['searchTxt'] ?? '';
+            $userId = $postData['userid'] ?? null;
         }
 
         if (!$fromDate || !$toDate) {
@@ -235,7 +274,7 @@ class CreditMemoController extends BaseApiController
         }
 
         $master = new CreditMemoModel();
-        $results = $master->GetCreditMemoReport($fromDate, $toDate, $search);
+        $results = $master->GetCreditMemoReport($fromDate, $toDate, $search, $userId);
 
         return $this->response->setJSON([
             'success' => true,

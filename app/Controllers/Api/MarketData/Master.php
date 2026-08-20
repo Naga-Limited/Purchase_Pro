@@ -216,6 +216,41 @@ class Master extends BaseApiController
   }
 
   /**
+   * Submit one S&S Relot (bin/lot move) row to SAP wh_qc API.
+   * POST body: row (object) or direct row fields.
+   */
+  public function submitRelot()
+  {
+    $postData = $this->request->getJSON(true);
+    if (!is_array($postData)) {
+      $postData = [];
+    }
+    $row = (isset($postData['row']) && is_array($postData['row'])) ? $postData['row'] : $postData;
+
+    $userId = (int) (session()->get('USERID') ?? 0);
+    $master = new MasterModel();
+    $result = $master->submitRelotToSap($row, $userId > 0 ? $userId : null);
+    return $this->response->setJSON($result);
+  }
+
+  /**
+   * Delete one ss_relot_history record.
+   * POST body: { id }
+   */
+  public function deleteRelot()
+  {
+    $postData = $this->request->getJSON(true);
+    if (!is_array($postData)) {
+      $postData = [];
+    }
+    $id = (int) ($postData['id'] ?? 0);
+
+    $master = new MasterModel();
+    $result = $master->deleteRelotHistory($id);
+    return $this->response->setJSON($result);
+  }
+
+  /**
    * Get scalar value from POST field (object with value/label or scalar).
    */
   private function scalarFromPost($v)

@@ -29,6 +29,20 @@ const CostCentreMappingForm = ({ form, onSubmit, plantIds, isEditing, onCancelEd
         <Col md="3" sm="12">
           <CustomDropdownInput url={`${apiBaseUrl}marketdata/master/getuserinfo`} label="Reporting GFA" form={form} id="REPORTING_GFA" isMulti />
         </Col>
+        <Col md="3" sm="12">
+          <CustomDropdownInput
+            options={[{ value: "Yes", label: "Yes" }, { value: "No", label: "No" }]}
+            label="Accounts Verification"
+            form={form}
+            id="ACCOUNTS_VERIFICATION"
+            placeholder="Select..."
+          />
+        </Col>
+        {form.values.ACCOUNTS_VERIFICATION?.value === "Yes" && (
+          <Col md="3" sm="12">
+            <CustomDropdownInput url={`${apiBaseUrl}marketdata/master/getuserinfo`} label="Accounts Verifier" form={form} id="ACCOUNTS_VERIFIER" />
+          </Col>
+        )}
       </Row>
       <Row>
         <Col md="6" sm="12">
@@ -129,6 +143,10 @@ const CostCentremapping = () => {
     validationSchema: Yup.object().shape({
       USER_ID: validation.required({ message: "User should not be empty", isObject: true }),
       COST_CENTRE: Yup.array().min(1, "Cost Centre should not be empty"),
+      ACCOUNTS_VERIFIER: Yup.mixed().when("ACCOUNTS_VERIFICATION", {
+        is: (v) => v?.value === "Yes",
+        then: () => Yup.mixed().required("Accounts Verifier should not be empty"),
+      }),
     }),
     onSubmit() {},
   });
@@ -151,6 +169,8 @@ const CostCentremapping = () => {
       reporting_manager_id: values.REPORTING_MANAGER ? values.REPORTING_MANAGER.value : null,
       store_reporting_id: joinMulti(values.STORE_REPORTING),
       reporting_gfa_id: joinMulti(values.REPORTING_GFA),
+      accounts_verification: values.ACCOUNTS_VERIFICATION?.value || "No",
+      reporting_accounts_id: values.ACCOUNTS_VERIFICATION?.value === "Yes" ? (values.ACCOUNTS_VERIFIER?.value || null) : null,
       // One User + one set of Reporting Manager/Store Reporting/Reporting GFA
       // can span several Cost Centres — each selected option already carries
       // its own code/desc/profit centre/business area/bank info from SAP.
@@ -237,6 +257,8 @@ const CostCentremapping = () => {
       REPORTING_MANAGER: reportingManagerOptions[0] || null,
       STORE_REPORTING: splitMulti(row.store_reporting_id, row.STORE_REPORTING_NAME),
       REPORTING_GFA: splitMulti(row.reporting_gfa_id, row.REPORTING_GFA_NAME),
+      ACCOUNTS_VERIFICATION: row.accounts_verification ? { value: row.accounts_verification, label: row.accounts_verification } : { value: "No", label: "No" },
+      ACCOUNTS_VERIFIER: row.reporting_accounts_id ? { value: row.reporting_accounts_id, label: row.ACCOUNTS_VERIFIER_NAME } : null,
       COST_CENTRE: siblings.flatMap(expandRow),
     });
     setEditingId(row.id);
@@ -289,6 +311,8 @@ const CostCentremapping = () => {
     { name: "Reporting Manager", selector: (row) => row.REPORTING_MANAGER_NAME, sortable: true },
     { name: "Store Reporting", selector: (row) => row.STORE_REPORTING_NAME, sortable: true },
     { name: "Reporting GFA", selector: (row) => row.REPORTING_GFA_NAME, sortable: true },
+    { name: "Accounts Verification", selector: (row) => row.accounts_verification, sortable: true },
+    { name: "Accounts Verifier", selector: (row) => row.ACCOUNTS_VERIFIER_NAME, sortable: true },
     { name: "Cost Centre", selector: (row) => row.cost_centre_code, sortable: true },
     { name: "Cost Center Desc", selector: (row) => row.cost_centre_desc, sortable: true },
     { name: "Profit Centre", selector: (row) => row.profit_centre, sortable: true },

@@ -2903,6 +2903,22 @@ const Routes = [
     path: "/BULKERCOUSTOMERWEIGHTAPPROVAL",
     component: lazy(() => import("../../views/FG/BulkerCustomerWeighmentApproval")),
   },
+  {
+    path: "/CREDITMEMORECEIPTACCOUNTSVERIFICATIONLIST",
+    component: lazy(() => import("../../views/FIPayment/CreditMemoReceiptAccountsVerificationlist")),
+  },
+  {
+    path: "/CREDITMEMOACCOUNTSVERIFICATION:Id",
+    component: lazy(() => import("../../views/FIPayment/CreditMemoAccountsVerification")),
+  },
+  {
+    path: "/INVOICERECEIPTACCOUNTSVERIFICATIONLIST",
+    component: lazy(() => import("../../views/FIPayment/InvoiceReceiptAccountsVerificationlist")),
+  },
+  {
+    path: "/ACCOUNTSVERIFICATION:Id",
+    component: lazy(() => import("../../views/FIPayment/AccountsVerification")),
+  },
 ];
 
 export { DefaultRoute, TemplateTitle, Routes };

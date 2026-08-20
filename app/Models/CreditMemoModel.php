@@ -148,6 +148,8 @@ class CreditMemoModel extends Model
             ]);
         }
 
+        (new AuditLogModel())->Log('credit_memo', $creditMemoId, 'insert', $postData->created_by ?? null, null, 1);
+
         $this->db->transComplete();
 
         if ($this->db->transStatus() === false) {
@@ -166,7 +168,12 @@ class CreditMemoModel extends Model
     // (approval_status back to 1, clearing the prior rejection markers).
     public function UpdateCreditMemo($id, $postData)
     {
+        $userId = $postData->updated_by ?? null;
+        $audit  = new AuditLogModel();
         $this->db->transStart();
+
+        $beforeHeader = $this->db->table('fi_credit_memo_header')->where('credit_memo_id', $id)->get()->getRowArray();
+        $beforeLines  = $this->db->table('fi_credit_memo_line_items')->where('credit_memo_id', $id)->get()->getResultArray();
 
         $headerData = [
             'record_type'           => $postData->record_type ?? 'non_related_fi',
@@ -198,10 +205,12 @@ class CreditMemoModel extends Model
         ];
 
         $this->db->table('fi_credit_memo_header')->where('credit_memo_id', $id)->update($headerData);
+        $headerDiff = $audit->DiffFields($beforeHeader, $headerData, array_keys($headerData));
 
         $this->db->table('fi_credit_memo_line_items')->where('credit_memo_id', $id)->delete();
+        $afterLines = [];
         foreach ($postData->line_items ?? [] as $item) {
-            $this->db->table('fi_credit_memo_line_items')->insert([
+            $row = [
                 'credit_memo_id'            => $id,
                 'expenses_type'             => $item->expenses_type ?? null,
                 'gl_code'                   => $item->gl_code ?? null,
@@ -222,8 +231,14 @@ class CreditMemoModel extends Model
                 'profit_center'             => $item->profit_center ?? null,
                 'profit_center_description' => $item->profit_center_desc ?? null,
                 'hsn_sac'                   => $item->hsn_sac ?? null,
-            ]);
+            ];
+            $this->db->table('fi_credit_memo_line_items')->insert($row);
+            $afterLines[] = $row;
         }
+
+        $audit->Log('credit_memo', $id, 'edit_resubmit', $userId, $beforeHeader['approval_status'] ?? null, 1, $headerDiff ?: null);
+        $audit->Log('credit_memo', $id, 'edit_resubmit', $userId, null, null,
+            ['line_items' => ['old' => $beforeLines, 'new' => $afterLines]], null, null, 'line_item');
 
         $this->db->transComplete();
 
@@ -245,6 +260,29 @@ class CreditMemoModel extends Model
     // request, request-level totals rather than per-line-item granularity.
     public function GetCreditMemoReport($fromDate, $toDate, $search = '', $userId = null)
     {
+        // What role(s) $userId holds against this request's own cost centre
+        // mapping(s) — Requester (user_cost_centre_mapping.user_id) plus
+        // whichever of Manager/Store/Accounts/GFA name them, aggregated
+        // across every line item's mapping since a request can span more
+        // than one cost centre. Same columns GetCreditMemoReport's own
+        // visibility filter below checks, just surfaced instead of only
+        // used to scope rows.
+        $userIdEscaped = !empty($userId) ? $this->db->escape($userId) : null;
+        $userAccessSelect = $userIdEscaped !== null
+            ? "(SELECT TRIM(BOTH ', ' FROM CONCAT_WS(', ',
+                    MAX(CASE WHEN ucm_access.user_id = {$userIdEscaped} THEN 'Requester' END),
+                    MAX(CASE WHEN FIND_IN_SET({$userIdEscaped}, ucm_access.reporting_manager_id) > 0 THEN 'Manager' END),
+                    MAX(CASE WHEN FIND_IN_SET({$userIdEscaped}, ucm_access.store_reporting_id) > 0 THEN 'Store' END),
+                    MAX(CASE WHEN ucm_access.reporting_accounts_id = {$userIdEscaped} THEN 'Accounts' END),
+                    MAX(CASE WHEN FIND_IN_SET({$userIdEscaped}, ucm_access.reporting_gfa_id) > 0 THEN 'GFA' END)
+                ))
+                FROM fi_credit_memo_line_items li_access
+                JOIN user_cost_centre_mapping ucm_access ON ucm_access.id = li_access.cost_center_desc
+                WHERE li_access.credit_memo_id = fi_credit_memo_header.credit_memo_id
+                    AND ucm_access.RecStatus = 1 AND ucm_access.deleted_at IS NULL
+            )"
+            : 'NULL';
+
         $builder = $this->db->table('fi_credit_memo_header');
         $builder->select("
             fi_credit_memo_header.credit_memo_id,
@@ -286,6 +324,7 @@ class CreditMemoModel extends Model
                 WHEN 2 THEN 'Approved by Manager'
                 WHEN 4 THEN 'Store Acknowledged'
                 WHEN 5 THEN 'GFA Verified (Completed)'
+                WHEN 6 THEN 'Pending Accounts Verification'
                 WHEN 10 THEN 'Rejected'
                 ELSE 'Unknown'
             END as approval_status_label,
@@ -293,19 +332,23 @@ class CreditMemoModel extends Model
             mg_approved_by_info.FIRST_NAME as mg_approved_by_name,
             fi_credit_memo_header.stores_approved_at,
             stores_approved_by_info.FIRST_NAME as stores_approved_by_name,
+            fi_credit_memo_header.accounts_verified_at,
+            accounts_verified_by_info.FIRST_NAME as accounts_verified_by_name,
             fi_credit_memo_header.gfa_posted_at,
             gfa_posted_by_info.FIRST_NAME as gfa_posted_by_name,
             fi_credit_memo_header.rejected_at,
             rejected_by_info.FIRST_NAME as rejected_by_name,
             fi_credit_memo_header.rejection_remarks,
             fi_credit_memo_header.invoice_copy,
-            fi_credit_memo_header.back_paper
+            fi_credit_memo_header.back_paper,
+            {$userAccessSelect} as user_access_type
         ");
         $builder->join('user_info', 'user_info.UI_ID = fi_credit_memo_header.created_by', 'left');
         $builder->join('definitions_list as invoice_type_def', 'invoice_type_def.id = fi_credit_memo_header.invoice_type', 'left');
         $builder->join('fi_payment_header', 'fi_payment_header.payment_id = fi_credit_memo_header.request_payment_id', 'left');
         $builder->join('user_info as mg_approved_by_info', 'mg_approved_by_info.UI_ID = fi_credit_memo_header.mg_approved_by', 'left');
         $builder->join('user_info as stores_approved_by_info', 'stores_approved_by_info.UI_ID = fi_credit_memo_header.stores_approved_by', 'left');
+        $builder->join('user_info as accounts_verified_by_info', 'accounts_verified_by_info.UI_ID = fi_credit_memo_header.accounts_verified_by', 'left');
         $builder->join('user_info as gfa_posted_by_info', 'gfa_posted_by_info.UI_ID = fi_credit_memo_header.gfa_posted_by', 'left');
         $builder->join('user_info as rejected_by_info', 'rejected_by_info.UI_ID = fi_credit_memo_header.rejected_by', 'left');
         $builder->where('DATE(fi_credit_memo_header.created_at) >=', $fromDate);
@@ -318,7 +361,6 @@ class CreditMemoModel extends Model
         // name several people, comma-separated — FIND_IN_SET matches any of
         // them). UserID 1 is exempt and always sees every request.
         if (!empty($userId) && (int) $userId !== 1) {
-            $userIdEscaped = $this->db->escape($userId);
             $builder->whereIn('credit_memo_id', function ($sub) use ($userId, $userIdEscaped) {
                 return $sub->select('fi_credit_memo_line_items.credit_memo_id')->from('fi_credit_memo_line_items')
                     ->join('user_cost_centre_mapping', 'user_cost_centre_mapping.id = fi_credit_memo_line_items.cost_center_desc')
@@ -350,7 +392,7 @@ class CreditMemoModel extends Model
     // approval_status: 1 = Pending Manager Approval, 2 = Approved by Manager
     // (waiting on Store Acknowledge), 4 = Store Acknowledged (waiting on GFA
     // Verification), 5 = GFA Verified (Completed), 10 = Rejected
-    public function GetCreditMemoList($start = 0, $pageSize = 25, $search = '', $approvalStatus = 1, $userId = null, $reportingManagerId = null, $storeReportingId = null)
+    public function GetCreditMemoList($start = 0, $pageSize = 25, $search = '', $approvalStatus = 1, $userId = null, $reportingManagerId = null, $storeReportingId = null, $reportingAccountsId = null)
     {
         $builder = $this->db->table('fi_credit_memo_header');
         $builder->where('approval_status', $approvalStatus);
@@ -387,6 +429,19 @@ class CreditMemoModel extends Model
                     ->where("FIND_IN_SET({$storeReportingIdEscaped}, store_reporting_id) >", 0, false)
                     ->where('RecStatus', 1)
                     ->where('deleted_at', null);
+            });
+        }
+        // Same per-line-item Cost Centre routing as Reporting Manager above,
+        // just keyed on reporting_accounts_id (single-select, plain equality —
+        // no FIND_IN_SET needed) so the Accounts Verification list only shows
+        // each verifier their own queue.
+        if (!empty($reportingAccountsId)) {
+            $builder->whereIn('credit_memo_id', function ($sub) use ($reportingAccountsId) {
+                return $sub->select('fi_credit_memo_line_items.credit_memo_id')->from('fi_credit_memo_line_items')
+                    ->join('user_cost_centre_mapping', 'user_cost_centre_mapping.id = fi_credit_memo_line_items.cost_center_desc')
+                    ->where('user_cost_centre_mapping.reporting_accounts_id', $reportingAccountsId)
+                    ->where('user_cost_centre_mapping.RecStatus', 1)
+                    ->where('user_cost_centre_mapping.deleted_at', null);
             });
         }
 
@@ -483,6 +538,11 @@ class CreditMemoModel extends Model
         return $this->GetPendingApprovalsForRole('store_reporting_id', [2]);
     }
 
+    public function GetPendingForReportingAccounts()
+    {
+        return $this->GetPendingApprovalsForRole('reporting_accounts_id', [6]);
+    }
+
     // GFA contact gets notified for anything still in flight (1, 2, 4) —
     // not just the GFA-specific stage (4) — per business rule: everything
     // except Completed (5) and Rejected (10).
@@ -491,16 +551,38 @@ class CreditMemoModel extends Model
         return $this->GetPendingApprovalsForRole('reporting_gfa_id', [5, 10], true);
     }
 
+    // approval_status: 1 = Pending Manager Approval, 2 = Approved by Manager
+    // (waiting on Store Acknowledge), 4 = Store Acknowledged (waiting on GFA
+    // Verification), 5 = GFA Verified (Completed), 6 = Pending Accounts
+    // Verification (waiting on the Cost Centre's assigned Accounts Verifier —
+    // only entered when that mapping flags accounts_verification = 'Yes';
+    // otherwise Store Ack goes straight to 4 same as before), 10 = Rejected
     public function UpdateApprovalStatus($id, $status, $userId, $remarks = null, $tdsCode = null, $tdsDescription = null)
     {
+        $this->db->transStart();
+
+        $before = $this->db->table('fi_credit_memo_header')->select('approval_status')->where('credit_memo_id', $id)->get()->getRowArray();
+
         $data = ['approval_status' => $status];
 
         if ((int) $status === 2) {
             $data['mg_approved_by'] = $userId;
             $data['mg_approved_at'] = date('Y-m-d H:i:s');
         } elseif ((int) $status === 4) {
-            $data['stores_approved_by'] = $userId;
-            $data['stores_approved_at'] = date('Y-m-d H:i:s');
+            if ((int) ($before['approval_status'] ?? 0) === 6) {
+                // Accounts Verifier's approval — advances Pending Accounts
+                // Verification straight into the existing GFA queue.
+                $data['accounts_verified_by'] = $userId;
+                $data['accounts_verified_at'] = date('Y-m-d H:i:s');
+            } else {
+                $data['stores_approved_by'] = $userId;
+                $data['stores_approved_at'] = date('Y-m-d H:i:s');
+                if ($this->RequiresAccountsVerification($id)) {
+                    // Fork: this Cost Centre requires Accounts Verification
+                    // before GFA, so land on 6 instead of 4.
+                    $data['approval_status'] = 6;
+                }
+            }
         } elseif ((int) $status === 5) {
             $data['gfa_posted_by'] = $userId;
             $data['gfa_posted_at'] = date('Y-m-d H:i:s');
@@ -518,11 +600,47 @@ class CreditMemoModel extends Model
 
         $this->db->table('fi_credit_memo_header')->where('credit_memo_id', $id)->update($data);
 
+        $finalStatus = (int) $data['approval_status'];
+        if ($finalStatus === 10) {
+            $action = 'reject';
+        } elseif ($finalStatus === 2) {
+            $action = 'mg_approve';
+        } elseif ($finalStatus === 5) {
+            $action = 'gfa_posted';
+        } elseif ($finalStatus === 6) {
+            $action = 'store_ack_pending_accounts';
+        } elseif ($finalStatus === 4 && (int) ($before['approval_status'] ?? 0) === 6) {
+            $action = 'accounts_verify_approve';
+        } else {
+            $action = 'store_ack';
+        }
+        (new AuditLogModel())->Log('credit_memo', $id, $action, $userId, $before['approval_status'] ?? null, $finalStatus, null, $remarks);
+
+        $this->db->transComplete();
+
         if ((int) $status === 10) {
             $this->SendRejectionEmail($id, $remarks);
         }
 
         return ['success' => true, 'message' => (int) $status === 10 ? 'Credit Memo rejected.' : 'Credit Memo approved.'];
+    }
+
+    // True if any of this request's line items points (via cost_center_desc)
+    // at a Cost Centre mapping flagged accounts_verification = 'Yes' — same
+    // join shape GetCreditMemoList already uses to resolve a line item's
+    // Reporting Manager. Drives the Store Ack fork in UpdateApprovalStatus.
+    private function RequiresAccountsVerification($id)
+    {
+        $row = $this->db->table('fi_credit_memo_line_items')
+            ->select('user_cost_centre_mapping.id')
+            ->join('user_cost_centre_mapping', 'user_cost_centre_mapping.id = fi_credit_memo_line_items.cost_center_desc')
+            ->where('fi_credit_memo_line_items.credit_memo_id', $id)
+            ->where('user_cost_centre_mapping.accounts_verification', 'Yes')
+            ->where('user_cost_centre_mapping.RecStatus', 1)
+            ->where('user_cost_centre_mapping.deleted_at', null)
+            ->get()->getRowArray();
+
+        return !empty($row);
     }
 
     // Notifies the original requester (user_info.MAIL_ID, via created_by) that
@@ -606,10 +724,18 @@ class CreditMemoModel extends Model
     // reconciliation table (Amount, Tax Code, Cost Centre, and the
     // Base/CGST/SGST/IGST split recalculated from them) before
     // VerifyAndPostToSap reads the line items back out for the SAP post.
-    public function UpdateGFADetails($id, $postData)
+    public function UpdateGFADetails($id, $postData, $actionLabel = 'gfa_update')
     {
+        $userId = $postData->userid ?? null;
+        $audit  = new AuditLogModel();
         $this->db->transStart();
 
+        $beforeLines = array_column(
+            $this->db->table('fi_credit_memo_line_items')->where('credit_memo_id', $id)->get()->getResultArray(),
+            null, 'line_id'
+        );
+
+        $lineLogs = [];
         foreach ($postData->line_items ?? [] as $item) {
             $data = [
                 'expenses_type'             => $item->expenses_type ?? null,
@@ -632,13 +758,23 @@ class CreditMemoModel extends Model
                 'profit_center_description' => $item->profit_center_desc ?? null,
                 'hsn_sac'                   => $item->hsn_sac ?? null,
             ];
-            if (!empty($item->line_id)) {
+            if (!empty($item->line_id) && isset($beforeLines[$item->line_id])) {
+                $diff = $audit->DiffFields($beforeLines[$item->line_id], $data, array_keys($data));
+                if ($diff) {
+                    $lineLogs[] = ['line_id' => $item->line_id, 'changes' => $diff];
+                }
                 $this->db->table('fi_credit_memo_line_items')
                     ->where('line_id', $item->line_id)->where('credit_memo_id', $id)
                     ->update($data);
             } else {
                 $this->db->table('fi_credit_memo_line_items')->insert($data + ['credit_memo_id' => $id]);
+                $lineLogs[] = ['line_id' => null, 'changes' => ['__added__' => $data]];
             }
+        }
+
+        $audit->Log('credit_memo', $id, $actionLabel, $userId);
+        foreach ($lineLogs as $l) {
+            $audit->Log('credit_memo', $id, $actionLabel, $userId, null, null, $l['changes'], null, $l['line_id'], 'line_item');
         }
 
         $this->db->transComplete();
@@ -663,29 +799,41 @@ class CreditMemoModel extends Model
             return 0;
         }
 
+        $audit    = new AuditLogModel();
         $affected = 0;
         foreach ($reversals as $docNo => $revNo) {
-            $this->db->table('fi_credit_memo_header')
+            $row = $this->db->table('fi_credit_memo_header')
+                ->select('credit_memo_id')
                 ->where('sap_document_no', $docNo)
                 ->where('approval_status', 5)
+                ->get()->getRowArray();
+            if (!$row) {
+                continue;
+            }
+
+            $this->db->table('fi_credit_memo_header')
+                ->where('credit_memo_id', $row['credit_memo_id'])
                 ->update([
                     'approval_status' => 4,
                     'reversal_doc_no' => $revNo,
                 ]);
             $affected += $this->db->affectedRows();
+
+            $audit->Log('credit_memo', $row['credit_memo_id'], 'reversal_revert', null, 5, 4, null, 'SAP reversal doc: ' . $revNo);
         }
 
         return $affected;
     }
 
-    // GFA Verification approve step: posts the credit memo to SAP via the
-    // documented ZZFI_DEDUCT contract and, only on a successful SAP response,
-    // marks the request GFA Verified.
-    public function VerifyAndPostToSap($id, $userId, $tdsCode, $tdsDescription, $postingDate)
+    // Builds the SAP ZZFI_DEDUCT payload shared by VerifyAndPostToSap (real
+    // post) and SimulatePosting (preview) — same shape, only the SAP endpoint
+    // and post-call side effects differ. Returns null when the credit memo
+    // itself can't be found.
+    private function BuildFiDeductSapData($id, $tdsCode, $tdsDescription, $postingDate)
     {
         $header = $this->db->table('fi_credit_memo_header')->where('credit_memo_id', $id)->get()->getRowArray();
         if (!$header) {
-            return ['success' => false, 'message' => 'Credit Memo not found.'];
+            return null;
         }
 
         $lineItems = $this->db->table('fi_credit_memo_line_items')->where('credit_memo_id', $id)->get()->getResultArray();
@@ -710,11 +858,10 @@ class CreditMemoModel extends Model
             $lineNum++;
         }
 
-        $postingDateFmt = date('Y-m-d', strtotime($postingDate));
         $sapPostingDate = date('Ymd', strtotime($postingDate));
         $invoiceDateFmt = !empty($header['memo_date']) ? date('Ymd', strtotime($header['memo_date'])) : '';
 
-        $SAP_DATA = [
+        return [
             "vendor_code"  => $header['vendor_code'],
             "invoice_date" => $invoiceDateFmt,
             "posting_date" => $sapPostingDate,
@@ -729,7 +876,19 @@ class CreditMemoModel extends Model
             "rev_doc"      => $header['reversal_doc_no'],
             "LINE"         => $sapLines,
         ];
-        
+    }
+
+    // GFA Verification approve step: posts the credit memo to SAP via the
+    // documented ZZFI_DEDUCT contract and, only on a successful SAP response,
+    // marks the request GFA Verified.
+    public function VerifyAndPostToSap($id, $userId, $tdsCode, $tdsDescription, $postingDate)
+    {
+        $SAP_DATA = $this->BuildFiDeductSapData($id, $tdsCode, $tdsDescription, $postingDate);
+        if ($SAP_DATA === null) {
+            return ['success' => false, 'message' => 'Credit Memo not found.'];
+        }
+
+        $postingDateFmt = date('Y-m-d', strtotime($postingDate));
 
         $urlPath = "ZZGP_API/ZZFI_DEDUCT/fideduct?SAP-client=900";
         $res = SapUrlHelper::PushToSap($urlPath, json_encode([$SAP_DATA]));
@@ -742,7 +901,14 @@ class CreditMemoModel extends Model
             // fall back so that case's message includes the document number too.
             $docNo = $res[0]->DEDUCT_DOCUMENT_NO ?? $res[0]->DOCUMENT_NO ?? '';
 
-            $this->db->table('fi_credit_memo_header')->where('credit_memo_id', $id)->update([
+            $audit  = new AuditLogModel();
+            $this->db->transStart();
+
+            $before = $this->db->table('fi_credit_memo_header')
+                ->select('approval_status, tds_code, tds_description, sap_document_no, sap_posting_date')
+                ->where('credit_memo_id', $id)->get()->getRowArray();
+
+            $updateData = [
                 'approval_status'  => 5,
                 'gfa_posted_by'    => $userId,
                 'gfa_posted_at'    => date('Y-m-d H:i:s'),
@@ -750,7 +916,13 @@ class CreditMemoModel extends Model
                 'tds_description'  => $tdsDescription,
                 'sap_posting_date' => $postingDateFmt,
                 'sap_document_no'  => $docNo ?: null,
-            ]);
+            ];
+            $this->db->table('fi_credit_memo_header')->where('credit_memo_id', $id)->update($updateData);
+
+            $diff = $audit->DiffFields($before, $updateData, ['tds_code', 'tds_description', 'sap_document_no', 'sap_posting_date']);
+            $audit->Log('credit_memo', $id, 'post_to_sap', $userId, $before['approval_status'] ?? null, 5, $diff ?: null);
+
+            $this->db->transComplete();
 
             $messages = array_filter([
                 trim($res[0]->MESSAGE ?? ''),
@@ -766,6 +938,26 @@ class CreditMemoModel extends Model
 
         $errorMessage = is_array($res) && isset($res[0]) && isset($res[0]->MESSAGE) ? $res[0]->MESSAGE : 'SAP posting failed.';
         return ['success' => false, 'message' => $errorMessage, 'sap_response' => $res];
+    }
+
+    // GFA Verification "Simulate" step: previews the SAP GL breakdown
+    // (ZZFI_SIMULATE) for the currently-saved line items without posting or
+    // touching approval_status — lets the verifier review before committing.
+    public function SimulatePosting($id, $tdsCode, $tdsDescription, $postingDate)
+    {
+        $SAP_DATA = $this->BuildFiDeductSapData($id, $tdsCode, $tdsDescription, $postingDate);
+        if ($SAP_DATA === null) {
+            return ['success' => false, 'message' => 'Credit Memo not found.'];
+        }
+
+        $urlPath = "ZZGP_API/ZZFI_SIMULATE/expsim?SAP-client=900";
+        $res = SapUrlHelper::PushToSap($urlPath, json_encode([$SAP_DATA]));
+
+        if (!is_array($res)) {
+            return ['success' => false, 'message' => 'SAP simulation failed.'];
+        }
+
+        return ['success' => true, 'results' => $res];
     }
 
     public function GetCreditMemoById($id)
@@ -797,9 +989,11 @@ class CreditMemoModel extends Model
             invoice_type_def.definitionsName as invoice_type_name,
             expense_type_def.definitionsName as expense_type_name,
             CONCAT(cost_center_def.cost_centre_code, ' - ', cost_center_def.cost_centre_desc) as cost_center_name,
+            accounts_approver_info.FIRST_NAME as accounts_approver_name,
             fi_payment_header.total_amount as original_invoice_total_amount,
             mg_approved_by_info.FIRST_NAME as mg_approved_by_name,
             stores_approved_by_info.FIRST_NAME as stores_approved_by_name,
+            accounts_verified_by_info.FIRST_NAME as accounts_verified_by_name,
             gfa_posted_by_info.FIRST_NAME as gfa_posted_by_name,
             rejected_by_info.FIRST_NAME as rejected_by_name
         ");
@@ -809,9 +1003,17 @@ class CreditMemoModel extends Model
         $builder->join('definitions_list as invoice_type_def', 'invoice_type_def.id = fi_credit_memo_header.invoice_type', 'left');
         $builder->join('definitions_list as expense_type_def', 'expense_type_def.id = fi_credit_memo_line_items.expenses_type', 'left');
         $builder->join('user_cost_centre_mapping as cost_center_def', 'cost_center_def.id = fi_credit_memo_line_items.cost_center_desc', 'left');
+        // The assigned Accounts Approver for this line item's Cost Centre
+        // mapping — distinct from accounts_verified_by_info, which only
+        // resolves once verification has actually happened. This resolves
+        // regardless, same as cost_center_name itself, so GFA can see who
+        // was (or would be) responsible even when accounts_verification is
+        // 'No' and the stage was skipped entirely.
+        $builder->join('user_info as accounts_approver_info', 'accounts_approver_info.UI_ID = cost_center_def.reporting_accounts_id', 'left');
         $builder->join('fi_payment_header', 'fi_payment_header.payment_id = fi_credit_memo_header.request_payment_id', 'left');
         $builder->join('user_info as mg_approved_by_info', 'mg_approved_by_info.UI_ID = fi_credit_memo_header.mg_approved_by', 'left');
         $builder->join('user_info as stores_approved_by_info', 'stores_approved_by_info.UI_ID = fi_credit_memo_header.stores_approved_by', 'left');
+        $builder->join('user_info as accounts_verified_by_info', 'accounts_verified_by_info.UI_ID = fi_credit_memo_header.accounts_verified_by', 'left');
         $builder->join('user_info as gfa_posted_by_info', 'gfa_posted_by_info.UI_ID = fi_credit_memo_header.gfa_posted_by', 'left');
         $builder->join('user_info as rejected_by_info', 'rejected_by_info.UI_ID = fi_credit_memo_header.rejected_by', 'left');
 
@@ -838,6 +1040,7 @@ class CreditMemoModel extends Model
             invoice_type_def.definitionsName as invoice_type_name,
             mg_approved_by_info.FIRST_NAME as mg_approved_by_name,
             stores_approved_by_info.FIRST_NAME as stores_approved_by_name,
+            accounts_verified_by_info.FIRST_NAME as accounts_verified_by_name,
             gfa_posted_by_info.FIRST_NAME as gfa_posted_by_name,
             rejected_by_info.FIRST_NAME as rejected_by_name
         ");
@@ -845,6 +1048,7 @@ class CreditMemoModel extends Model
         $headerBuilder->join('definitions_list as invoice_type_def', 'invoice_type_def.id = fi_credit_memo_header.invoice_type', 'left');
         $headerBuilder->join('user_info as mg_approved_by_info', 'mg_approved_by_info.UI_ID = fi_credit_memo_header.mg_approved_by', 'left');
         $headerBuilder->join('user_info as stores_approved_by_info', 'stores_approved_by_info.UI_ID = fi_credit_memo_header.stores_approved_by', 'left');
+        $headerBuilder->join('user_info as accounts_verified_by_info', 'accounts_verified_by_info.UI_ID = fi_credit_memo_header.accounts_verified_by', 'left');
         $headerBuilder->join('user_info as gfa_posted_by_info', 'gfa_posted_by_info.UI_ID = fi_credit_memo_header.gfa_posted_by', 'left');
         $headerBuilder->join('user_info as rejected_by_info', 'rejected_by_info.UI_ID = fi_credit_memo_header.rejected_by', 'left');
         $headerBuilder->where('fi_credit_memo_header.credit_memo_id', $id);
@@ -872,7 +1076,7 @@ class CreditMemoModel extends Model
 
         $sapData = [[
             'LIFNR'     => str_pad($header['vendor_code'], 10, '0', STR_PAD_LEFT),
-            'BELNR'     => $header['payment_voucher_no'] ?? $header['sap_document_no'],
+            'BELNR'     => $header['sap_document_no'],
             'POST_DATE' => $header['sap_posting_date'],
         ]];
 

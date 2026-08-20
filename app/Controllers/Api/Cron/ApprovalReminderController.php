@@ -17,6 +17,7 @@ class ApprovalReminderController extends BaseController
         2  => 'Pending Store Acknowledge',
         4  => 'Pending GFA Verification',
         5  => 'GFA Verified',
+        6  => 'Pending Accounts Verification',
         10 => 'Rejected',
     ];
 
@@ -40,6 +41,7 @@ class ApprovalReminderController extends BaseController
         $model = new FIPaymentModel();
         $this->sendRemindersForRole($model->GetPendingForReportingManager(), 'FI Payment', 'Manager Approval');
         $this->sendRemindersForRole($model->GetPendingForStoreReporting(), 'FI Payment', 'Store Acknowledge');
+        $this->sendRemindersForRole($model->GetPendingForReportingAccounts(), 'FI Payment', 'Accounts Verification');
         $this->sendRemindersForRole($model->GetPendingForReportingGfa(), 'FI Payment', 'GFA Verification', false);
     }
 
@@ -48,6 +50,7 @@ class ApprovalReminderController extends BaseController
         $model = new CreditMemoModel();
         $this->sendRemindersForRole($model->GetPendingForReportingManager(), 'Credit Memo', 'Manager Approval');
         $this->sendRemindersForRole($model->GetPendingForStoreReporting(), 'Credit Memo', 'Store Acknowledge');
+        $this->sendRemindersForRole($model->GetPendingForReportingAccounts(), 'Credit Memo', 'Accounts Verification');
         $this->sendRemindersForRole($model->GetPendingForReportingGfa(), 'Credit Memo', 'GFA Verification', false);
     }
 
@@ -90,6 +93,7 @@ class ApprovalReminderController extends BaseController
     {
         $date = $date ? date('Ymd', strtotime($date)) : null;
         $today = date('Ymd');
+        // print_r($today);exit;
         $fiModel = new FIPaymentModel();
         $reversals = $fiModel->GetReversedDocumentsFromSap($date ?: $today);
         if (empty($reversals)) {
@@ -111,6 +115,7 @@ class ApprovalReminderController extends BaseController
     // each row shows its own real status in the Status column.
     private function sendRemindersForRole(array $rows, string $moduleLabel, string $stageLabel, bool $splitByStatus = true)
     {
+        // print_r($rows);exit;
         $grouped = [];
         foreach ($rows as $row) {
             if (empty($row['recipient_mail'])) {
@@ -201,7 +206,7 @@ class ApprovalReminderController extends BaseController
                 if ($stageLabel === 'GFA Verification') {
                     $email->setCc($this->buildGfaCcList($items));
                 }
-                
+
                 if (!$email->send()) {
                     log_message('error', print_r($email->printDebugger(['headers', 'subject', 'body']), true));
                 }

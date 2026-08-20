@@ -397,6 +397,133 @@ class MasterModel extends Model
   }
 
   /**
+   * Push one S&S Relot (bin/lot move) row to SAP wh_qc API and, on success,
+   * record it in ss_relot_history.
+   *
+   * @param array<string, mixed> $row
+   * @param int|null $userId
+   * @return array<string, mixed>
+   */
+  public function submitRelotToSap(array $row, $userId = null): array
+  {
+    $pick = static function (array $src, array $keys, $default = '') {
+      foreach ($keys as $k) {
+        if (array_key_exists($k, $src) && $src[$k] !== null && $src[$k] !== '') {
+          return $src[$k];
+        }
+      }
+      return $default;
+    };
+
+    $quantity = $pick($row, ['quantity', 'QUANTITY', 'QTY'], '');
+    $payloadRow = [
+      'wh_code'  => (string) $pick($row, ['wh_code', 'WH_CODE'], ''),
+      'material' => (string) $pick($row, ['material', 'MATERIAL_CODE', 'MATERIAL'], ''),
+      'plant'    => (string) $pick($row, ['plant', 'PLANT'], ''),
+      'stoloc'   => (string) $pick($row, ['stoloc', 'sto_loc', 'STRO_LOC'], ''),
+      'batch'    => (string) $pick($row, ['batch', 'BATCH'], ''),
+      'quantity' => $quantity === '' ? 0 : $quantity,
+      'uom'      => (string) $pick($row, ['uom', 'UOM'], ''),
+      'from_lot' => (string) $pick($row, ['from_lot', 'OLD_BIN'], ''),
+      'to_lot'   => (string) $pick($row, ['to_lot', 'NEW_BIN'], ''),
+    ];
+
+    $missing = [];
+    foreach (['wh_code', 'material', 'plant', 'stoloc', 'batch', 'uom', 'from_lot', 'to_lot'] as $req) {
+      if (trim((string) $payloadRow[$req]) === '') {
+        $missing[] = $req;
+      }
+    }
+    if ((float) $payloadRow['quantity'] <= 0) {
+      $missing[] = 'quantity';
+    }
+    if ($missing !== []) {
+      return [
+        'success' => 0,
+        'message' => 'Missing required fields for SAP push: ' . implode(', ', $missing),
+        'payload' => $payloadRow,
+      ];
+    }
+
+    $urlPath = '/zzgp_api/wh_qc?sap-client=900';
+    $body = json_encode([$payloadRow], JSON_UNESCAPED_UNICODE);
+    $payloadJson = $body === false ? '[]' : $body;
+   
+    // wh_qc requires CSRF token + cookie handshake; PushToSap handles that.
+    $sapRaw = SapUrlHelper::PushToSap($urlPath, $payloadJson);
+    $sapDecoded = is_string($sapRaw) ? json_decode($sapRaw, true) : $sapRaw;
+    $sapText = is_string($sapRaw) ? $sapRaw : json_encode($sapRaw);
+    $sapTextUpper = strtoupper((string) $sapText);
+    $message = $sapDecoded[0]->MESSAGE ?? '';
+    $STATUS = $sapDecoded[0]->STATUS ?? '';
+    //  print_r($sapRaw);exit;
+    $isSapFailure =
+      $sapRaw === false ||
+      $sapRaw === null ||
+      strpos($sapTextUpper, 'CSRF TOKEN VALIDATION FAILED') !== false ||
+      strpos($sapTextUpper, 'FORBIDDEN') !== false ||
+      strpos($sapTextUpper, 'UNAUTHORIZED') !== false ||
+      strpos($sapTextUpper, 'HTTP/1.1 4') !== false ||
+      strpos($sapTextUpper, 'HTTP/1.1 5') !== false;
+
+    if ($isSapFailure || $STATUS == 0) {
+      return [
+        'success' => 0,
+        'message' => 'SAP submission failed - ' . ($message !== '' ? $message : 'Unknown error'),
+        'payload' => $payloadRow,
+        'sap_response' => $sapDecoded ?? $sapRaw,
+      ];
+    }
+
+    $this->db->table('ss_relot_history')->insert([
+      'whCode'       => $payloadRow['wh_code'],
+      'whName'       => (string) $pick($row, ['wh_name', 'WH_NAME'], ''),
+      'plant'        => $payloadRow['plant'],
+      'stroLoc'      => $payloadRow['stoloc'],
+      'material'     => $payloadRow['material'],
+      'materialName' => (string) $pick($row, ['material_name', 'MATERIAL_NAME'], ''),
+      'batch'        => $payloadRow['batch'],
+      'uom'          => $payloadRow['uom'],
+      'quantity'     => $payloadRow['quantity'],
+      'fromLot'      => $payloadRow['from_lot'],
+      'toLot'        => $payloadRow['to_lot'],
+      'sapStatus'    => (string) $STATUS,
+      'sapMessage'   => (string) $message,
+      'userId'       => $userId,
+      'createdAt'    => date('Y-m-d H:i:s'),
+    ]);
+    $insertId = $this->db->insertID();
+
+    return [
+      'success' => 1,
+      'message' => $message !== '' ? $message : 'Submitted to SAP successfully',
+      'id' => $insertId,
+      'payload' => $payloadRow,
+      'sap_response' => $sapDecoded ?? $sapRaw,
+    ];
+  }
+
+  /**
+   * Delete one ss_relot_history record (used when a user removes an already-submitted
+   * Bin Selection row on the S&S Relotting screen).
+   *
+   * @param int $id
+   * @return array<string, mixed>
+   */
+  public function deleteRelotHistory($id): array
+  {
+    $id = (int) $id;
+    if ($id <= 0) {
+      return ['success' => 0, 'message' => 'Invalid id'];
+    }
+    $deleted = $this->db->table('ss_relot_history')->where('id', $id)->delete();
+    if (!$deleted) {
+      return ['success' => 0, 'message' => 'Failed to delete record'];
+    }
+    return ['success' => 1, 'message' => 'Deleted successfully'];
+  }
+
+  /**
    * For each receipt row, call zzgp_api/zzwh_ss/wh_qc?qa_lot=… (cached per qa_lot) and attach SAP STATUS / QC_CODE.
    *
    * @param array<int, array<string, mixed>> $rows

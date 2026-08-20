@@ -122,6 +122,7 @@ class FIPaymentController extends BaseApiController
         $userId = null;
         $reportingManagerId = null;
         $storeReportingId = null;
+        $reportingAccountsId = null;
         if (is_object($postData)) {
             $start = $postData->startCount ?? 0;
             $pageSize = $postData->pageSize ?? 25;
@@ -130,6 +131,7 @@ class FIPaymentController extends BaseApiController
             $userId = $postData->userid ?? null;
             $reportingManagerId = $postData->reporting_manager_id ?? null;
             $storeReportingId = $postData->store_reporting_id ?? null;
+            $reportingAccountsId = $postData->reporting_accounts_id ?? null;
         } elseif (is_array($postData)) {
             $start = $postData['startCount'] ?? 0;
             $pageSize = $postData['pageSize'] ?? 25;
@@ -138,10 +140,11 @@ class FIPaymentController extends BaseApiController
             $userId = $postData['userid'] ?? null;
             $reportingManagerId = $postData['reporting_manager_id'] ?? null;
             $storeReportingId = $postData['store_reporting_id'] ?? null;
+            $reportingAccountsId = $postData['reporting_accounts_id'] ?? null;
         }
 
         $master = new FIPaymentModel();
-        $data = $master->GetFIPaymentList($start, $pageSize, $search, $approvalStatus, $userId, $reportingManagerId, $storeReportingId);
+        $data = $master->GetFIPaymentList($start, $pageSize, $search, $approvalStatus, $userId, $reportingManagerId, $storeReportingId, $reportingAccountsId);
 
         return $this->response->setJSON([
             'success' => true,
@@ -219,6 +222,36 @@ class FIPaymentController extends BaseApiController
 
         $master = new FIPaymentModel();
         $res = $master->VerifyAndPostToSap($id, $userId, $tdsCode, $tdsDescription, $postingDate);
+
+        return $this->response->setJSON($res);
+    }
+
+    public function SimulatePosting()
+    {
+        $postData = $this->request->getJSON();
+
+        $id = null;
+        $tdsCode = null;
+        $tdsDescription = null;
+        $postingDate = null;
+        if (is_object($postData)) {
+            $id = $postData->id ?? null;
+            $tdsCode = $postData->tds_code ?? null;
+            $tdsDescription = $postData->tds_description ?? null;
+            $postingDate = $postData->posting_date ?? null;
+        } elseif (is_array($postData)) {
+            $id = $postData['id'] ?? null;
+            $tdsCode = $postData['tds_code'] ?? null;
+            $tdsDescription = $postData['tds_description'] ?? null;
+            $postingDate = $postData['posting_date'] ?? null;
+        }
+
+        if (!$id || !$postingDate) {
+            return $this->response->setJSON(['success' => false, 'message' => 'id and posting_date are required']);
+        }
+
+        $master = new FIPaymentModel();
+        $res = $master->SimulatePosting($id, $tdsCode, $tdsDescription, $postingDate);
 
         return $this->response->setJSON($res);
     }
@@ -348,9 +381,12 @@ class FIPaymentController extends BaseApiController
     public function SaveCostCentreMapping()
     {
         $postData = $this->request->getJSON();
-        // print_r($postData);exit;
         $master = new FIPaymentModel();
         $res = $master->SaveCostCentreMapping($postData);
+        // sendSuccessResult() hardcodes success:1 regardless of $res, which
+        // would bury the model's own success:false (duplicate check) under
+        // results — pass the model's {success, message, id} straight through
+        // instead so the FE's own data.success/data.message checks work.
         return $this->response->setJSON($res);
     }
 
@@ -485,7 +521,10 @@ class FIPaymentController extends BaseApiController
             return $this->response->setJSON(['success' => false, 'message' => 'payment_id is required']);
         }
 
-        $res = $master->UpdateGFADetails($id, $postData);
+        // Accounts Verification reuses this same save-line-items endpoint but
+        // tags the audit log with its own action name instead of 'gfa_update'.
+        $actionLabel = (is_object($postData) ? ($postData->action ?? null) : ($postData['action'] ?? null)) ?: 'gfa_update';
+        $res = $master->UpdateGFADetails($id, $postData, $actionLabel);
 
         return $this->response->setJSON($res);
     }
@@ -527,14 +566,17 @@ class FIPaymentController extends BaseApiController
         $fromDate = null;
         $toDate = null;
         $search = '';
+        $userId = null;
         if (is_object($postData)) {
             $fromDate = $postData->fromDate ?? null;
             $toDate = $postData->toDate ?? null;
             $search = $postData->searchTxt ?? '';
+            $userId = $postData->userid ?? null;
         } elseif (is_array($postData)) {
             $fromDate = $postData['fromDate'] ?? null;
             $toDate = $postData['toDate'] ?? null;
             $search = $postData['searchTxt'] ?? '';
+            $userId = $postData['userid'] ?? null;
         }
 
         if (!$fromDate || !$toDate) {
@@ -542,12 +584,55 @@ class FIPaymentController extends BaseApiController
         }
 
         $master = new FIPaymentModel();
-        $results = $master->GetFIPaymentReport($fromDate, $toDate, $search);
+        $results = $master->GetFIPaymentReport($fromDate, $toDate, $search, $userId);
 
         return $this->response->setJSON([
             'success' => true,
             'results' => $results,
             'count'   => count($results),
+        ]);
+    }
+
+    // Shared audit_log listing (fi_payment + credit_memo actions) — no
+    // separate Audit controller/model, this is the one place it's queried
+    // from. $module/$recordId narrow to one request's history; without them
+    // it's every logged action across both screens in the date range.
+    public function GetAuditLog()
+    {
+        $postData = $this->request->getJSON();
+
+        $fromDate = null;
+        $toDate = null;
+        $module = null;
+        $recordId = null;
+        $search = '';
+        $start = 0;
+        $pageSize = 50;
+        if (is_object($postData)) {
+            $fromDate = $postData->fromDate ?? null;
+            $toDate = $postData->toDate ?? null;
+            $module = $postData->module ?? null;
+            $recordId = $postData->recordId ?? null;
+            $search = $postData->searchTxt ?? '';
+            $start = $postData->start ?? 0;
+            $pageSize = $postData->pageSize ?? 50;
+        } elseif (is_array($postData)) {
+            $fromDate = $postData['fromDate'] ?? null;
+            $toDate = $postData['toDate'] ?? null;
+            $module = $postData['module'] ?? null;
+            $recordId = $postData['recordId'] ?? null;
+            $search = $postData['searchTxt'] ?? '';
+            $start = $postData['start'] ?? 0;
+            $pageSize = $postData['pageSize'] ?? 50;
+        }
+
+        $master = new FIPaymentModel();
+        $res = $master->GetAuditLog($fromDate, $toDate, $module, $recordId, $search, $start, $pageSize);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'results' => $res['results'],
+            'count'   => $res['count'],
         ]);
     }
 

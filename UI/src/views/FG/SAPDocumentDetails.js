@@ -96,7 +96,7 @@ const SAPDocumentDetails = ({ actionRendorer }) => {
             window.open(`/public/#/SmartForm/${row.gateInOutInfoId}`)
         } else if (row.moduleTypeId == 2) {
             window.open(`/public/#/StoSmartForm/${row.gateInOutInfoId}`)
-        } else if (row.moduleTypeId == 6 || row.moduleTypeId == 20) {
+        } else if (row.moduleTypeId == 6 ) {
             window.open(`/public/#/SsAndPmSmartForm/${row.gateInOutInfoId}`)
         } else if (row.moduleTypeId == 8) {
             window.open(`/public/#/RMSalesSmartForm/${row.gateInOutInfoId}`)
@@ -108,7 +108,7 @@ const SAPDocumentDetails = ({ actionRendorer }) => {
             window.open(`/public/#/GatePassSmartForm/${row.gateInOutInfoId}`)
         } else if (row.moduleTypeId == 13) {
             window.open(`/public/#/SDGStoSmartForm/${row.gateInOutInfoId}`)
-        } else if (row.moduleTypeId == 26 || row.moduleTypeId == 27 || row.moduleTypeId == 29 || row.moduleTypeId == 24 || row.moduleTypeId == 38 || row.moduleTypeId == 44 || row.moduleTypeId == 43) {
+        } else if (row.moduleTypeId == 26 || row.moduleTypeId == 27 || row.moduleTypeId == 29 || row.moduleTypeId == 24 || row.moduleTypeId == 38 || row.moduleTypeId == 44 || row.moduleTypeId == 43 || row.moduleTypeId == 20) {
             window.open(`/public/#/OverAllSmartForm/${row.gateInOutInfoId}`)
         }
     }

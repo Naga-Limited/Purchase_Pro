@@ -284,12 +284,19 @@ class FIPaymentModel extends Model
     // VerifyAndPostToSap.
     public function UpdatePaymentVoucherDetails($id, $postData)
     {
+        $audit  = new AuditLogModel();
+        $before = $this->db->table('fi_payment_header')
+            ->select('payment_voucher_no, utr_number')->where('payment_id', $id)->get()->getRowArray();
+
         $data = [
             'payment_voucher_no' => $postData->payment_voucher_no ?? null,
             'utr_number'         => $postData->utr_number ?? null,
         ];
 
         $this->db->table('fi_payment_header')->where('payment_id', $id)->update($data);
+
+        $diff = $audit->DiffFields($before, $data, ['payment_voucher_no', 'utr_number']);
+        $audit->Log('fi_payment', $id, 'payment_voucher_update', null, null, null, $diff ?: null);
 
         return ['success' => true, 'message' => 'Payment voucher details updated.', 'payment_id' => $id];
     }
@@ -302,6 +309,7 @@ class FIPaymentModel extends Model
     // (match on sap_document_no = DOC_NO) and what reversal_doc_no to record.
     public function GetReversedDocumentsFromSap($date)
     {
+        // print_r($date);exit;
         $urlPath = "ZZGP_API/ZZFI_REVERSAL/Firev?SAP-client=900&DATE={$date}";
         $res = SapUrlHelper::getWhDatas($urlPath);
         // print_r($res);exit;
@@ -336,16 +344,27 @@ class FIPaymentModel extends Model
             return 0;
         }
 
+        $audit    = new AuditLogModel();
         $affected = 0;
         foreach ($reversals as $docNo => $revNo) {
-            $this->db->table('fi_payment_header')
+            $row = $this->db->table('fi_payment_header')
+                ->select('payment_id')
                 ->where('sap_document_no', $docNo)
                 ->where('approval_status', 5)
+                ->get()->getRowArray();
+            if (!$row) {
+                continue;
+            }
+
+            $this->db->table('fi_payment_header')
+                ->where('payment_id', $row['payment_id'])
                 ->update([
                     'approval_status' => 4,
                     'reversal_doc_no' => $revNo,
                 ]);
             $affected += $this->db->affectedRows();
+
+            $audit->Log('fi_payment', $row['payment_id'], 'reversal_revert', null, 5, 4, null, 'SAP reversal doc: ' . $revNo);
         }
 
         return $affected;
@@ -551,6 +570,8 @@ class FIPaymentModel extends Model
             ]);
         }
 
+        (new AuditLogModel())->Log('fi_payment', $paymentId, 'insert', $postData->created_by ?? null, null, 1);
+
         $this->db->transComplete();
 
         if ($this->db->transStatus() === false) {
@@ -569,7 +590,19 @@ class FIPaymentModel extends Model
     // (approval_status back to 1, clearing the prior rejection markers).
     public function UpdateFIPayment($id, $postData)
     {
+        $userId = $postData->updated_by ?? null;
+        $audit  = new AuditLogModel();
         $this->db->transStart();
+
+        $beforeHeader = $this->db->table('fi_payment_header')->where('payment_id', $id)->get()->getRowArray();
+        $beforeLines  = array_column(
+            $this->db->table('fi_payment_line_items')->where('payment_id', $id)->get()->getResultArray(),
+            null, 'line_id'
+        );
+        $beforeMigo = array_column(
+            $this->db->table('fi_payment_migo_details')->where('payment_id', $id)->get()->getResultArray(),
+            null, 'migo_detail_id'
+        );
 
         $headerData = [
             'payment_to'         => $postData->payment_to ?? null,
@@ -606,10 +639,12 @@ class FIPaymentModel extends Model
         ];
 
         $this->db->table('fi_payment_header')->where('payment_id', $id)->update($headerData);
+        $headerDiff = $audit->DiffFields($beforeHeader, $headerData, array_keys($headerData));
 
         // Update existing line items in place (matched by line_id) and insert
         // any newly-added rows — never delete, even for rows the user removed
         // in the UI, so no line item is ever dropped from the DB on resubmit.
+        $lineLogs = [];
         foreach ($postData->line_items ?? [] as $item) {
             $data = [
                 'expenses_type'             => $item->expenses_type ?? null,
@@ -627,28 +662,47 @@ class FIPaymentModel extends Model
                 'profit_center_description' => $item->profit_center_desc ?? null,
                 'hsn_sac'                   => $item->hsn_sac ?? null,
             ];
-            if (!empty($item->line_id)) {
+            if (!empty($item->line_id) && isset($beforeLines[$item->line_id])) {
+                $diff = $audit->DiffFields($beforeLines[$item->line_id], $data, array_keys($data));
+                if ($diff) {
+                    $lineLogs[] = ['line_id' => $item->line_id, 'changes' => $diff];
+                }
                 $this->db->table('fi_payment_line_items')
                     ->where('line_id', $item->line_id)->where('payment_id', $id)
                     ->update($data);
             } else {
                 $this->db->table('fi_payment_line_items')->insert($data + ['payment_id' => $id]);
+                $lineLogs[] = ['line_id' => null, 'changes' => ['__added__' => $data]];
             }
         }
 
         // Same update-in-place / insert-new rule for MIGO rows.
+        $migoLogs = [];
         foreach ($postData->migo_items ?? [] as $m) {
             $data = [
                 'migo_no'   => $m->migo_no ?? null,
                 'va_number' => $m->va_number ?? null,
             ];
-            if (!empty($m->migo_detail_id)) {
+            if (!empty($m->migo_detail_id) && isset($beforeMigo[$m->migo_detail_id])) {
+                $diff = $audit->DiffFields($beforeMigo[$m->migo_detail_id], $data, array_keys($data));
+                if ($diff) {
+                    $migoLogs[] = ['line_id' => $m->migo_detail_id, 'changes' => $diff];
+                }
                 $this->db->table('fi_payment_migo_details')
                     ->where('migo_detail_id', $m->migo_detail_id)->where('payment_id', $id)
                     ->update($data);
             } else {
                 $this->db->table('fi_payment_migo_details')->insert($data + ['payment_id' => $id]);
+                $migoLogs[] = ['line_id' => null, 'changes' => ['__added__' => $data]];
             }
+        }
+
+        $audit->Log('fi_payment', $id, 'edit_resubmit', $userId, $beforeHeader['approval_status'] ?? null, 1, $headerDiff ?: null);
+        foreach ($lineLogs as $l) {
+            $audit->Log('fi_payment', $id, 'edit_resubmit', $userId, null, null, $l['changes'], null, $l['line_id'], 'line_item');
+        }
+        foreach ($migoLogs as $l) {
+            $audit->Log('fi_payment', $id, 'edit_resubmit', $userId, null, null, $l['changes'], null, $l['line_id'], 'line_item');
         }
 
         $this->db->transComplete();
@@ -668,9 +722,17 @@ class FIPaymentModel extends Model
     // to correct (invoice no/date, payment term, supporting docs, line items)
     // before VerifyAndPostToSap re-reads the header/line items from the DB.
     // Vendor/employee identity fields are intentionally untouched here.
-    public function UpdateGFADetails($id, $postData)
+    public function UpdateGFADetails($id, $postData, $actionLabel = 'gfa_update')
     {
+        $userId = $postData->userid ?? null;
+        $audit  = new AuditLogModel();
         $this->db->transStart();
+
+        $beforeHeader = $this->db->table('fi_payment_header')->where('payment_id', $id)->get()->getRowArray();
+        $beforeLines  = array_column(
+            $this->db->table('fi_payment_line_items')->where('payment_id', $id)->get()->getResultArray(),
+            null, 'line_id'
+        );
 
         $headerData = [
             'invoice_number' => $postData->invoice_number ?? null,
@@ -685,7 +747,9 @@ class FIPaymentModel extends Model
         }
 
         $this->db->table('fi_payment_header')->where('payment_id', $id)->update($headerData);
+        $headerDiff = $audit->DiffFields($beforeHeader, $headerData, array_keys($headerData));
 
+        $lineLogs = [];
         foreach ($postData->line_items ?? [] as $item) {
             $data = [
                 'expenses_type'             => $item->expenses_type ?? null,
@@ -707,13 +771,23 @@ class FIPaymentModel extends Model
                 'profit_center_description' => $item->profit_center_desc ?? null,
                 'hsn_sac'                   => $item->hsn_sac ?? null,
             ];
-            if (!empty($item->line_id)) {
+            if (!empty($item->line_id) && isset($beforeLines[$item->line_id])) {
+                $diff = $audit->DiffFields($beforeLines[$item->line_id], $data, array_keys($data));
+                if ($diff) {
+                    $lineLogs[] = ['line_id' => $item->line_id, 'changes' => $diff];
+                }
                 $this->db->table('fi_payment_line_items')
                     ->where('line_id', $item->line_id)->where('payment_id', $id)
                     ->update($data);
             } else {
                 $this->db->table('fi_payment_line_items')->insert($data + ['payment_id' => $id]);
+                $lineLogs[] = ['line_id' => null, 'changes' => ['__added__' => $data]];
             }
+        }
+
+        $audit->Log('fi_payment', $id, $actionLabel, $userId, null, null, $headerDiff ?: null);
+        foreach ($lineLogs as $l) {
+            $audit->Log('fi_payment', $id, $actionLabel, $userId, null, null, $l['changes'], null, $l['line_id'], 'line_item');
         }
 
         $this->db->transComplete();
@@ -732,6 +806,29 @@ class FIPaymentModel extends Model
     // request-level totals rather than per-line-item granularity.
     public function GetFIPaymentReport($fromDate, $toDate, $search = '', $userId = null)
     {
+        // What role(s) $userId holds against this request's own cost centre
+        // mapping(s) — Requester (user_cost_centre_mapping.user_id) plus
+        // whichever of Manager/Store/Accounts/GFA name them, aggregated
+        // across every line item's mapping since a request can span more
+        // than one cost centre. Same columns GetFIPaymentReport's own
+        // visibility filter below checks, just surfaced instead of only
+        // used to scope rows.
+        $userIdEscaped = !empty($userId) ? $this->db->escape($userId) : null;
+        $userAccessSelect = $userIdEscaped !== null
+            ? "(SELECT TRIM(BOTH ', ' FROM CONCAT_WS(', ',
+                    MAX(CASE WHEN ucm_access.user_id = {$userIdEscaped} THEN 'Requester' END),
+                    MAX(CASE WHEN FIND_IN_SET({$userIdEscaped}, ucm_access.reporting_manager_id) > 0 THEN 'Manager' END),
+                    MAX(CASE WHEN FIND_IN_SET({$userIdEscaped}, ucm_access.store_reporting_id) > 0 THEN 'Store' END),
+                    MAX(CASE WHEN ucm_access.reporting_accounts_id = {$userIdEscaped} THEN 'Accounts' END),
+                    MAX(CASE WHEN FIND_IN_SET({$userIdEscaped}, ucm_access.reporting_gfa_id) > 0 THEN 'GFA' END)
+                ))
+                FROM fi_payment_line_items li_access
+                JOIN user_cost_centre_mapping ucm_access ON ucm_access.id = li_access.cost_center_desc
+                WHERE li_access.payment_id = fi_payment_header.payment_id
+                    AND ucm_access.RecStatus = 1 AND ucm_access.deleted_at IS NULL
+            )"
+            : 'NULL';
+
         $builder = $this->db->table('fi_payment_header');
         $builder->select("
             fi_payment_header.payment_id,
@@ -778,6 +875,7 @@ class FIPaymentModel extends Model
                 WHEN 2 THEN 'Approved by Manager'
                 WHEN 4 THEN 'Store Acknowledged'
                 WHEN 5 THEN 'GFA Verified / Completed'
+                WHEN 6 THEN 'Pending Accounts Verification'
                 WHEN 10 THEN 'Rejected'
                 ELSE 'Unknown'
             END as approval_status_label,
@@ -785,13 +883,16 @@ class FIPaymentModel extends Model
             mg_approved_by_info.FIRST_NAME as mg_approved_by_name,
             fi_payment_header.stores_approved_at,
             stores_approved_by_info.FIRST_NAME as stores_approved_by_name,
+            fi_payment_header.accounts_verified_at,
+            accounts_verified_by_info.FIRST_NAME as accounts_verified_by_name,
             fi_payment_header.gfa_posted_at,
             gfa_posted_by_info.FIRST_NAME as gfa_posted_by_name,
             fi_payment_header.rejected_at,
             rejected_by_info.FIRST_NAME as rejected_by_name,
             fi_payment_header.rejection_remarks,
             fi_payment_header.invoice_copy,
-            fi_payment_header.back_paper
+            fi_payment_header.back_paper,
+            {$userAccessSelect} as user_access_type
         ");
         $builder->join('user_info', 'user_info.UI_ID = fi_payment_header.created_by', 'left');
         $builder->join('definitions_list as invoice_type_def', 'invoice_type_def.id = fi_payment_header.invoice_type', 'left');
@@ -799,6 +900,7 @@ class FIPaymentModel extends Model
         $builder->join('definitions_list as service_category_def', 'service_category_def.id = fi_payment_header.service_category', 'left');
         $builder->join('user_info as mg_approved_by_info', 'mg_approved_by_info.UI_ID = fi_payment_header.mg_approved_by', 'left');
         $builder->join('user_info as stores_approved_by_info', 'stores_approved_by_info.UI_ID = fi_payment_header.stores_approved_by', 'left');
+        $builder->join('user_info as accounts_verified_by_info', 'accounts_verified_by_info.UI_ID = fi_payment_header.accounts_verified_by', 'left');
         $builder->join('user_info as gfa_posted_by_info', 'gfa_posted_by_info.UI_ID = fi_payment_header.gfa_posted_by', 'left');
         $builder->join('user_info as rejected_by_info', 'rejected_by_info.UI_ID = fi_payment_header.rejected_by', 'left');
         $builder->where('DATE(fi_payment_header.created_at) >=', $fromDate);
@@ -811,7 +913,6 @@ class FIPaymentModel extends Model
         // name several people, comma-separated — FIND_IN_SET matches any of
         // them). UserID 1 is exempt and always sees every request.
         if (!empty($userId) && (int) $userId !== 1) {
-            $userIdEscaped = $this->db->escape($userId);
             $builder->whereIn('payment_id', function ($sub) use ($userId, $userIdEscaped) {
                 return $sub->select('fi_payment_line_items.payment_id')->from('fi_payment_line_items')
                     ->join('user_cost_centre_mapping', 'user_cost_centre_mapping.id = fi_payment_line_items.cost_center_desc')
@@ -842,8 +943,73 @@ class FIPaymentModel extends Model
         return $builder->get()->getResultArray();
     }
 
+    // Shared audit_log table (fi_payment + credit_memo actions, written by
+    // AuditLogModel::Log across both models) surfaced here rather than
+    // through a separate Audit controller/model. audit_log.record_id means
+    // payment_id or credit_memo_id depending on audit_log.module, so it's
+    // resolved against whichever header table matches to show a
+    // human-readable request number alongside each entry.
+    public function GetAuditLog($fromDate = null, $toDate = null, $module = null, $recordId = null, $search = '', $start = 0, $pageSize = 50)
+    {
+        $builder = $this->db->table('audit_log');
+        $builder->join('user_info', 'user_info.UI_ID = audit_log.actor_id', 'left');
+        $builder->join('fi_payment_header', "audit_log.module = 'fi_payment' AND fi_payment_header.payment_id = audit_log.record_id", 'left');
+        $builder->join('fi_credit_memo_header', "audit_log.module = 'credit_memo' AND fi_credit_memo_header.credit_memo_id = audit_log.record_id", 'left');
+
+        if (!empty($module)) {
+            $builder->where('audit_log.module', $module);
+        }
+        if (!empty($recordId)) {
+            $builder->where('audit_log.record_id', $recordId);
+        }
+        if (!empty($fromDate)) {
+            $builder->where('DATE(audit_log.created_at) >=', $fromDate);
+        }
+        if (!empty($toDate)) {
+            $builder->where('DATE(audit_log.created_at) <=', $toDate);
+        }
+        if (!empty($search)) {
+            $builder->groupStart();
+            $builder->like('audit_log.action', $search);
+            $builder->orLike('audit_log.remarks', $search);
+            $builder->orLike('user_info.FIRST_NAME', $search);
+            $builder->orLike('fi_payment_header.unique_payment_no', $search);
+            $builder->orLike('fi_credit_memo_header.unique_credit_memo_no', $search);
+            $builder->groupEnd();
+        }
+
+        $total = $builder->countAllResults(false);
+
+        $builder->select("
+            audit_log.audit_id,
+            audit_log.module,
+            audit_log.record_id,
+            COALESCE(fi_payment_header.unique_payment_no, fi_credit_memo_header.unique_credit_memo_no) as request_no,
+            audit_log.line_id,
+            audit_log.scope,
+            audit_log.action,
+            audit_log.actor_id,
+            user_info.FIRST_NAME as actor_name,
+            audit_log.status_before,
+            audit_log.status_after,
+            audit_log.changes,
+            audit_log.remarks,
+            audit_log.created_at
+        ");
+        $builder->orderBy('audit_log.created_at', 'DESC');
+        $builder->limit((int) $pageSize, (int) $start);
+
+        $results = $builder->get()->getResultArray();
+        foreach ($results as &$row) {
+            $row['changes'] = $row['changes'] !== null ? json_decode($row['changes'], true) : null;
+        }
+        unset($row);
+
+        return ['results' => $results, 'count' => $total];
+    }
+
     // approval_status: 1 = Pending Manager Approval, 2 = Approved by Manager, 3 = Rejected
-    public function GetFIPaymentList($start = 0, $pageSize = 25, $search = '', $approvalStatus = 1, $userId = null, $reportingManagerId = null, $storeReportingId = null)
+    public function GetFIPaymentList($start = 0, $pageSize = 25, $search = '', $approvalStatus = 1, $userId = null, $reportingManagerId = null, $storeReportingId = null, $reportingAccountsId = null)
     {
         $builder = $this->db->table('fi_payment_header');
         $builder->where('approval_status', $approvalStatus);
@@ -880,6 +1046,19 @@ class FIPaymentModel extends Model
                     ->where("FIND_IN_SET({$storeReportingIdEscaped}, store_reporting_id) >", 0, false)
                     ->where('RecStatus', 1)
                     ->where('deleted_at', null);
+            });
+        }
+        // Same per-line-item Cost Centre routing as Reporting Manager above,
+        // just keyed on reporting_accounts_id (single-select, plain equality —
+        // no FIND_IN_SET needed) so the Accounts Verification list only shows
+        // each verifier their own queue.
+        if (!empty($reportingAccountsId)) {
+            $builder->whereIn('payment_id', function ($sub) use ($reportingAccountsId) {
+                return $sub->select('fi_payment_line_items.payment_id')->from('fi_payment_line_items')
+                    ->join('user_cost_centre_mapping', 'user_cost_centre_mapping.id = fi_payment_line_items.cost_center_desc')
+                    ->where('user_cost_centre_mapping.reporting_accounts_id', $reportingAccountsId)
+                    ->where('user_cost_centre_mapping.RecStatus', 1)
+                    ->where('user_cost_centre_mapping.deleted_at', null);
             });
         }
 
@@ -933,6 +1112,9 @@ class FIPaymentModel extends Model
     // account. $excludeStatuses flips $statuses from an allow-list (manager /
     // store, which fire on one exact status) to a block-list (GFA, which
     // fires on everything still in flight except Completed/Rejected).
+    // $dateColumn picks what "Pending Since" is measured from — Reporting
+    // Manager wants it from created_at (original submission), while Store /
+    // GFA keep the default updated_at (last status change).
     private function GetPendingApprovalsForRole($mappingField, array $statuses, $excludeStatuses = false, $dateColumn = 'updated_at')
     {
         $builder = $this->db->table('fi_payment_header');
@@ -986,6 +1168,11 @@ class FIPaymentModel extends Model
         return $this->GetPendingApprovalsForRole('store_reporting_id', [2]);
     }
 
+    public function GetPendingForReportingAccounts()
+    {
+        return $this->GetPendingApprovalsForRole('reporting_accounts_id', [6]);
+    }
+
     // GFA contact gets notified for anything still in flight (1, 2, 4) —
     // not just the GFA-specific stage (4) — per business rule: everything
     // except Completed (5) and Rejected (10).
@@ -996,17 +1183,36 @@ class FIPaymentModel extends Model
 
     // approval_status: 1 = Pending Manager Approval, 2 = Approved by Manager
     // (waiting on Store Acknowledge), 4 = Store Acknowledged (waiting on GFA
-    // Verification), 5 = GFA Verified (Completed), 10 = Rejected
+    // Verification), 5 = GFA Verified (Completed), 6 = Pending Accounts
+    // Verification (waiting on the Cost Centre's assigned Accounts Verifier —
+    // only entered when that mapping flags accounts_verification = 'Yes';
+    // otherwise Store Ack goes straight to 4 same as before), 10 = Rejected
     public function UpdateApprovalStatus($id, $status, $userId, $remarks = null, $tdsCode = null, $tdsDescription = null)
     {
+        $this->db->transStart();
+
+        $before = $this->db->table('fi_payment_header')->select('approval_status')->where('payment_id', $id)->get()->getRowArray();
+
         $data = ['approval_status' => $status];
 
         if ((int) $status === 2) {
             $data['mg_approved_by'] = $userId;
             $data['mg_approved_at'] = date('Y-m-d H:i:s');
         } elseif ((int) $status === 4) {
-            $data['stores_approved_by'] = $userId;
-            $data['stores_approved_at'] = date('Y-m-d H:i:s');
+            if ((int) ($before['approval_status'] ?? 0) === 6) {
+                // Accounts Verifier's approval — advances Pending Accounts
+                // Verification straight into the existing GFA queue.
+                $data['accounts_verified_by'] = $userId;
+                $data['accounts_verified_at'] = date('Y-m-d H:i:s');
+            } else {
+                $data['stores_approved_by'] = $userId;
+                $data['stores_approved_at'] = date('Y-m-d H:i:s');
+                if ($this->RequiresAccountsVerification($id)) {
+                    // Fork: this Cost Centre requires Accounts Verification
+                    // before GFA, so land on 6 instead of 4.
+                    $data['approval_status'] = 6;
+                }
+            }
         } elseif ((int) $status === 5) {
             $data['gfa_posted_by'] = $userId;
             $data['gfa_posted_at'] = date('Y-m-d H:i:s');
@@ -1024,11 +1230,47 @@ class FIPaymentModel extends Model
 
         $this->db->table('fi_payment_header')->where('payment_id', $id)->update($data);
 
+        $finalStatus = (int) $data['approval_status'];
+        if ($finalStatus === 10) {
+            $action = 'reject';
+        } elseif ($finalStatus === 2) {
+            $action = 'mg_approve';
+        } elseif ($finalStatus === 5) {
+            $action = 'gfa_posted';
+        } elseif ($finalStatus === 6) {
+            $action = 'store_ack_pending_accounts';
+        } elseif ($finalStatus === 4 && (int) ($before['approval_status'] ?? 0) === 6) {
+            $action = 'accounts_verify_approve';
+        } else {
+            $action = 'store_ack';
+        }
+        (new AuditLogModel())->Log('fi_payment', $id, $action, $userId, $before['approval_status'] ?? null, $finalStatus, null, $remarks);
+
+        $this->db->transComplete();
+
         if ((int) $status === 10) {
             $this->SendRejectionEmail($id, $remarks);
         }
 
         return ['success' => true, 'message' => (int) $status === 10 ? 'Payment rejected.' : 'Payment approved.'];
+    }
+
+    // True if any of this request's line items points (via cost_center_desc)
+    // at a Cost Centre mapping flagged accounts_verification = 'Yes' — same
+    // join shape GetFIPaymentList already uses to resolve a line item's
+    // Reporting Manager. Drives the Store Ack fork in UpdateApprovalStatus.
+    private function RequiresAccountsVerification($id)
+    {
+        $row = $this->db->table('fi_payment_line_items')
+            ->select('user_cost_centre_mapping.id')
+            ->join('user_cost_centre_mapping', 'user_cost_centre_mapping.id = fi_payment_line_items.cost_center_desc')
+            ->where('fi_payment_line_items.payment_id', $id)
+            ->where('user_cost_centre_mapping.accounts_verification', 'Yes')
+            ->where('user_cost_centre_mapping.RecStatus', 1)
+            ->where('user_cost_centre_mapping.deleted_at', null)
+            ->get()->getRowArray();
+
+        return !empty($row);
     }
 
     // Notifies the original requester (user_info.MAIL_ID, via created_by) that
@@ -1109,9 +1351,11 @@ class FIPaymentModel extends Model
         }
     }
 
-    // GFA Verification approve step: posts the invoice to SAP (ZZFI_EXP_POST)
-    // and, only on a successful SAP response, marks the request GFA Verified.
-    public function VerifyAndPostToSap($id, $userId, $tdsCode, $tdsDescription, $postingDate)
+    // Builds the SAP ZZFI_EXP_POST payload shared by VerifyAndPostToSap (real
+    // post) and SimulatePosting (preview) — same shape, only the SAP endpoint
+    // and post-call side effects differ. Returns null when the payment
+    // request itself can't be found.
+    private function BuildFiExpSapData($id, $tdsCode, $tdsDescription, $postingDate)
     {
         $header = $this->db->table('fi_payment_header')
             ->select('fi_payment_header.*, payment_term_def.definitionsName as pay_term_code')
@@ -1119,7 +1363,7 @@ class FIPaymentModel extends Model
             ->where('fi_payment_header.payment_id', $id)
             ->get()->getRowArray();
         if (!$header) {
-            return ['success' => false, 'message' => 'Payment request not found.'];
+            return null;
         }
 
         $lineItems = $this->db->table('fi_payment_line_items')->where('payment_id', $id)->get()->getResultArray();
@@ -1157,9 +1401,6 @@ class FIPaymentModel extends Model
 
         $invoiceFile   = $fetchFile($header['invoice_copy']);
         $backPaperFile = $fetchFile($header['back_paper']);
-
-        // print_r($invoiceFile);
-        // print_r($backPaperFile);exit;
 
         $sapLines = [];
         $lineNum  = 1;
@@ -1220,19 +1461,26 @@ class FIPaymentModel extends Model
             "LINE"            => $sapLines,
         ];
 
-        // print_r($SAP_DATA);exit; // Debugging: print the SAP data being sent
+        return ['sap_data' => $SAP_DATA, 'requires_emp_doc' => $requiresEmpDoc];
+    }
 
-        // print_r($SAP_DATA);exit;
+    // GFA Verification approve step: posts the invoice to SAP (ZZFI_EXP_POST)
+    // and, only on a successful SAP response, marks the request GFA Verified.
+    public function VerifyAndPostToSap($id, $userId, $tdsCode, $tdsDescription, $postingDate)
+    {
+        $built = $this->BuildFiExpSapData($id, $tdsCode, $tdsDescription, $postingDate);
+        if ($built === null) {
+            return ['success' => false, 'message' => 'Payment request not found.'];
+        }
+        $requiresEmpDoc = $built['requires_emp_doc'];
+        $postingDateFmt = date('Ymd', strtotime($postingDate));
 
         $urlPath = "ZZGP_API/ZZFI_EXP_POST/fiexp?SAP-client=900";
-        $res = SapUrlHelper::PushToSap($urlPath, json_encode([$SAP_DATA]));
-
-        // print_r($res); exit;// Debugging: print the SAP response
+        $res = SapUrlHelper::PushToSap($urlPath, json_encode([$built['sap_data']]));
 
         $resRow    = is_array($res) && isset($res[0]) ? $res[0] : null;
         $status    = $resRow->STATUS ?? 0;
         $empStatus = $resRow->EMP_STATUS ?? 0;
-        // print_r($status);exit;
 
         // Only requests that actually sent emp_code (Employee + gst_vendor_code
         // set) get a second, Employee-side SAP document, so only those need
@@ -1250,7 +1498,14 @@ class FIPaymentModel extends Model
             $currentMonth = (int) date('n');
             $fiscalYear   = $currentMonth >= 4 ? $currentYear : $currentYear - 1;
 
-            $this->db->table('fi_payment_header')->where('payment_id', $id)->update([
+            $audit  = new AuditLogModel();
+            $this->db->transStart();
+
+            $before = $this->db->table('fi_payment_header')
+                ->select('approval_status, tds_code, tds_description, sap_document_no, sap_posting_date')
+                ->where('payment_id', $id)->get()->getRowArray();
+
+            $updateData = [
                 'approval_status'     => 5,
                 'gfa_posted_by'       => $userId,
                 'gfa_posted_at'       => date('Y-m-d H:i:s'),
@@ -1260,9 +1515,13 @@ class FIPaymentModel extends Model
                 'sap_document_no'     => $resRow->DOCUMENT_NO ?? null,
                 'emp_sap_document_no' => $requiresEmpDoc ? ($resRow->EMP_DOCUMENT_NO ?? null) : null,
                 'sap_fiscal_year'     => $fiscalYear,
-            ]);
+            ];
+            $this->db->table('fi_payment_header')->where('payment_id', $id)->update($updateData);
 
-            
+            $diff = $audit->DiffFields($before, $updateData, ['tds_code', 'tds_description', 'sap_document_no', 'sap_posting_date']);
+            $audit->Log('fi_payment', $id, 'post_to_sap', $userId, $before['approval_status'] ?? null, 5, $diff ?: null);
+
+            $this->db->transComplete();
 
             $messages = array_filter([
                 trim($resRow->MESSAGE ?? ''),
@@ -1286,6 +1545,26 @@ class FIPaymentModel extends Model
         return ['success' => false, 'message' => $errorMessage, 'sap_response' => $res];
     }
 
+    // GFA Verification "Simulate" step: previews the SAP GL breakdown
+    // (ZZFI_SIMULATE) for the currently-saved line items without posting or
+    // touching approval_status — lets the verifier review before committing.
+    public function SimulatePosting($id, $tdsCode, $tdsDescription, $postingDate)
+    {
+        $built = $this->BuildFiExpSapData($id, $tdsCode, $tdsDescription, $postingDate);
+        if ($built === null) {
+            return ['success' => false, 'message' => 'Payment request not found.'];
+        }
+
+        $urlPath = "ZZGP_API/ZZFI_SIMULATE/expsim?SAP-client=900";
+        $res = SapUrlHelper::PushToSap($urlPath, json_encode([$built['sap_data']]));
+
+        if (!is_array($res)) {
+            return ['success' => false, 'message' => 'SAP simulation failed.'];
+        }
+
+        return ['success' => true, 'results' => $res];
+    }
+
     public function GetFIPaymentById($id)
     {
         $builder = $this->db->table('fi_payment_header');
@@ -1298,8 +1577,10 @@ class FIPaymentModel extends Model
             service_category_def.definitionsName as service_category_name,
             expense_type_def.definitionsName as expense_type_name,
             CONCAT(cost_center_def.cost_centre_code, ' - ', cost_center_def.cost_centre_desc) as cost_center_name,
+            accounts_approver_info.FIRST_NAME as accounts_approver_name,
             mg_approved_by_info.FIRST_NAME as mg_approved_by_name,
             stores_approved_by_info.FIRST_NAME as stores_approved_by_name,
+            accounts_verified_by_info.FIRST_NAME as accounts_verified_by_name,
             gfa_posted_by_info.FIRST_NAME as gfa_posted_by_name,
             rejected_by_info.FIRST_NAME as rejected_by_name
         ");
@@ -1311,8 +1592,16 @@ class FIPaymentModel extends Model
         $builder->join('definitions_list as service_category_def', 'service_category_def.id = fi_payment_header.service_category', 'left');
         $builder->join('definitions_list as expense_type_def', 'expense_type_def.id = fi_payment_line_items.expenses_type', 'left');
         $builder->join('user_cost_centre_mapping as cost_center_def', 'cost_center_def.id = fi_payment_line_items.cost_center_desc', 'left');
+        // The assigned Accounts Approver for this line item's Cost Centre
+        // mapping — distinct from accounts_verified_by_info, which only
+        // resolves once verification has actually happened. This resolves
+        // regardless, same as cost_center_name itself, so GFA can see who
+        // was (or would be) responsible even when accounts_verification is
+        // 'No' and the stage was skipped entirely.
+        $builder->join('user_info as accounts_approver_info', 'accounts_approver_info.UI_ID = cost_center_def.reporting_accounts_id', 'left');
         $builder->join('user_info as mg_approved_by_info', 'mg_approved_by_info.UI_ID = fi_payment_header.mg_approved_by', 'left');
         $builder->join('user_info as stores_approved_by_info', 'stores_approved_by_info.UI_ID = fi_payment_header.stores_approved_by', 'left');
+        $builder->join('user_info as accounts_verified_by_info', 'accounts_verified_by_info.UI_ID = fi_payment_header.accounts_verified_by', 'left');
         $builder->join('user_info as gfa_posted_by_info', 'gfa_posted_by_info.UI_ID = fi_payment_header.gfa_posted_by', 'left');
         $builder->join('user_info as rejected_by_info', 'rejected_by_info.UI_ID = fi_payment_header.rejected_by', 'left');
 
@@ -1337,6 +1626,7 @@ class FIPaymentModel extends Model
             service_category_def.definitionsName as service_category_name,
             mg_approved_by_info.FIRST_NAME as mg_approved_by_name,
             stores_approved_by_info.FIRST_NAME as stores_approved_by_name,
+            accounts_verified_by_info.FIRST_NAME as accounts_verified_by_name,
             gfa_posted_by_info.FIRST_NAME as gfa_posted_by_name,
             rejected_by_info.FIRST_NAME as rejected_by_name
         ");
@@ -1346,6 +1636,7 @@ class FIPaymentModel extends Model
         $headerBuilder->join('definitions_list as service_category_def', 'service_category_def.id = fi_payment_header.service_category', 'left');
         $headerBuilder->join('user_info as mg_approved_by_info', 'mg_approved_by_info.UI_ID = fi_payment_header.mg_approved_by', 'left');
         $headerBuilder->join('user_info as stores_approved_by_info', 'stores_approved_by_info.UI_ID = fi_payment_header.stores_approved_by', 'left');
+        $headerBuilder->join('user_info as accounts_verified_by_info', 'accounts_verified_by_info.UI_ID = fi_payment_header.accounts_verified_by', 'left');
         $headerBuilder->join('user_info as gfa_posted_by_info', 'gfa_posted_by_info.UI_ID = fi_payment_header.gfa_posted_by', 'left');
         $headerBuilder->join('user_info as rejected_by_info', 'rejected_by_info.UI_ID = fi_payment_header.rejected_by', 'left');
         $headerBuilder->where('fi_payment_header.payment_id', $id);
@@ -1527,6 +1818,8 @@ class FIPaymentModel extends Model
             'reporting_manager_id' => $postData->reporting_manager_id ?? null,
             'store_reporting_id' => $postData->store_reporting_id ?? null,
             'reporting_gfa_id' => $postData->reporting_gfa_id ?? null,
+            'accounts_verification' => $postData->accounts_verification ?? 'No',
+            'reporting_accounts_id' => $postData->reporting_accounts_id ?? null,
         ];
         $costCentres = $postData->cost_centres ?? [];
         if (empty($costCentres)) {
@@ -1640,6 +1933,8 @@ class FIPaymentModel extends Model
             user_cost_centre_mapping.reporting_manager_id,
             user_cost_centre_mapping.store_reporting_id,
             user_cost_centre_mapping.reporting_gfa_id,
+            user_cost_centre_mapping.accounts_verification,
+            user_cost_centre_mapping.reporting_accounts_id,
             user_cost_centre_mapping.cost_centre_code,
             user_cost_centre_mapping.cost_centre_desc,
             user_cost_centre_mapping.profit_centre,
@@ -1649,6 +1944,7 @@ class FIPaymentModel extends Model
             user_cost_centre_mapping.house_bank_ac_no,
             user_cost_centre_mapping.RecStatus,
             user_info.LOGIN_ID AS USER_NAME,
+            accounts_verifier_info.LOGIN_ID AS ACCOUNTS_VERIFIER_NAME,
             (SELECT GROUP_CONCAT(ui.LOGIN_ID ORDER BY FIND_IN_SET(ui.UI_ID, user_cost_centre_mapping.reporting_manager_id) SEPARATOR ', ')
                 FROM user_info ui WHERE FIND_IN_SET(ui.UI_ID, user_cost_centre_mapping.reporting_manager_id)) AS REPORTING_MANAGER_NAME,
             (SELECT GROUP_CONCAT(ui.LOGIN_ID ORDER BY FIND_IN_SET(ui.UI_ID, user_cost_centre_mapping.store_reporting_id) SEPARATOR ', ')
@@ -1657,6 +1953,7 @@ class FIPaymentModel extends Model
                 FROM user_info ui WHERE FIND_IN_SET(ui.UI_ID, user_cost_centre_mapping.reporting_gfa_id)) AS REPORTING_GFA_NAME
         ");
         $builder->join('user_info', 'user_info.UI_ID = user_cost_centre_mapping.user_id', 'left');
+        $builder->join('user_info AS accounts_verifier_info', 'accounts_verifier_info.UI_ID = user_cost_centre_mapping.reporting_accounts_id', 'left');
         $builder->where('user_cost_centre_mapping.deleted_at', null);
         $builder->orderBy('user_cost_centre_mapping.id', 'DESC');
 

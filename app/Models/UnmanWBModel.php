@@ -173,7 +173,7 @@ class UnmanWBModel extends Model
             }
         }
         // CASE A: special modules or both first+second exist -> insert new weighment row (chain)
-        if (($firstWeight && $secondWeight ) && in_array($moduleType, [5,7,13,21,33,19,29,39])) {
+        if (($firstWeight && $secondWeight ) && in_array($moduleType, [5,7,13,21,33,19,29,39,20])) {
             $this->db->transStart();
              $netWeight1 = 0;
             if ($movementType === 1) {

@@ -1044,7 +1044,7 @@ const OverAllDetails = ({ setShow, show, gateInOutInfoId }) => {
                                         </FormGroup>
                                     </Col> */}
 
-                                </> : data.moduleTypeId == 12 || data.moduleTypeId == 15 || data.moduleTypeId == 21 || data.moduleTypeId == 25 || data.moduleTypeId == 29 || data.moduleTypeId == 33 || data.moduleTypeId == 34 || data.moduleTypeId == 1 || data.moduleTypeId == 2 ?
+                                </> : data.moduleTypeId == 12 || data.moduleTypeId == 15 || data.moduleTypeId == 21 || data.moduleTypeId == 25 || data.moduleTypeId == 29 || data.moduleTypeId == 33 || data.moduleTypeId == 34 || data.moduleTypeId == 1 || data.moduleTypeId == 2 || data.moduleTypeId == 20 || data.moduleTypeId == 5 ?
                                     <>
                                         <Col md="12" sm="12">
                                             <table className="table table-bordered">

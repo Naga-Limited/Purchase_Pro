@@ -361,7 +361,7 @@ const GateInOutReport = ({ actionRendorer }) => {
             window.open(`/public/#/SsAndPmReturnSmartForm/${row.gateInOutInfoId}`)
         } else if (row.moduleTypeId == 5 || row.moduleTypeId == 22) {
             window.open(`/public/#/GatePassSmartForm/${row.gateInOutInfoId}`)
-        } else if (row.moduleTypeId == 6 || row.moduleTypeId == 20) {
+        } else if (row.moduleTypeId == 6 ) {
             window.open(`/public/#/SsAndPmSmartForm/${row.gateInOutInfoId}`)
         } else if (row.moduleTypeId == 7) {
             window.open(`/public/#/SDGSalesSmartForm/${row.gateInOutInfoId}`)
@@ -373,7 +373,7 @@ const GateInOutReport = ({ actionRendorer }) => {
             window.open(`/public/#/SDGStoSmartForm/${row.gateInOutInfoId}`)
         } else if (row.moduleTypeId == 14 || row.moduleTypeId == 45) {
             window.open(`/public/#/RmWaterSmartForm/${row.gateInOutInfoId}`)
-        } else if (row.moduleTypeId == 36  || row.moduleTypeId == 26 || row.moduleTypeId == 27 || row.moduleTypeId == 29 || row.moduleTypeId == 24 || row.moduleTypeId == 28 || row.moduleTypeId == 30 || row.moduleTypeId == 31 || row.moduleTypeId == 37 || row.moduleTypeId == 40 || row.moduleTypeId == 41 || row.moduleTypeId == 38 || row.moduleTypeId == 42 || row.moduleTypeId == 44 || row.moduleTypeId == 43) {
+        } else if (row.moduleTypeId == 36  || row.moduleTypeId == 26 || row.moduleTypeId == 27 || row.moduleTypeId == 29 || row.moduleTypeId == 24 || row.moduleTypeId == 28 || row.moduleTypeId == 30 || row.moduleTypeId == 31 || row.moduleTypeId == 37 || row.moduleTypeId == 40 || row.moduleTypeId == 41 || row.moduleTypeId == 38 || row.moduleTypeId == 42 || row.moduleTypeId == 44 || row.moduleTypeId == 43 || row.moduleTypeId == 20) {
             window.open(`/public/#/OverAllSmartForm/${row.gateInOutInfoId}`)
         }
     }

@@ -12,23 +12,13 @@ import { apiPostMethod } from '@helpers/axiosHelper';
 import { ShowToast } from '@helpers/appHelper';
 import { useLoader } from '../../utility/hooks/useLoader';
 import confirmDialog from '../../@core/components/confirm/confirmDialog';
-import DateComponent from '../common/dateComponent';
 
-// approval_status: 1 = Pending Manager Approval, 2 = Approved by Manager
-// (waiting on Store Acknowledge), 4 = Store Acknowledged (waiting on GFA
-// Verification — this screen), 5 = GFA Verified (Completed), 10 = Rejected
-const APPROVAL_STATUS = { GFA_STAGE: 4, VERIFIED: 5, REJECTED: 10 };
+// approval_status: 6 = Pending Accounts Verification (this screen), 4 =
+// Approved (rejoins the existing GFA queue), 10 = Rejected.
+const APPROVAL_STATUS = { PENDING: 6, APPROVED: 4, REJECTED: 10 };
 
 const currency = (n) =>
     `INR ${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-// SAP displays negative amounts with a trailing minus (e.g. "9,146.00-")
-// instead of a leading one — matches the SAP GUI simulation screen.
-const formatSapAmount = (n) => {
-    const num = Number(n) || 0;
-    const abs = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    return num < 0 ? `${abs}-` : abs;
-};
 
 const formatDate = (dateStr) => {
     if (!dateStr) return '-';
@@ -73,7 +63,6 @@ const transformCreditMemoRows = (rows) => {
 
         memo_no: first.memo_no,
         memo_date: first.memo_date,
-        posting_date: first.posting_date,
         total_amount: first.total_amount,
         original_invoice_total_amount: first.original_invoice_total_amount,
 
@@ -85,13 +74,10 @@ const transformCreditMemoRows = (rows) => {
         account_no: first.account_no,
         business_area: first.business_area,
         cost_center: [...new Set(lineRows.map((r) => r.cost_center).filter(Boolean))].join(', '),
-        accounts_approver_name: [...new Set(lineRows.map((r) => r.accounts_approver_name).filter(Boolean))].join(', '),
         bank_ac_no: first.bank_account_no,
         bank_ifsc_code: first.bank_ifsc_code,
         house_bank_id: first.house_bank_id,
         house_bank_ac_no: first.house_bank_ac_no,
-        tds_code: first.tds_code,
-        tds_description: first.tds_description,
 
         invoice_copy_url: first.invoice_copy,
         back_paper_url: first.back_paper,
@@ -166,7 +152,7 @@ const Card = ({ icon, title, extra, children }) => (
     </div>
 );
 
-function CreditMemoGFAVerification() {
+function CreditMemoAccountsVerification() {
     const { Id } = useParams();
     const id = Id ? Id.replace(':', '') : '';
     const history = useHistory();
@@ -182,13 +168,9 @@ function CreditMemoGFAVerification() {
     const [rejectModalOpen, setRejectModalOpen] = useState(false);
     const [rejectRemarks, setRejectRemarks]     = useState('');
 
-    const [tdsCode, setTdsCode]               = useState('');
-    const [tdsDescription, setTdsDescription] = useState('');
-    const [tdsOptions, setTdsOptions]         = useState([]);
-    const [postingDate, setPostingDate]       = useState(() => new Date().toISOString().slice(0, 10));
-    const dateRestriction = DateComponent('fiPayment');
-
-    // ─── GFA-editable line items (mirrors GFAVerification.js) ────────────────
+    // ─── Accounts Verification-editable line items (mirrors
+    // CreditMemoGFAVerification.js, minus TDS Code/Posting Date/SAP
+    // simulate-post — those stay GFA-only) ───────────────────────────────
     const [expensesTypeOptions, setExpensesTypeOptions] = useState([]);
     const [costCentreOptions, setCostCentreOptions]     = useState([]);
     const [taxOptions, setTaxOptions]                   = useState([]);
@@ -200,11 +182,6 @@ function CreditMemoGFAVerification() {
         profit_center_desc: '', hsn_sac: '',
     });
     const [lineItems, setLineItems] = useState([]);
-
-    // ─── SAP posting simulation popup (Simulate button) ──────────────────────
-    const [simulateModalOpen, setSimulateModalOpen] = useState(false);
-    const [simulateRows, setSimulateRows]           = useState([]);
-    const [simulating, setSimulating]               = useState(false);
 
     const showErrorDialog = (message) => {
         confirmDialog({
@@ -227,16 +204,6 @@ function CreditMemoGFAVerification() {
         });
     };
 
-    const showSuccessDialog = (message) => {
-        confirmDialog({
-            title: `<h5><strong class="text-white">${message || 'Success'}</strong></h5>`,
-            cancelButton: false,
-            confirmText: false,
-            confirmButton: false,
-            background: '#28a745',
-        });
-    };
-
     const fetchRecord = useCallback(async () => {
         if (!id) { setError('No credit memo id provided'); setLoading(false); return; }
         try {
@@ -244,13 +211,7 @@ function CreditMemoGFAVerification() {
             showLoader();
             const res = await apiPostMethod(`${apiBaseUrl}CreditMemoController/GetCreditMemoById`, { id });
             if (res?.data?.success && res.data.results?.length) {
-                const transformed = transformCreditMemoRows(res.data.results);
-                setRecord(transformed);
-                setTdsCode(transformed?.tds_code || '');
-                setTdsDescription(transformed?.tds_description || '');
-                if (transformed?.posting_date) {
-                    setPostingDate(transformed.posting_date.split(' ')[0].split('T')[0]);
-                }
+                setRecord(transformCreditMemoRows(res.data.results));
                 setError('');
             } else {
                 setError(res?.data?.message || 'Unable to load credit memo');
@@ -266,17 +227,10 @@ function CreditMemoGFAVerification() {
 
     useEffect(() => { fetchRecord(); }, [fetchRecord]);
 
-    useEffect(() => {
-        if (!record?.vendor_code) return;
-        apiPostMethod(`${apiBaseUrl}FIPaymentController/GetTdsFromVendor`, { vendor_code: record.vendor_code })
-            .then((res) => setTdsOptions(res?.data?.results || []))
-            .catch((e) => console.error(e));
-    }, [record]); // eslint-disable-line
-
     // Expense Type / Cost Centre options are scoped to the request's original
-    // submitter (created_by), not the logged-in GFA verifier — the verifier is
-    // editing someone else's line items, so the dropdowns must reflect the
-    // submitter's own mappings.
+    // submitter (created_by), not the logged-in Accounts Verifier — the
+    // verifier is editing someone else's line items, so the dropdowns must
+    // reflect the submitter's own mappings.
     useEffect(() => {
         if (!record?.created_by) return;
         apiPostMethod(`${apiBaseUrl}FIPaymentController/GetExpenseTypesByUser`, { userid: record.created_by })
@@ -294,7 +248,7 @@ function CreditMemoGFAVerification() {
             .then((res) => setTaxOptions(res?.data?.results || []));
     }, []);
 
-    // ─── Hydrate the GFA-editable line items once the record has loaded ─────
+    // ─── Hydrate the editable line items once the record has loaded ─────────
     useEffect(() => {
         if (!record) return;
         setLineItems(record.line_items && record.line_items.length ? record.line_items : [blankLineItem()]);
@@ -306,7 +260,7 @@ function CreditMemoGFAVerification() {
     // whenever the invoice's Division is one of these.
     const DIVISION_AS_COST_CTR = ['NLSD', 'NLCD'];
 
-    // ─── Line item helpers (mirrors GFAVerification.js) ──────────────────────
+    // ─── Line item helpers (mirrors CreditMemoGFAVerification.js) ────────────
     const fetchBudgetForLineItem = async (lineId, glCode, costCentre) => {
         if (!glCode || !costCentre) return;
         try {
@@ -411,14 +365,9 @@ function CreditMemoGFAVerification() {
     // Tax code descriptions from SAP are the only place a rate is exposed —
     // GetTaxCodesFromSap only forwards TAX_CODE/TAX_DESC, no separate rate
     // field — so CGST/SGST/IGST rates are parsed out of that free text.
-    // SAP writes this two different ways: rate-follows-its-own-keyword
-    // ("CGST 9% + SGST 9%") and keywords-grouped-then-rates-grouped
-    // ("SGST,CGST @ 9%+9%") — pairing keywords and rates up positionally, in
-    // the order each is written, handles both shapes. A lone "18%" with no
-    // CGST/SGST/IGST keyword is treated as an intra-state rate and split
-    // evenly. Same logic as VendorInvoiceSubmit.js / GFAVerification.js, so
-    // Credit Memo GFA re-verification recalculates live off whatever Amount /
-    // Tax Code the verifier edits here.
+    // Same logic as GFAVerification.js/CreditMemoGFAVerification.js, so
+    // Accounts Verification recalculates live off whatever Amount / Tax
+    // Code the verifier edits here.
     const parseTaxRates = (description) => {
         const text = (description || '').toUpperCase();
         const keywords = text.match(/CGST|SGST|IGST/g) || [];
@@ -456,16 +405,16 @@ function CreditMemoGFAVerification() {
         return { baseAmt, cgstAmt, sgstAmt, igstAmt };
     };
 
-    const updateApprovalStatus = async (status, remarks, extra) => {
+    const updateApprovalStatus = async (status, remarks) => {
         try {
             setSubmitting(true);
             showLoader();
             const res = await apiPostMethod(`${apiBaseUrl}CreditMemoController/UpdateApprovalStatus`, {
-                id, status, remarks: remarks || null, userid: UserDetails.USERID, ...extra,
+                id, status, remarks: remarks || null, userid: UserDetails.USERID,
             });
             if (res?.data?.success) {
                 ShowToast(res.data.message || 'Updated successfully.');
-                history.push('/CREDITMEMORECEIPTGFALIST');
+                history.push('/CREDITMEMORECEIPTACCOUNTSVERIFICATIONLIST');
             } else {
                 showErrorDialog(res?.data?.message || 'Unable to update credit memo status');
             }
@@ -478,68 +427,30 @@ function CreditMemoGFAVerification() {
         }
     };
 
-    const verifyAndPostToSap = async () => {
-        try {
-            setSubmitting(true);
-            showLoader();
-            const res = await apiPostMethod(`${apiBaseUrl}CreditMemoController/VerifyAndPostToSap`, {
-                id, userid: UserDetails.USERID,
-                tds_code: tdsCode, tds_description: tdsDescription,
-                posting_date: postingDate,
-            });
-            if (res?.data?.success ) {
-                // Backend already embeds "Document No: X" into message when SAP
-                // returns one (both a fresh post's DEDUCT_DOCUMENT_NO and an
-                // "already posted" response's DOCUMENT_NO) — no need to re-derive
-                // it here.
-                showSuccessDialog(res.data.message || 'Verified and posted to SAP successfully.');
-                history.push('/CREDITMEMORECEIPTGFALIST');
-            } else {
-                showErrorDialog(res?.data?.message || 'Unable to post credit memo to SAP');
-            }
-        } catch (e) {
-            console.error(e);
-            showErrorDialog('Failed to post credit memo to SAP');
-        } finally {
-            setSubmitting(false);
-            hideLoader();
-        }
-    };
-
-    const handleTdsCodeChange = (e) => {
-        const val = e.target.value;
-        const selected = tdsOptions.find((opt) => opt.value === val);
-        setTdsCode(selected ? selected.tds_code : '');
-        setTdsDescription(selected ? selected.description : '');
-    };
-
-    // TDS_CODE alone can repeat across TDS_TYPEs (e.g. 'Z1'), so the <select>
-    // option value is a composite key — recover it here from the plain
-    // code/description pair stored on the record for the initial selection.
-    const selectedTdsValue = tdsOptions.find(
-        (opt) => opt.tds_code === tdsCode && opt.description === tdsDescription
-    )?.value || '';
-
-    // Saves the current line item edits, then asks SAP to simulate the
-    // posting (ZZFI_SIMULATE) and opens a preview popup instead of posting
-    // immediately — the popup's Post button performs the actual SAP post
-    // (verifyAndPostToSap), Cancel just dismisses the preview.
-    const handleSimulate = async () => {
-        if (!postingDate) {
-            showErrorDialog('Posting Date is required before approving');
-            return;
-        }
+    // Saves the current line item edits (same UpdateGFADetails endpoint GFA
+    // uses, tagged with its own audit action label), then advances the
+    // request straight into the existing GFA queue — no SAP simulate/post
+    // here, that stays GFA's job.
+    const handleApprove = async () => {
         if (lineItems.some((item) => isOverBudget(item))) {
             showErrorDialog('One or more line items exceed the available budget for their GL Code / Cost Centre.');
             return;
         }
 
+        const confirmed = await confirmDialog({
+            title: 'Approve this credit memo?',
+            confirmText: 'Approve',
+            cancelText: 'Cancel',
+        });
+        if (!confirmed) return;
+
         try {
-            setSimulating(true);
+            setSubmitting(true);
             showLoader();
             const updateRes = await apiPostMethod(`${apiBaseUrl}CreditMemoController/UpdateGFADetails`, {
                 credit_memo_id: id,
                 userid: UserDetails.USERID,
+                action: 'accounts_verify_update',
                 line_items: lineItems.map((item) => {
                     const { id: lineItemId, ...rest } = item;
                     const { baseAmt, cgstAmt, sgstAmt, igstAmt } = getTaxSplit(item);
@@ -551,29 +462,22 @@ function CreditMemoGFAVerification() {
                 return;
             }
 
-            const simRes = await apiPostMethod(`${apiBaseUrl}CreditMemoController/SimulatePosting`, {
-                id, tds_code: tdsCode, tds_description: tdsDescription, posting_date: postingDate,
+            const res = await apiPostMethod(`${apiBaseUrl}CreditMemoController/UpdateApprovalStatus`, {
+                id, status: APPROVAL_STATUS.APPROVED, remarks: null, userid: UserDetails.USERID,
             });
-            if (!simRes?.data?.success) {
-                showErrorDialog(simRes?.data?.message || 'Unable to simulate SAP posting.');
-                return;
+            if (res?.data?.success) {
+                ShowToast(res.data.message || 'Approved successfully.');
+                history.push('/CREDITMEMORECEIPTACCOUNTSVERIFICATIONLIST');
+            } else {
+                showErrorDialog(res?.data?.message || 'Unable to update credit memo status');
             }
-            setSimulateRows(Array.isArray(simRes.data.results) ? simRes.data.results : []);
-            setSimulateModalOpen(true);
         } catch (e) {
             console.error(e);
-            showErrorDialog('Failed to simulate SAP posting.');
+            showErrorDialog('Failed to approve credit memo.');
         } finally {
-            setSimulating(false);
+            setSubmitting(false);
             hideLoader();
         }
-    };
-
-    const closeSimulateModal = () => setSimulateModalOpen(false);
-
-    const handlePostFromSimulate = () => {
-        setSimulateModalOpen(false);
-        verifyAndPostToSap();
     };
 
     const openRejectModal  = () => setRejectModalOpen(true);
@@ -607,7 +511,7 @@ function CreditMemoGFAVerification() {
 
     const d = record || {};
     const isRelatedToFI = d.record_type === 'related_fi';
-    const isActionable = d.approval_status === APPROVAL_STATUS.GFA_STAGE;
+    const isActionable = d.approval_status === APPROVAL_STATUS.PENDING;
 
     const historyStages = [
         { label: 'Submitted', at: d.created_at },
@@ -628,9 +532,9 @@ function CreditMemoGFAVerification() {
                         <ArrowLeft size={15} /> Back
                     </Button>
                     <div>
-                        <h2 style={{ color: '#22315a', fontWeight: 800, marginBottom: 4 }}>GFA - Verification</h2>
+                        <h2 style={{ color: '#22315a', fontWeight: 800, marginBottom: 4 }}>Accounts Verification</h2>
                         <p style={{ color: '#6c757d', marginBottom: 0 }}>
-                            Verify and approve global financial authorizations for pending credit memo requests.
+                            Review and verify credit memo requests before they move on to GFA Verification.
                         </p>
                     </div>
                 </div>
@@ -667,11 +571,9 @@ function CreditMemoGFAVerification() {
                 <Row>
                     <Col md="2" sm="6" xs="6"><Field label="Manager Approved By" value={d.mg_approved_by_name} /></Col>
                     <Col md="2" sm="6" xs="6"><Field label="Store Acknowledged By" value={d.stores_approved_by_name} /></Col>
-                    <Col md="2" sm="6" xs="6"><Field label="Accounts Verified By" value={d.accounts_verified_by_name} /></Col>
                     <Col md="2" sm="6" xs="6"><Field label="GFA Posted By" value={d.gfa_posted_by_name} /></Col>
                     <Col md="2" sm="6" xs="6"><Field label="Rejected By" value={d.rejected_by_name} /></Col>
                     <Col md="2" sm="6" xs="6"><Field label="Cost Centre" value={d.cost_center} /></Col>
-                    <Col md="2" sm="6" xs="6"><Field label="Accounts Approver" value={d.accounts_approver_name} /></Col>
                 </Row>
             </Card>
 
@@ -688,46 +590,6 @@ function CreditMemoGFAVerification() {
                         <Row>
                             <Col md="3" sm="6" xs="6"><Field label="House Bank Id" value={d.house_bank_id} /></Col>
                             <Col md="3" sm="6" xs="6"><Field label="House Bank AC No" value={d.house_bank_ac_no} /></Col>
-                            <Col md="3" sm="6" xs="6">
-                                <FormGroup className="mb-0">
-                                    <Label style={{
-                                        fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
-                                        textTransform: 'uppercase', color: '#8a94a6', marginBottom: 4,
-                                    }}>
-                                        TDS Code {isActionable && <span className="text-danger">*</span>}
-                                    </Label>
-                                    <Input
-                                        type="select" bsSize="sm"
-                                        value={selectedTdsValue} disabled={!isActionable}
-                                        onChange={handleTdsCodeChange}
-                                    >
-                                        <option value="">Select...</option>
-                                        {tdsOptions.map((opt) => (
-                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                        ))}
-                                    </Input>
-                                </FormGroup>
-                            </Col>
-                            <Col md="3" sm="6" xs="6"><Field label="TDS Description" value={tdsDescription} /></Col>
-                        </Row>
-                        <Row>
-                            <Col md="3" sm="6" xs="6">
-                                <FormGroup className="mb-0">
-                                    <Label style={{
-                                        fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
-                                        textTransform: 'uppercase', color: '#8a94a6', marginBottom: 4,
-                                    }}>
-                                        Posting Date {isActionable && <span className="text-danger">*</span>}
-                                    </Label>
-                                    <Input
-                                        type="date" bsSize="sm"
-                                        value={postingDate} disabled={!isActionable}
-                                        min={dateRestriction.min_date} max={dateRestriction.max_date}
-                                        onChange={(e) => setPostingDate(e.target.value)}
-                                        onKeyDown={e => e.preventDefault()}
-                                    />
-                                </FormGroup>
-                            </Col>
                         </Row>
                     </Card>
                 </Col>
@@ -943,13 +805,13 @@ function CreditMemoGFAVerification() {
             {/* ── APPROVE / REJECT ACTIONS ────────────────────────────── */}
             {isActionable && (
                 <div className="d-flex justify-content-end" style={{ gap: 8, marginTop: 8 }}>
-                    <Button color="danger" disabled={submitting || simulating} onClick={openRejectModal}
+                    <Button color="danger" disabled={submitting} onClick={openRejectModal}
                         style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <XCircle size={16} /> Reject
                     </Button>
-                    <Button color="primary" disabled={submitting || simulating} onClick={handleSimulate}
+                    <Button color="success" disabled={submitting} onClick={handleApprove}
                         style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Check size={16} /> Simulate
+                        <Check size={16} /> Approve
                     </Button>
                 </div>
             )}
@@ -979,75 +841,6 @@ function CreditMemoGFAVerification() {
                     <Button color="secondary" size="sm" onClick={closeRejectModal}>Cancel</Button>
                     <Button color="danger" size="sm" disabled={submitting} onClick={handleRejectSubmit}>
                         Reject Credit Memo
-                    </Button>
-                </Modal.Footer>
-            </Modal>
-
-            {/* ── SAP SIMULATION MODAL ─────────────────────────────────── */}
-            <Modal show={simulateModalOpen} onHide={closeSimulateModal} centered size="lg">
-                <Modal.Header style={{ background: '#f8f9fa', borderBottom: '1px solid #dee2e6' }}>
-                    <Modal.Title style={{ fontSize: 16, fontWeight: 600, color: '#343a40' }}>
-                        SAP Posting Simulation
-                    </Modal.Title>
-                    <button type="button" className="close" onClick={closeSimulateModal}>
-                        <X size={18} />
-                    </button>
-                </Modal.Header>
-                <Modal.Body>
-                    <Row>
-                        <Col md="4" sm="6" xs="6"><Field label="Vendor Name" value={d.vendor_name} /></Col>
-                        <Col md="4" sm="6" xs="6"><Field label="Posting Date" value={formatDate(postingDate)} /></Col>
-                        <Col md="4" sm="6" xs="6"><Field label="Document Date" value={formatDate(d.memo_date)} /></Col>
-                    </Row>
-                    <Row>
-                        <Col md="4" sm="6" xs="6"><Field label="House Bank Id" value={d.house_bank_id} /></Col>
-                        <Col md="4" sm="6" xs="6"><Field label="House Bank AC No" value={d.house_bank_ac_no} /></Col>
-                        <Col md="4" sm="6" xs="6"><Field label="Business Area" value={d.business_area} /></Col>
-                    </Row>
-                    <hr style={{ margin: '4px 0 16px' }} />
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                            <thead>
-                                <tr style={{ background: '#eef3fc' }}>
-                                    {['Item', 'Account', 'Account Short Text', 'Amount'].map((col) => (
-                                        <th key={col} style={{
-                                            padding: '8px 10px', textAlign: col === 'Amount' ? 'right' : 'left',
-                                            fontWeight: 700, color: '#22315a', fontSize: 11,
-                                            textTransform: 'uppercase', letterSpacing: '0.03em',
-                                            borderBottom: '1px solid #dbe4f3',
-                                        }}>
-                                            {col}
-                                        </th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {simulateRows.map((row, i) => (
-                                    <tr key={i} style={{ background: i % 2 ? '#f5f8fd' : '#fff' }}>
-                                        <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef1f6' }}>{i + 1}</td>
-                                        <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef1f6' }}>{row.VEN_GL}</td>
-                                        <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef1f6' }}>{row.TEXT}</td>
-                                        <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef1f6', textAlign: 'right' }}>
-                                            {formatSapAmount(row.AMOUNT)}
-                                        </td>
-                                    </tr>
-                                ))}
-                                {!simulateRows.length && (
-                                    <tr>
-                                        <td colSpan={4} style={{ padding: 16, textAlign: 'center', color: '#8a94a6' }}>
-                                            No simulation data returned.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </Modal.Body>
-                <Modal.Footer style={{ background: '#f8f9fa', justifyContent: 'space-between' }}>
-                    <Button color="secondary" size="sm" onClick={closeSimulateModal}>Cancel</Button>
-                    <Button color="success" size="sm" disabled={submitting} onClick={handlePostFromSimulate}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Check size={14} /> Post
                     </Button>
                 </Modal.Footer>
             </Modal>
@@ -1099,4 +892,4 @@ function CreditMemoGFAVerification() {
     );
 }
 
-export default CreditMemoGFAVerification;
+export default CreditMemoAccountsVerification;

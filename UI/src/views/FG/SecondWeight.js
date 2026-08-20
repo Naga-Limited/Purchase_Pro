@@ -18,7 +18,7 @@ const SecondWeight = ({ data, setData, setIsDisabled, setTruckValue, selectedDoc
 
   //console.log(selectedDocument?.documentWeight);
 
-  const multipleWeightType = data?.moduleTypeId == 7 || data?.moduleTypeId == 13 || data?.moduleTypeId == 5 || data?.moduleTypeId == 12 || data?.moduleTypeId == 15 || data?.moduleTypeId == 21 || data?.moduleTypeId == 25 || data?.moduleTypeId == 33 || data?.moduleTypeId == 34 || data?.moduleTypeId == 1 || data?.moduleTypeId == 2 || data?.moduleTypeId == 29  || data?.moduleTypeId == 27 || data?.moduleTypeId == 28 || data?.moduleTypeId == 40 || data?.moduleTypeId == 39 || data?.moduleTypeId == 41 || data?.moduleTypeId == 19 ||  data?.moduleTypeId == 8 ||  data?.moduleTypeId == 43
+  const multipleWeightType = data?.moduleTypeId == 7 || data?.moduleTypeId == 13 || data?.moduleTypeId == 5 || data?.moduleTypeId == 12 || data?.moduleTypeId == 15 || data?.moduleTypeId == 21 || data?.moduleTypeId == 25 || data?.moduleTypeId == 33 || data?.moduleTypeId == 34 || data?.moduleTypeId == 1 || data?.moduleTypeId == 2 || data?.moduleTypeId == 29  || data?.moduleTypeId == 27 || data?.moduleTypeId == 28 || data?.moduleTypeId == 40 || data?.moduleTypeId == 39 || data?.moduleTypeId == 41 || data?.moduleTypeId == 19 ||  data?.moduleTypeId == 8 ||  data?.moduleTypeId == 43 ||  data?.moduleTypeId == 20
 
 
   useEffect(() => {

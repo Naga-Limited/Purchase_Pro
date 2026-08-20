@@ -118,6 +118,8 @@ const baseColumns = [
     { name: 'Manager Approved By', selector: 'mg_approved_by_name', sortable: true, minWidth: '160px' },
     { name: 'Store Acknowledged At', selector: 'stores_approved_at', sortable: true, minWidth: '180px', cell: dateTimeCell('stores_approved_at') },
     { name: 'Store Acknowledged By', selector: 'stores_approved_by_name', sortable: true, minWidth: '170px' },
+    { name: 'Accounts Verified At', selector: 'accounts_verified_at', sortable: true, minWidth: '180px', cell: dateTimeCell('accounts_verified_at') },
+    { name: 'Accounts Verified By', selector: 'accounts_verified_by_name', sortable: true, minWidth: '170px' },
     { name: 'GFA Posted At', selector: 'gfa_posted_at', sortable: true, minWidth: '170px', cell: dateTimeCell('gfa_posted_at') },
     { name: 'GFA Posted By', selector: 'gfa_posted_by_name', sortable: true, minWidth: '150px' },
     { name: 'Rejected At', selector: 'rejected_at', sortable: true, minWidth: '160px', cell: dateTimeCell('rejected_at') },

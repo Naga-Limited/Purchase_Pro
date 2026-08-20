@@ -27,6 +27,14 @@ const GST_LABELS = { 1: 'YES', 2: 'NO' };
 const currency = (n) =>
     `INR ${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+// SAP displays negative amounts with a trailing minus (e.g. "9,146.00-")
+// instead of a leading one — matches the SAP GUI simulation screen.
+const formatSapAmount = (n) => {
+    const num = Number(n) || 0;
+    const abs = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return num < 0 ? `${abs}-` : abs;
+};
+
 const formatDate = (dateStr) => {
     if (!dateStr) return '-';
     const d = new Date(dateStr);
@@ -90,6 +98,7 @@ const transformPaymentRows = (rows) => {
         business_area: first.business_area,
         nature_of_expenses: first.nature_of_expenses,
         cost_center: [...new Set(rows.filter((r) => r.line_id !== null && r.line_id !== undefined).map((r) => r.cost_center).filter(Boolean))].join(', '),
+        accounts_approver_name: [...new Set(rows.filter((r) => r.line_id !== null && r.line_id !== undefined).map((r) => r.accounts_approver_name).filter(Boolean))].join(', '),
         tds_code: first.tds_code,
         tds_description: first.tds_description,
 
@@ -101,6 +110,8 @@ const transformPaymentRows = (rows) => {
         mg_approved_by_name: first.mg_approved_by_name,
         stores_approved_at: first.stores_approved_at,
         stores_approved_by_name: first.stores_approved_by_name,
+        accounts_verified_at: first.accounts_verified_at,
+        accounts_verified_by_name: first.accounts_verified_by_name,
         gfa_posted_at: first.gfa_posted_at,
         gfa_posted_by_name: first.gfa_posted_by_name,
         rejected_at: first.rejected_at,
@@ -211,6 +222,11 @@ function GFAVerificationView() {
 
     const [existingFiles, setExistingFiles] = useState({ Invoicecopy: '', Attachment: '' });
     const [attachedFiles, setAttachedFiles]   = useState({});
+
+    // ─── SAP posting simulation popup (Simulate button) ──────────────────────
+    const [simulateModalOpen, setSimulateModalOpen] = useState(false);
+    const [simulateRows, setSimulateRows]           = useState([]);
+    const [simulating, setSimulating]               = useState(false);
 
     // CustomDropdownInput only needs a form-shaped object to read touched/errors
     // from — Payment Term is driven directly off local state (value + onChange
@@ -389,14 +405,21 @@ function GFAVerificationView() {
         }
     };
 
-    const handleCostCentreChange = (lineId, mappingId) => {
-        const selected = costCentreOptions.find((opt) => String(opt.value) === String(mappingId));
+    // A single mapping row can carry several comma-separated Cost Centre
+    // codes (GetCostCentresByUser explodes each into its own option), so
+    // multiple options can share the same mapping id — matching on id alone
+    // would always resolve to whichever code was exploded first, not
+    // whichever option the user actually picked. The option's array index is
+    // the only thing guaranteed unique per <option>, so the select is keyed
+    // on that; cost_center_desc still stores the option's real mapping id.
+    const handleCostCentreChange = (lineId, optionIdx) => {
+        const selected = costCentreOptions[Number(optionIdx)];
         const costCenterCode = selected ? selected.cost_centre_code : '';
         let nextItem = null;
         setLineItems((p) => p.map((i) => {
             if (i.id !== lineId) return i;
             nextItem = {
-                ...i, cost_center_desc: mappingId, cost_center: costCenterCode,
+                ...i, cost_center_desc: selected ? selected.value : '', cost_center: costCenterCode,
                 profit_center: selected ? selected.profit_centre : '',
                 profit_center_desc: selected ? selected.profit_centre_desc : '',
             };
@@ -551,7 +574,11 @@ function GFAVerificationView() {
         (opt) => opt.tds_code === tdsCode && opt.description === tdsDescription
     )?.value || '';
 
-    const handleApprove = async () => {
+    // Saves the current line item / header edits, then asks SAP to simulate
+    // the posting (ZZFI_SIMULATE) and opens a preview popup instead of
+    // posting immediately — the popup's Post button performs the actual
+    // SAP post (verifyAndPostToSap), Cancel just dismisses the preview.
+    const handleSimulate = async () => {
         if (!postingDate) {
             showErrorDialog('Posting Date is required before approving');
             return;
@@ -568,15 +595,9 @@ function GFAVerificationView() {
             showErrorDialog('One or more line items exceed the available budget for their GL Code / Cost Centre.');
             return;
         }
-        const confirmed = await confirmDialog({
-            title: 'Verify and post this payment to SAP?',
-            confirmText: 'Approve',
-            cancelText: 'Cancel',
-        });
-        if (!confirmed) return;
 
         try {
-            setSubmitting(true);
+            setSimulating(true);
             showLoader();
 
             let invoiceCopyFileName = existingFiles.Invoicecopy || '';
@@ -600,6 +621,7 @@ function GFAVerificationView() {
 
             const updateRes = await apiPostMethod(`${apiBaseUrl}FIPaymentController/UpdateGFADetails`, {
                 payment_id: id,
+                userid: UserDetails.USERID,
                 invoice_number: invoiceNumber,
                 invoice_date: invoiceDate,
                 payment_term: paymentTerm?.value || null,
@@ -615,15 +637,31 @@ function GFAVerificationView() {
                 showErrorDialog(updateRes?.data?.message || 'Unable to save payment details.');
                 return;
             }
+            setExistingFiles({ Invoicecopy: invoiceCopyFileName, Attachment: attachmentFileName });
+            setAttachedFiles({});
+
+            const simRes = await apiPostMethod(`${apiBaseUrl}FIPaymentController/SimulatePosting`, {
+                id, tds_code: tdsCode, tds_description: tdsDescription, posting_date: postingDate,
+            });
+            if (!simRes?.data?.success) {
+                showErrorDialog(simRes?.data?.message || 'Unable to simulate SAP posting.');
+                return;
+            }
+            setSimulateRows(Array.isArray(simRes.data.results) ? simRes.data.results : []);
+            setSimulateModalOpen(true);
         } catch (e) {
             console.error(e);
-            showErrorDialog('Failed to save payment details.');
-            return;
+            showErrorDialog('Failed to simulate SAP posting.');
         } finally {
-            setSubmitting(false);
+            setSimulating(false);
             hideLoader();
         }
+    };
 
+    const closeSimulateModal = () => setSimulateModalOpen(false);
+
+    const handlePostFromSimulate = () => {
+        setSimulateModalOpen(false);
         verifyAndPostToSap();
     };
 
@@ -665,6 +703,7 @@ function GFAVerificationView() {
         { label: 'Submitted', at: d.created_at },
         { label: 'Manager Approved', at: d.mg_approved_at, by: d.mg_approved_by_name },
         { label: 'Store Acknowledged', at: d.stores_approved_at, by: d.stores_approved_by_name },
+        { label: 'Accounts Verified', at: d.accounts_verified_at, by: d.accounts_verified_by_name },
         { label: 'GFA Verified', at: d.gfa_posted_at, by: d.gfa_posted_by_name },
         { label: 'Rejected', at: d.rejected_at, by: d.rejected_by_name },
     ].filter((s) => s.label !== 'Rejected' || d.rejected_at);
@@ -736,10 +775,12 @@ function GFAVerificationView() {
                     <Col md="2" sm="6" xs="6"><Field label="MIGO Number" value={d.migo_number} /></Col>
                     <Col md="2" sm="6" xs="6"><Field label="Service Category" value={d.service_category} /></Col>
                     <Col md="2" sm="6" xs="6"><Field label="Cost Centre" value={d.cost_center} /></Col>
+                    <Col md="2" sm="6" xs="6"><Field label="Accounts Approver" value={d.accounts_approver_name} /></Col>
                 </Row>
                 <Row>
                     <Col md="2" sm="6" xs="6"><Field label="Manager Approved By" value={d.mg_approved_by_name} /></Col>
                     <Col md="2" sm="6" xs="6"><Field label="Store Acknowledged By" value={d.stores_approved_by_name} /></Col>
+                    <Col md="2" sm="6" xs="6"><Field label="Accounts Verified By" value={d.accounts_verified_by_name} /></Col>
                     <Col md="2" sm="6" xs="6"><Field label="GFA Posted By" value={d.gfa_posted_by_name} /></Col>
                     <Col md="2" sm="6" xs="6"><Field label="Rejected By" value={d.rejected_by_name} /></Col>
                 </Row>
@@ -946,11 +987,13 @@ function GFAVerificationView() {
                                         )}
                                     </td>
                                     <td style={{ padding: '4px', minWidth: 170 }}>
-                                        <Input type="select" bsSize="sm" value={item.cost_center_desc} disabled={!isActionable}
+                                        <Input type="select" bsSize="sm"
+                                            value={costCentreOptions.findIndex((opt) => String(opt.value) === String(item.cost_center_desc) && opt.cost_centre_code === item.cost_center)}
+                                            disabled={!isActionable}
                                             onChange={(e) => handleCostCentreChange(item.id, e.target.value)}>
-                                            <option value="">Select...</option>
-                                            {costCentreOptions.map((opt) => (
-                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                            <option value="-1">Select...</option>
+                                            {costCentreOptions.map((opt, idx) => (
+                                                <option key={idx} value={idx}>{opt.label}</option>
                                             ))}
                                         </Input>
                                     </td>
@@ -1028,13 +1071,13 @@ function GFAVerificationView() {
             {/* ── APPROVE / REJECT ACTIONS ────────────────────────────── */}
             {isActionable && (
                 <div className="d-flex justify-content-end" style={{ gap: 8, marginTop: 8 }}>
-                    <Button color="danger" disabled={submitting} onClick={openRejectModal}
+                    <Button color="danger" disabled={submitting || simulating} onClick={openRejectModal}
                         style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <XCircle size={16} /> Reject
                     </Button>
-                    <Button color="success" disabled={submitting} onClick={handleApprove}
+                    <Button color="primary" disabled={submitting || simulating} onClick={handleSimulate}
                         style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Check size={16} /> Approve
+                        <Check size={16} /> Simulate
                     </Button>
                 </div>
             )}
@@ -1064,6 +1107,75 @@ function GFAVerificationView() {
                     <Button color="secondary" size="sm" onClick={closeRejectModal}>Cancel</Button>
                     <Button color="danger" size="sm" disabled={submitting} onClick={handleRejectSubmit}>
                         Reject Payment
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* ── SAP SIMULATION MODAL ─────────────────────────────────── */}
+            <Modal show={simulateModalOpen} onHide={closeSimulateModal} centered size="lg">
+                <Modal.Header style={{ background: '#f8f9fa', borderBottom: '1px solid #dee2e6' }}>
+                    <Modal.Title style={{ fontSize: 16, fontWeight: 600, color: '#343a40' }}>
+                        SAP Posting Simulation
+                    </Modal.Title>
+                    <button type="button" className="close" onClick={closeSimulateModal}>
+                        <X size={18} />
+                    </button>
+                </Modal.Header>
+                <Modal.Body>
+                    <Row>
+                        <Col md="4" sm="6" xs="6"><Field label="Vendor Name" value={d.vendor_name} /></Col>
+                        <Col md="4" sm="6" xs="6"><Field label="Posting Date" value={formatDate(postingDate)} /></Col>
+                        <Col md="4" sm="6" xs="6"><Field label="Document Date" value={formatDate(invoiceDate)} /></Col>
+                    </Row>
+                    <Row>
+                        <Col md="4" sm="6" xs="6"><Field label="House Bank Id" value={d.house_bank_id} /></Col>
+                        <Col md="4" sm="6" xs="6"><Field label="House Bank AC No" value={d.house_bank_ac_no} /></Col>
+                        <Col md="4" sm="6" xs="6"><Field label="Business Area" value={d.business_area} /></Col>
+                    </Row>
+                    <hr style={{ margin: '4px 0 16px' }} />
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                            <thead>
+                                <tr style={{ background: '#eef3fc' }}>
+                                    {['Item', 'Account', 'Account Short Text', 'Amount'].map((col) => (
+                                        <th key={col} style={{
+                                            padding: '8px 10px', textAlign: col === 'Amount' ? 'right' : 'left',
+                                            fontWeight: 700, color: '#22315a', fontSize: 11,
+                                            textTransform: 'uppercase', letterSpacing: '0.03em',
+                                            borderBottom: '1px solid #dbe4f3',
+                                        }}>
+                                            {col}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {simulateRows.map((row, i) => (
+                                    <tr key={i} style={{ background: i % 2 ? '#f5f8fd' : '#fff' }}>
+                                        <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef1f6' }}>{i + 1}</td>
+                                        <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef1f6' }}>{row.VEN_GL}</td>
+                                        <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef1f6' }}>{row.TEXT}</td>
+                                        <td style={{ padding: '8px 10px', borderBottom: '1px solid #eef1f6', textAlign: 'right' }}>
+                                            {formatSapAmount(row.AMOUNT)}
+                                        </td>
+                                    </tr>
+                                ))}
+                                {!simulateRows.length && (
+                                    <tr>
+                                        <td colSpan={4} style={{ padding: 16, textAlign: 'center', color: '#8a94a6' }}>
+                                            No simulation data returned.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </Modal.Body>
+                <Modal.Footer style={{ background: '#f8f9fa', justifyContent: 'space-between' }}>
+                    <Button color="secondary" size="sm" onClick={closeSimulateModal}>Cancel</Button>
+                    <Button color="success" size="sm" disabled={submitting} onClick={handlePostFromSimulate}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Check size={14} /> Post
                     </Button>
                 </Modal.Footer>
             </Modal>

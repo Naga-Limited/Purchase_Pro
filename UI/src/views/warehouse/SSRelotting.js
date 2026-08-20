@@ -1,5 +1,5 @@
-import React, { Fragment, useState, useEffect } from 'react'
-import { Col, Button, ButtonGroup, Card, CardBody } from 'reactstrap'
+import React, { Fragment, useState, useEffect, useMemo, useRef } from 'react'
+import { Col, Button, ButtonGroup, Card, CardBody, Modal, ModalHeader, ModalBody, ModalFooter, FormGroup, Label, Input } from 'reactstrap'
 import Row from 'reactstrap/lib/Row'
 import { apiBaseUrl } from '../../urlConstants'
 import { CustomDropdownInput } from '../forms/custom-form'
@@ -7,11 +7,14 @@ import { useFormik } from "formik";
 import { Yup } from "../forms/custom-form";
 import { useLoader } from '../../utility/hooks/useLoader';
 import { apiPostMethod } from '../../helper/axiosHelper';
-import { errorToast } from '../../helper/appHelper';
+import { errorToast, ShowToast } from '../../helper/appHelper';
 import { CardComponent } from "../common/CardComponent";
 import TableComponent from "../common/TableComponent";
+import { DropdownControl } from "../../@core/components/dropdown";
+import confirmDialog from "../../@core/components/confirm/confirmDialog";
 import { ExportToCsv } from 'export-to-csv';
 import * as XLSX from 'xlsx';
+import JsBarcode from 'jsbarcode';
 import { Search, Trash2, Download, FileText, Printer, Package, Clock } from 'react-feather';
 
 const stockdetails = {
@@ -37,7 +40,48 @@ const stockdetails = {
   Rndreleasedqty: "",
 }
 
-const ssAuditTableColumns = [
+const escapeHtmlLabel = (v) =>
+  String(v ?? '—')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+const SS_MAX_LABELS_PER_PRINT = 500;
+
+/** Compact pipe-delimited payload so any Code128 scanner dumps every field as plain text on scan. */
+const buildSsBarcodeValue = (row, entryNo, seqLabel) => {
+  const parts = [
+    `WH:${row?.WH_CODE ?? '-'}`,
+    `PLANT:${row?.PLANT ?? '-'}`,
+    `LOC:${row?.STRO_LOC ?? '-'}`,
+    `BIN:${row?.BIN ?? '-'}`,
+    `MAT:${row?.MATERIAL_CODE ?? '-'}`,
+    `BATCH:${row?.BATCH ?? '-'}`,
+    `QTY:${row?.QUANTITY ?? '-'}`,
+    `ENTRY:${entryNo ?? '-'}`,
+    `SL:${seqLabel ?? '-'}`,
+  ];
+  return parts.join('|');
+};
+
+/** Renders a Code128 barcode into a detached SVG node so it can be serialized into the print window's HTML. */
+const SS_BARCODE_OPTS = {
+  format: 'CODE128',
+  displayValue: false,
+  fontSize: 9,
+  height: 48,
+  width:0.4,
+  margin: 2,
+};
+
+const buildSsBarcodeSvgMarkup = (value) => {
+  const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  JsBarcode(svgEl, value, SS_BARCODE_OPTS);
+  return svgEl.outerHTML;
+};
+
+const ssDataColumns = [
   { name: "S.No", width: "70px", sortable: false, cell: (row, index) => (index != null ? index + 1 : '-') },
   { name: "WH CODE", selector: "WH_CODE", sortable: true, minWidth: "100px", wrap: false },
   { name: "WH NAME", selector: "WH_NAME", minWidth: "200px", wrap: true, sortable: true },
@@ -58,6 +102,392 @@ const SsStockReportData = ({ form, onSubmit }) => {
   const [locationoption, setLocationoption] = useState([]);
   const [materialoption, setMaterialoption] = useState([]);
   const [lastFetchedAt, setLastFetchedAt] = useState(null);
+
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [printRow, setPrintRow] = useState(null);
+  const [printedQtyInput, setPrintedQtyInput] = useState("1");
+  const [entryNo, setEntryNo] = useState("");
+  const barcodePreviewRef = useRef(null);
+
+  const openPrintModal = (row) => {
+    setPrintRow(row);
+    setPrintedQtyInput("1");
+    setEntryNo(`SS${Date.now()}`);
+    setPrintModalOpen(true);
+  };
+
+  const closePrintModal = () => {
+    setPrintModalOpen(false);
+    setPrintRow(null);
+    setPrintedQtyInput("1");
+    setEntryNo("");
+  };
+
+  useEffect(() => {
+    if (!printModalOpen || !printRow || !barcodePreviewRef.current) return;
+    try {
+      JsBarcode(barcodePreviewRef.current, buildSsBarcodeValue(printRow, entryNo, "L1"), SS_BARCODE_OPTS);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [printModalOpen, printRow, entryNo]);
+
+  const [binModalOpen, setBinModalOpen] = useState(false);
+  const [binModalRow, setBinModalRow] = useState(null);
+  const [binOptions, setBinOptions] = useState([]);
+  const [selectedBinOption, setSelectedBinOption] = useState(null);
+  const [binQtyInput, setBinQtyInput] = useState("");
+  const [relottedRows, setRelottedRows] = useState([]);
+
+  const openBinModal = (row) => {
+    setBinModalRow(row);
+    setSelectedBinOption(null);
+    setBinQtyInput(row?.QUANTITY != null ? String(row.QUANTITY) : "");
+    setBinOptions([]);
+    setBinModalOpen(true);
+    apiPostMethod(apiBaseUrl + "marketdata/master/getLotsSAP", {
+      warehouseid: row?.WH_CODE,
+      plantId: row?.PLANT,
+      storagelocationid: row?.STRO_LOC,
+    })
+      .then((response) => {
+        const { data } = response;
+        if (data.success && Array.isArray(data.results)) setBinOptions(data.results);
+      })
+      .catch(() => errorToast("Failed to load bins for this location"));
+  };
+
+  const closeBinModal = () => {
+    setBinModalOpen(false);
+    setBinModalRow(null);
+    setBinOptions([]);
+    setSelectedBinOption(null);
+    setBinQtyInput("");
+  };
+
+  const [binSubmitting, setBinSubmitting] = useState(false);
+
+  const submitBinSelection = () => {
+    if (!binModalRow) return;
+    if (!selectedBinOption) {
+      errorToast("Please select a bin.");
+      return;
+    }
+    const maxQty = parseFloat(String(binModalRow.QUANTITY).replace(/,/g, ""));
+    const typedQty = parseFloat(String(binQtyInput).replace(/,/g, ""));
+    if (binQtyInput === "" || Number.isNaN(typedQty)) {
+      errorToast("Please enter a valid quantity.");
+      return;
+    }
+    if (typedQty <= 0) {
+      errorToast("Quantity must be greater than 0.");
+      return;
+    }
+    if (!Number.isNaN(maxQty) && typedQty > maxQty) {
+      errorToast(`Quantity cannot be greater than available quantity (${maxQty}).`);
+      return;
+    }
+
+    const newBin = selectedBinOption.label ?? selectedBinOption.value;
+    const uom = binModalRow.UOM ?? binModalRow.MEINS ?? "";
+
+    setBinSubmitting(true);
+    apiPostMethod(apiBaseUrl + "marketdata/master/submitRelot", {
+      row: {
+        wh_code: binModalRow.WH_CODE,
+        wh_name: binModalRow.WH_NAME,
+        material: binModalRow.MATERIAL_CODE,
+        material_name: binModalRow.MATERIAL_NAME,
+        plant: binModalRow.PLANT,
+        stoloc: binModalRow.STRO_LOC,
+        batch: binModalRow.BATCH,
+        quantity: typedQty,
+        uom,
+        from_lot: binModalRow.BIN,
+        to_lot: newBin,
+      },
+    })
+      .then((response) => {
+        const data = response?.data || {};
+        const historyRow = {
+          WH_CODE: binModalRow.WH_CODE,
+          WH_NAME: binModalRow.WH_NAME,
+          PLANT: binModalRow.PLANT,
+          STRO_LOC: binModalRow.STRO_LOC,
+          MATERIAL_CODE: binModalRow.MATERIAL_CODE,
+          MATERIAL_NAME: binModalRow.MATERIAL_NAME,
+          BATCH: binModalRow.BATCH,
+          UOM: uom,
+          OLD_BIN: binModalRow.BIN,
+          NEW_BIN: newBin,
+          QTY: typedQty,
+        };
+        if (data.success) {
+          ShowToast(data.message || "Submitted to SAP successfully");
+          setRelottedRows((prev) => [
+            ...prev,
+            { ...historyRow, SAP_STATUS: "SUBMITTED", SAP_MESSAGE: data.message || "", HISTORY_ID: data.id || null },
+          ]);
+          closeBinModal();
+        } else {
+          errorToast(data.message || "Failed to submit to SAP");
+          setRelottedRows((prev) => [...prev, { ...historyRow, SAP_STATUS: "FAILED", SAP_MESSAGE: data.message || "" }]);
+        }
+        
+      })
+      .catch(() => errorToast("Something went wrong, please try again after sometime"))
+      .finally(() => setBinSubmitting(false));
+  };
+
+  const [removingRelotIndex, setRemovingRelotIndex] = useState(-1);
+
+  const removeRelottedRow = (row, rowIndex) => {
+    confirmDialog({
+      title: "Are you sure you want to remove this bin selection?",
+      description: row?.SAP_STATUS === "SUBMITTED" ? "This was already submitted to SAP; the saved record will also be deleted." : undefined,
+    }).then((confirmed) => {
+      if (!confirmed) return;
+
+      if (row?.SAP_STATUS === "SUBMITTED" && row?.HISTORY_ID) {
+        setRemovingRelotIndex(rowIndex);
+        apiPostMethod(apiBaseUrl + "marketdata/master/deleteRelot", { id: row.HISTORY_ID })
+          .then((response) => {
+            const data = response?.data || {};
+            if (data.success) {
+              ShowToast(data.message || "Removed successfully");
+              setRelottedRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
+            } else {
+              errorToast(data.message || "Failed to remove on the backend");
+            }
+          })
+          .catch(() => errorToast("Something went wrong, please try again after sometime"))
+          .finally(() => setRemovingRelotIndex(-1));
+      } else {
+        setRelottedRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
+      }
+    });
+  };
+
+  const [submittingRelotIndex, setSubmittingRelotIndex] = useState(-1);
+
+  const submitRelotRow = (row, rowIndex) => {
+    setSubmittingRelotIndex(rowIndex);
+    apiPostMethod(apiBaseUrl + "marketdata/master/submitRelot", {
+      row: {
+        wh_code: row.WH_CODE,
+        wh_name: row.WH_NAME,
+        material: row.MATERIAL_CODE,
+        material_name: row.MATERIAL_NAME,
+        plant: row.PLANT,
+        stoloc: row.STRO_LOC,
+        batch: row.BATCH,
+        quantity: row.QTY,
+        uom: row.UOM,
+        from_lot: row.OLD_BIN,
+        to_lot: row.NEW_BIN,
+      },
+    })
+      .then((response) => {
+        const data = response?.data || {};
+        if (data.success) {
+          ShowToast(data.message || "Submitted to SAP successfully");
+          setRelottedRows((prev) =>
+            prev.map((r, idx) =>
+              idx === rowIndex ? { ...r, SAP_STATUS: "SUBMITTED", SAP_MESSAGE: data.message || "", HISTORY_ID: data.id || null } : r
+            )
+          );
+        } else {
+          errorToast(data.message || "Failed to submit to SAP");
+          setRelottedRows((prev) =>
+            prev.map((r, idx) => (idx === rowIndex ? { ...r, SAP_STATUS: "FAILED", SAP_MESSAGE: data.message || "" } : r))
+          );
+        }
+      })
+      .catch(() => errorToast("Something went wrong, please try again after sometime"))
+      .finally(() => setSubmittingRelotIndex(-1));
+  };
+
+  const relotColumns = useMemo(
+    () => [
+      { name: "S.No", width: "70px", sortable: false, cell: (row, index) => (index != null ? index + 1 : "-") },
+      { name: "WH CODE", selector: "WH_CODE", sortable: true, minWidth: "100px" },
+      { name: "PLANT", selector: "PLANT", sortable: true, minWidth: "100px" },
+      { name: "STRO LOC", selector: "STRO_LOC", sortable: true, minWidth: "100px" },
+      { name: "MATERIAL", selector: "MATERIAL_NAME", sortable: true, minWidth: "150px", wrap: true },
+      { name: "BATCH", selector: "BATCH", sortable: true, minWidth: "100px" },
+      { name: "OLD BIN", selector: "OLD_BIN", sortable: true, minWidth: "100px" },
+      { name: "NEW BIN", selector: "NEW_BIN", sortable: true, minWidth: "100px" },
+      { name: "QTY", selector: "QTY", sortable: true, minWidth: "100px" },
+      {
+        name: "SAP STATUS",
+        selector: "SAP_STATUS",
+        sortable: false,
+        minWidth: "110px",
+        center: true,
+        cell: (row) =>
+          row.SAP_STATUS === "SUBMITTED" ? (
+            <span className="badge badge-success">Submitted</span>
+          ) : row.SAP_STATUS === "FAILED" ? (
+            <span className="badge badge-danger" title={row.SAP_MESSAGE}>Failed</span>
+          ) : (
+            <span className="badge badge-secondary">Pending</span>
+          ),
+      },
+      {
+        name: "ACTIONS",
+        selector: "_relotActions",
+        sortable: false,
+        minWidth: "180px",
+        center: true,
+        cell: (row, index) => (
+          <div className="d-flex" style={{ gap: "0.4rem" }}>
+            <Button.Ripple
+              type="button"
+              color="success"
+              outline
+              size="sm"
+              disabled={row.SAP_STATUS === "SUBMITTED" || submittingRelotIndex === index}
+              onClick={() => submitRelotRow(row, index)}
+            >
+              {submittingRelotIndex === index ? "Submitting..." : "Submit"}
+            </Button.Ripple>
+            <Button.Ripple
+              type="button"
+              color="danger"
+              outline
+              size="sm"
+              disabled={submittingRelotIndex === index || removingRelotIndex === index}
+              onClick={() => removeRelottedRow(row, index)}
+            >
+              {removingRelotIndex === index ? "Removing..." : <Trash2 size={14} />}
+            </Button.Ripple>
+          </div>
+        ),
+      },
+    ],
+    [submittingRelotIndex, removingRelotIndex]
+  );
+
+  const runPrintLabel = () => {
+    if (!printRow) return;
+    const maxQty = parseFloat(String(printRow.QUANTITY).replace(/,/g, ""));
+    const labelCountParsed = parseInt(String(printedQtyInput).trim(), 10);
+    if (!Number.isFinite(labelCountParsed) || labelCountParsed < 1) {
+      errorToast("Please enter how many labels you need (at least 1).");
+      return;
+    }
+    if (!Number.isNaN(maxQty) && labelCountParsed > maxQty) {
+      errorToast(`Printed qty cannot be greater than available quantity (${maxQty}).`);
+      return;
+    }
+    if (labelCountParsed > SS_MAX_LABELS_PER_PRINT) {
+      errorToast(`You can print at most ${SS_MAX_LABELS_PER_PRINT} labels at once.`);
+      return;
+    }
+    const labelCount = labelCountParsed;
+
+    let labelsHtml = "";
+    try {
+      labelsHtml = Array.from({ length: labelCount }, (_, idx) => {
+        const seqLabel = `L${idx + 1}`;
+        const barcodeSvg = buildSsBarcodeSvgMarkup(buildSsBarcodeValue(printRow, entryNo, seqLabel));
+        return `<div class="label-wrap">
+      <div class="label-70x60">
+        <table class="label-table" role="table" aria-label="S&amp;S stock label details">
+          <thead>
+            <tr><th colspan="2">${escapeHtmlLabel(printRow.MATERIAL_CODE)} — ${escapeHtmlLabel(printRow.MATERIAL_NAME)}</th></tr>
+          </thead>
+          <tbody>
+            
+            <tr><th>Bin</th><td>${escapeHtmlLabel(printRow.BIN)}</td></tr>
+            <tr><th>Batch</th><td>${escapeHtmlLabel(printRow.BATCH)}</td></tr>
+            <tr><th>Quantity</th><td>${escapeHtmlLabel(printRow.QUANTITY)}</td></tr>
+            <tr><th>Entry No</th><td>${escapeHtmlLabel(entryNo)}</td></tr>
+            <tr><th>Serial No</th><td>${escapeHtmlLabel(seqLabel)}</td></tr>
+          </tbody>
+        </table>
+        <div class="label-barcode">${barcodeSvg}</div>
+      </div>
+    </div>`;
+      }).join("");
+    } catch (e) {
+      console.error(e);
+      errorToast("Could not generate barcode. Please try again.");
+      return;
+    }
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>S&amp;S Stock Label</title>
+    <style>
+    *{box-sizing:border-box;}
+    html,body{margin:0;padding:0;}
+    body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#111;background:#e5e7eb;padding:8px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .label-wrap{margin-bottom:12px;display:flex;justify-content:center;}
+    .label-70x60{width:70mm;height:60mm;max-width:70mm;max-height:60mm;margin:0 auto;background:#fff;overflow:hidden;padding-top:1mm;}
+    .label-table{width:100%;border-collapse:collapse;background:#fff;font-size:6.4pt;}
+    .label-table th,.label-table td{border:0.1mm solid #222;padding:0.8px 3px;text-align:left;vertical-align:middle;line-height:1.15;}
+    .label-table thead th{font-weight:800;padding:2px 4px;font-size:7.6pt;color:#0b1220;}
+    .label-table tbody th{width:19mm;color:#0b1220;font-weight:800;text-transform:uppercase;font-size:6.4pt;}
+    .label-table tbody td{color:#0b1220;font-weight:800;font-size:6.4pt;}
+    .label-barcode{margin-top:0.8mm;text-align:center;line-height:0;}
+    .label-barcode svg{width:auto;max-width:100%;height:15mm;}
+    @media print{
+    @page{margin:0;size:70mm 60mm;}
+    body{background:#fff;padding:0;}
+    .label-wrap{break-inside:avoid;page-break-after:always;margin-bottom:0;}
+    .label-wrap:last-child{page-break-after:auto;}
+    .label-table th,.label-table td{-webkit-print-color-adjust:exact;print-color-adjust:exact;color:#0b1220;}
+    }
+    </style></head><body>
+    ${labelsHtml}
+    </body></html>`;
+
+    const win = window.open("", "_blank", "width=360,height=460");
+    if (!win) {
+      errorToast("Please allow pop-ups to print.");
+      return;
+    }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    closePrintModal();
+    setTimeout(() => {
+      win.print();
+      win.close();
+    }, 250);
+  };
+
+  const tableColumns = useMemo(
+    () => [
+      ...ssDataColumns,
+      {
+        name: "PRINT",
+        selector: "_ssPrint",
+        sortable: false,
+        minWidth: "100px",
+        center: true,
+        cell: (row) => (
+          <Button.Ripple type="button" color="info" outline size="sm" onClick={() => openPrintModal(row)}>
+            <Printer size={14} className="mr-50" />
+            Print
+          </Button.Ripple>
+        ),
+      },
+      {
+        name: "Relotting Bin",
+        selector: "_ssBin",
+        sortable: false,
+        minWidth: "120px",
+        center: true,
+        cell: (row) => (
+          <Button.Ripple type="button" color="warning" outline size="sm" onClick={() => openBinModal(row)}>
+            Select Bin
+          </Button.Ripple>
+        ),
+      },
+    ],
+    []
+  );
 
   useEffect(() => {
     apiPostMethod(apiBaseUrl + "marketdata/master/getWarehousesByUserId", {})
@@ -249,8 +679,8 @@ const SsStockReportData = ({ form, onSubmit }) => {
       errorToast('No data to export. Run Show first.');
       return;
     }
-    const headers = ssAuditTableColumns.map((c) => c.name);
-    const keys = ssAuditTableColumns.map((c) => c.selector);
+    const headers = ssDataColumns.map((c) => c.name);
+    const keys = ssDataColumns.map((c) => c.selector);
     const options = {
       fieldSeparator: ',',
       quoteStrings: '"',
@@ -276,8 +706,8 @@ const SsStockReportData = ({ form, onSubmit }) => {
       errorToast('No data to export. Run Show first.');
       return;
     }
-    const keys = ssAuditTableColumns.map((c) => c.selector);
-    const headers = ssAuditTableColumns.map((c) => c.name);
+    const keys = ssDataColumns.map((c) => c.selector);
+    const headers = ssDataColumns.map((c) => c.name);
     const rows = [headers, ...list.map((row) => keys.map((k) => row[k] ?? ''))];
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -291,8 +721,8 @@ const SsStockReportData = ({ form, onSubmit }) => {
       errorToast('No data to export. Run Show first.');
       return;
     }
-    const keys = ssAuditTableColumns.map((c) => c.selector);
-    const headers = ssAuditTableColumns.map((c) => c.name);
+    const keys = ssDataColumns.map((c) => c.selector);
+    const headers = ssDataColumns.map((c) => c.name);
     const thead = '<tr>' + headers.map((h) => `<th style="border:1px solid #ddd;padding:6px;text-align:left">${escapeHtml(h)}</th>`).join('') + '</tr>';
     const rows = list.map((row, idx) => '<tr>' + keys.map((k, i) => `<td style="border:1px solid #ddd;padding:6px">${escapeHtml(String(k != null ? (row[k] ?? '') : (idx + 1)))}</td>`).join('') + '</tr>').join('');
     const tableHtml = '<table style="border-collapse:collapse;width:100%;font-size:12px"><thead>' + thead + '</thead><tbody>' + rows + '</tbody></table>';
@@ -458,7 +888,7 @@ const SsStockReportData = ({ form, onSubmit }) => {
         <CardBody className="p-0">
           {hasData ? (
             <div style={{ overflowX: 'auto', fontSize: '12px' }}>
-              <TableComponent columns={ssAuditTableColumns} data={checkList} />
+              <TableComponent columns={tableColumns} data={checkList} />
             </div>
           ) : (
             <div className="text-center py-5 text-muted" style={{ minHeight: '120px' }}>
@@ -468,6 +898,143 @@ const SsStockReportData = ({ form, onSubmit }) => {
           )}
         </CardBody>
       </Card>
+
+      {/* {relottedRows.length > 0 && (
+        <Card className="mt-2">
+          <CardBody className="p-0">
+            <h6 className="text-muted p-2 mb-0" style={{ fontSize: '0.85rem', fontWeight: 600 }}>Bin Selections</h6>
+            <div style={{ overflowX: 'auto', fontSize: '12px' }}>
+              <TableComponent columns={relotColumns} data={relottedRows} />
+            </div>
+          </CardBody>
+        </Card>
+      )} */}
+
+      <Modal isOpen={binModalOpen} toggle={closeBinModal} centered>
+        <ModalHeader toggle={closeBinModal}>Select Bin</ModalHeader>
+        <ModalBody>
+          {binModalRow && (
+            <>
+              <div className="mb-3" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                {[
+                  ['WH Code', binModalRow.WH_CODE],
+                  ['Plant', binModalRow.PLANT],
+                  ['Storage Location', binModalRow.STRO_LOC],
+                  ['Current Bin', binModalRow.BIN],
+                  ['Material', `${binModalRow.MATERIAL_CODE ?? '—'} - ${binModalRow.MATERIAL_NAME ?? '—'}`],
+                  ['Batch', binModalRow.BATCH],
+                  ['Available Qty', binModalRow.QUANTITY],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="d-flex justify-content-between"
+                    style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem', borderBottom: '1px solid #f1f5f9' }}
+                  >
+                    <span className="text-muted" style={{ fontWeight: 600 }}>{label}</span>
+                    <span style={{ fontWeight: 600 }}>{value ?? '—'}</span>
+                  </div>
+                ))}
+              </div>
+              <FormGroup>
+                <Label>New Bin</Label>
+                <DropdownControl
+                  options={binOptions}
+                  selectedValue={selectedBinOption}
+                  onDdlChange={(val) => setSelectedBinOption(val)}
+                  placeholder="Select bin"
+                />
+              </FormGroup>
+              <FormGroup>
+                <Label for="ss-bin-qty">
+                  Quantity <span className="text-muted font-weight-normal">(available {binModalRow.QUANTITY ?? '—'})</span>
+                </Label>
+                <Input
+                  id="ss-bin-qty"
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={binQtyInput}
+                  onChange={(e) => setBinQtyInput(e.target.value)}
+                  placeholder="e.g. 25"
+                />
+              </FormGroup>
+            </>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button color="secondary" outline onClick={closeBinModal} disabled={binSubmitting}>
+            Cancel
+          </Button>
+          <Button color="primary" onClick={submitBinSelection} disabled={binSubmitting}>
+            {binSubmitting ? "Submitting..." : "Submit"}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      <Modal isOpen={printModalOpen} toggle={closePrintModal} centered>
+        <ModalHeader toggle={closePrintModal}>Print Stock Label</ModalHeader>
+        <ModalBody>
+          {printRow && (
+            <>
+              <div className="mb-3" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                {[
+                  ['WH Code', printRow.WH_CODE],
+                  ['WH Name', printRow.WH_NAME],
+                  ['Plant', printRow.PLANT],
+                  ['Storage Location', printRow.STRO_LOC],
+                  ['Bin', printRow.BIN],
+                  ['Material', `${printRow.MATERIAL_CODE ?? '—'} - ${printRow.MATERIAL_NAME ?? '—'}`],
+                  ['Batch', printRow.BATCH],
+                  ['Available Qty', printRow.QUANTITY],
+                  ['Entry No', entryNo],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="d-flex justify-content-between"
+                    style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem', borderBottom: '1px solid #f1f5f9' }}
+                  >
+                    <span className="text-muted" style={{ fontWeight: 600 }}>{label}</span>
+                    <span style={{ fontWeight: 600 }}>{value ?? '—'}</span>
+                  </div>
+                ))}
+              </div>
+              <FormGroup>
+                <Label for="ss-print-qty">
+                  Printed Qty (No. of labels){" "}
+                  <span className="text-muted font-weight-normal">(available {printRow.QUANTITY ?? '—'})</span>
+                </Label>
+                <Input
+                  id="ss-print-qty"
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={printedQtyInput}
+                  onChange={(e) => setPrintedQtyInput(e.target.value)}
+                  placeholder="e.g. 5"
+                />
+                <small className="text-muted d-block mt-1">
+                  Each unit printed gets its own label, numbered Serial No L1, L2, L3…
+                </small>
+              </FormGroup>
+              <div className="text-center py-2" style={{ border: '1px dashed #cbd5e1', borderRadius: '8px' }}>
+                <svg ref={barcodePreviewRef}></svg>
+              </div>
+              <small className="text-muted d-block mt-2">
+                Scanning any printed barcode returns all label fields (WH, plant, location, bin, material, batch, entry no, serial no) as plain text.
+              </small>
+            </>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button color="secondary" outline onClick={closePrintModal}>
+            Cancel
+          </Button>
+          <Button color="primary" onClick={runPrintLabel}>
+            <Printer size={14} className="mr-50" />
+            Print
+          </Button>
+        </ModalFooter>
+      </Modal>
     </Fragment>
   );
 };

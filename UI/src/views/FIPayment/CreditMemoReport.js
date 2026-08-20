@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { useSelector } from 'react-redux';
 import { Card, CardHeader, CardBody, Row, Col, Button, FormGroup, Badge } from 'reactstrap';
 import { Modal } from 'react-bootstrap';
-import { ArrowDown, Eye, X } from 'react-feather';
+import { ArrowDown, Eye, X, FileText, File } from 'react-feather';
 import { HrLine } from '../common/HrLine';
 import { useFormik } from 'formik';
 import moment from 'moment';
@@ -19,6 +20,30 @@ const currency = (n) =>
 const dateCell = (field) => (row) => (row[field] ? moment(row[field]).format('DD-MMM-YYYY') : '-');
 const dateTimeCell = (field) => (row) => (row[field] ? moment(row[field]).format('DD-MMM-YYYY HH:mm') : '-');
 const recordTypeCell = (row) => (row.record_type === 'related_fi' ? 'Related to FI' : 'Non Related to FI');
+
+const formatDurationBreakdown = (ms) => {
+    if (ms == null || Number.isNaN(ms) || ms < 0) return '-';
+    let totalSeconds = Math.floor(ms / 1000);
+    const days = Math.floor(totalSeconds / 86400); totalSeconds %= 86400;
+    const hours = Math.floor(totalSeconds / 3600); totalSeconds %= 3600;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+};
+
+// Elapsed time from submission to the terminal event (GFA Verified/Completed
+// or Rejected) — or up to now for anything still in flight, same "how long
+// has this been going" convention as the pending-list screens' duration_days,
+// just with day/hour/minute/second granularity instead of whole days.
+const approvalDurationCell = (row) => {
+    if (!row.created_at) return '-';
+    const start = moment(row.created_at);
+    const status = Number(row.approval_status);
+    const end = status === 5 && row.gfa_posted_at ? moment(row.gfa_posted_at)
+        : status === 10 && row.rejected_at ? moment(row.rejected_at)
+        : moment();
+    return formatDurationBreakdown(end.diff(start));
+};
 
 // GetCreditMemoById returns one row per line item (header fields repeated) —
 // same flattening convention as CreditMemoGFAVerification.js/CreditMemoEdit.js.
@@ -57,6 +82,7 @@ const baseColumns = [
         minWidth: '190px',
         cell: (row) => <Badge color="primary">{row.approval_status_label}</Badge>,
     },
+    { name: 'Approval Duration', minWidth: '190px', cell: approvalDurationCell },
     { name: 'Credit Memo Type', selector: 'record_type', sortable: true, minWidth: '160px', cell: recordTypeCell },
     { name: 'FI Doc No', selector: 'fi_doc_no', sortable: true, minWidth: '130px' },
     { name: 'FI Doc Date', selector: 'fi_doc_date', sortable: true, minWidth: '130px', cell: dateCell('fi_doc_date') },
@@ -64,6 +90,7 @@ const baseColumns = [
     { name: 'Vendor Code', selector: 'vendor_code', sortable: true, minWidth: '120px' },
     { name: 'Vendor Name', selector: 'vendor_name', sortable: true, minWidth: '200px' },
     { name: 'Division', selector: 'division', sortable: true, minWidth: '100px' },
+    { name: 'Cost Centre', selector: 'cost_center', sortable: true, minWidth: '140px' },
     { name: 'Reason', selector: 'reason', sortable: true, minWidth: '160px' },
     { name: 'Memo No', selector: 'memo_no', sortable: true, minWidth: '130px' },
     { name: 'Memo Date', selector: 'memo_date', sortable: true, minWidth: '130px', cell: dateCell('memo_date') },
@@ -84,20 +111,38 @@ const baseColumns = [
     { name: 'Payment Voucher No', selector: 'payment_voucher_no', sortable: true, minWidth: '170px' },
     { name: 'UTR Number', selector: 'utr_number', sortable: true, minWidth: '150px' },
     { name: 'Manager Approved At', selector: 'mg_approved_at', sortable: true, minWidth: '170px', cell: dateTimeCell('mg_approved_at') },
+    { name: 'Manager Approved By', selector: 'mg_approved_by_name', sortable: true, minWidth: '160px' },
     { name: 'Store Acknowledged At', selector: 'stores_approved_at', sortable: true, minWidth: '180px', cell: dateTimeCell('stores_approved_at') },
+    { name: 'Store Acknowledged By', selector: 'stores_approved_by_name', sortable: true, minWidth: '170px' },
+    { name: 'Accounts Verified At', selector: 'accounts_verified_at', sortable: true, minWidth: '180px', cell: dateTimeCell('accounts_verified_at') },
+    { name: 'Accounts Verified By', selector: 'accounts_verified_by_name', sortable: true, minWidth: '170px' },
     { name: 'GFA Posted At', selector: 'gfa_posted_at', sortable: true, minWidth: '170px', cell: dateTimeCell('gfa_posted_at') },
+    { name: 'GFA Posted By', selector: 'gfa_posted_by_name', sortable: true, minWidth: '150px' },
     { name: 'Rejected At', selector: 'rejected_at', sortable: true, minWidth: '160px', cell: dateTimeCell('rejected_at') },
+    { name: 'Rejected By', selector: 'rejected_by_name', sortable: true, minWidth: '140px' },
     { name: 'Rejection Remarks', selector: 'rejection_remarks', sortable: true, minWidth: '220px' },
 ];
 
 function CreditMemoReport() {
     const { showLoader, hideLoader } = useLoader();
+    const UserDetails = useSelector((state) => (state && state.auth ? state.auth.userData : {}));
     const [reportData, setReportData] = useState([]);
 
     const [viewModalOpen, setViewModalOpen] = useState(false);
     const [viewLoading, setViewLoading] = useState(false);
     const [viewLineItems, setViewLineItems] = useState([]);
     const [viewHeader, setViewHeader] = useState(null);
+
+    // Invoice Copy / Back Paper "View" buttons — same viewed-tracking pattern
+    // as InvoiceReceiptStoreAck.js (turns green once opened).
+    const [viewedDocs, setViewedDocs] = useState({});
+    const openDocument = (row, docKey, url) => {
+        window.open(url, '_blank');
+        setViewedDocs((prev) => ({
+            ...prev,
+            [row.credit_memo_id]: { ...prev[row.credit_memo_id], [docKey]: true },
+        }));
+    };
 
     // The report row already carries every header field the report query
     // selects, so the modal's header section needs no extra fetch — only the
@@ -132,6 +177,30 @@ function CreditMemoReport() {
     const columns = [
         ...baseColumns,
         {
+            name: 'Invoice Copy',
+            minWidth: '130px',
+            cell: (row) => (
+                <Button color={viewedDocs[row.credit_memo_id]?.invoice ? 'success' : 'light'} size="sm"
+                    disabled={!row.invoice_copy}
+                    onClick={() => openDocument(row, 'invoice', row.invoice_copy)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <FileText size={14} /> View
+                </Button>
+            ),
+        },
+        {
+            name: 'Back Paper',
+            minWidth: '130px',
+            cell: (row) => (
+                <Button color={viewedDocs[row.credit_memo_id]?.backPaper ? 'success' : 'light'} size="sm"
+                    disabled={!row.back_paper}
+                    onClick={() => openDocument(row, 'backPaper', row.back_paper)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <File size={14} /> View
+                </Button>
+            ),
+        },
+        {
             name: 'Action',
             minWidth: '100px',
             cell: (row) => (
@@ -158,11 +227,14 @@ function CreditMemoReport() {
         const toDate = moment(date.end).format('YYYY-MM-DD');
 
         showLoader();
-        apiPostMethod(`${apiBaseUrl}CreditMemoController/GetCreditMemoReport`, { fromDate, toDate })
+        apiPostMethod(`${apiBaseUrl}CreditMemoController/GetCreditMemoReport`, { fromDate, toDate, userid: UserDetails.USERID })
             .then((response) => {
                 const { data } = response;
-                if (data?.success) {
-                    setReportData(data.results || []);
+                if (data?.success && data.results?.length) {
+                    setReportData(data.results);
+                } else if (data?.success) {
+                    errorToast('No records found for the selected date range');
+                    setReportData([]);
                 } else {
                     errorToast(data?.message || 'Unable to load Credit Memo report');
                     setReportData([]);
@@ -215,6 +287,7 @@ function CreditMemoReport() {
                                 <Col md="2" sm="6" xs="6"><Field label="Status" value={<Badge color="primary">{viewHeader.approval_status_label}</Badge>} /></Col>
                                 <Col md="2" sm="6" xs="6"><Field label="Credit Memo Type" value={recordTypeCell(viewHeader)} /></Col>
                                 <Col md="2" sm="6" xs="6"><Field label="Division" value={viewHeader.division} /></Col>
+                                <Col md="2" sm="6" xs="6"><Field label="Cost Centre" value={viewHeader.cost_center} /></Col>
                             </Row>
                             <Row>
                                 <Col md="2" sm="6" xs="6"><Field label="Vendor Code" value={viewHeader.vendor_code} /></Col>
