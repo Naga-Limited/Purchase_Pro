@@ -1,0 +1,71 @@
+name: Build and Deploy to ECS Fargate
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    name: Build, Push to ECR, and Deploy to ECS Fargate
+    runs-on: ubuntu-latest
+    environment: naga
+
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      COMMON_REF: main
+      SHARED_REF: main
+      ECR_REPOSITORY_PROD: ${{ secrets.ECR_REPOSITORY_PROD }}
+      ECS_CLUSTER_PROD: ${{ secrets.ECS_CLUSTER_PROD }}
+      ECS_SERVICE_PROD: ${{ secrets.ECS_SERVICE_PROD }}
+      TASK_DEFINITION_PROD: ${{ secrets.ECS_TASK_DEFINITION_PROD }}
+      CONTAINER_NAME_PROD: ${{ secrets.CONTAINER_NAME_PROD }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_ID }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Pin @naga/common + @naga/shared to env-matching ref  # digipro-pin-injected
+        # package.json pins a release/* ref for local installs; prod must build
+        # against #main (COMMON_REF/SHARED_REF=main) or it ships stale @naga types.
+        run: |
+          if jq -e '.dependencies."@naga/common"' package.json > /dev/null 2>&1; then
+            npm pkg set "dependencies.@naga/common=github:Naga-Limited/digipro-common#${COMMON_REF}"
+          fi
+          if jq -e '.dependencies."@naga/shared"' package.json > /dev/null 2>&1; then
+            npm pkg set "dependencies.@naga/shared=github:Naga-Limited/digipro-shared#${SHARED_REF}"
+          fi
+          echo "--- @naga deps after pin ---"
+          grep -E '"@naga/' package.json || true
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg GH_PAT=${{ secrets.GH_PAT }} \
+            -t $ECR_REPOSITORY_PROD:latest .
+          docker tag $ECR_REPOSITORY_PROD:latest \
+            ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY_PROD:latest
+
+      - name: Push Docker image to ECR
+        run: |
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY_PROD:latest
+      - name: Wait for ECR image to be fully available
+        run: sleep 30
+
+      - name: Force deploy to ECS Fargate
+        run: |
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER_PROD \
+            --service $ECS_SERVICE_PROD \
+            --force-new-deployment
